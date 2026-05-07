@@ -47,11 +47,6 @@ const steps: Step[] = [
   },
 ];
 
-function formatAddress(address?: string) {
-  if (!address) return 'Connect Wallet';
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
 function SidebarStep({
   step,
   isLast,
@@ -104,7 +99,7 @@ function SidebarStep({
 }
 
 export default function VerifyProofPage() {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
 
   return (
     <div className="min-h-screen bg-white">
@@ -120,10 +115,7 @@ export default function VerifyProofPage() {
           </div>
 
           {isConnected ? (
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              {formatAddress(address)}
-            </div>
+            <ConnectButton variant="header" />
           ) : (
             <ConnectButton variant="green" />
           )}
