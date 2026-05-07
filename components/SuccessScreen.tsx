@@ -1,149 +1,161 @@
-// 'use client';
+'use client';
 
-// import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
-// import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
-// import Link from 'next/link';
-// import { Address, isAddress } from 'viem';
-// import { useReadContract } from 'wagmi';
-// import { CheckCircle2, Copy } from 'lucide-react';
-// import { useGrantCreationStore } from '@/app/grants/new/store';
+import { GrantIdentity } from '@/app/grants/new/store';
+import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
+import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
+import { Check, Copy, Star } from 'lucide-react';
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { Address, isAddress } from 'viem';
+import { useReadContract } from 'wagmi';
 
-// type SuccessScreenProps = {
-//   grantId?: string;
-//   builderAddress: string;
-//   createHash?: string;
-// };
+type SuccessScreenProps = {
+  grantId: string;
+  builderAddress: string;
+  builderIdentity: GrantIdentity | null;
+  onCreateAnotherGrant: () => void;
+};
 
-// export default function SuccessScreen({ grantId, builderAddress, createHash }: SuccessScreenProps) {
-//   const canRead = isAddress(builderAddress) && Boolean(identityRegistryAbi);
-//   const { data } = useReadContract({
-//     abi: (identityRegistryAbi ?? []) as never,
-//     address: IDENTITY_REGISTRY_ADDRESS,
-//     functionName: 'getIdentity',
-//     args: canRead ? [builderAddress as Address] : undefined,
-//     query: { enabled: canRead },
-//   });
-  
-//   const { reset } = useGrantCreationStore();
+function shortAddress(addr: string) {
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
 
-//   type IdentityRow = readonly [boolean, string, number, number, bigint];
-//   const row = data as IdentityRow | undefined;
-//   const reputation = row ? row[4].toString() : '94.2';
-//   const zkVerified = row ? row[0] : false;
-//   const hasGrantLink = Boolean(grantId);
-//   const shareableUrl = hasGrantLink ? `${typeof window !== 'undefined' ? window.location.origin : ''}/grants/${grantId}` : '';
+function tierLabel(tier: number) {
+  if (tier >= 3) return 'Tier 3';
+  if (tier === 2) return 'Tier 2';
+  if (tier === 1) return 'Tier 1';
+  return 'Tier 0';
+}
 
-//   return (
-//     <div className="mx-auto flex w-full max-w-2xl flex-col items-center rounded-3xl bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-in fade-in slide-in-from-bottom-2 duration-500 sm:p-12">
-      
-//       {/* Header */}
-//       <div className="flex w-full items-center justify-between">
-//         <Link href="/" className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900">
-//           ← Back
-//         </Link>
-//         <span className="text-sm font-bold uppercase tracking-widest text-slate-400">Creation Complete</span>
-//       </div>
+export default function SuccessScreen({
+  grantId,
+  builderAddress,
+  builderIdentity,
+  onCreateAnotherGrant,
+}: SuccessScreenProps) {
+  const canReadIdentity = isAddress(builderAddress);
+  const { data } = useReadContract({
+    abi: identityRegistryAbi,
+    address: IDENTITY_REGISTRY_ADDRESS,
+    functionName: 'getIdentity',
+    args: canReadIdentity ? [builderAddress as Address] : undefined,
+    query: { enabled: canReadIdentity },
+  });
 
-//       {/* Success Illustration */}
-//       <div className="mb-8 mt-12 flex flex-col items-center text-center">
-//         <div className="relative flex h-24 w-24 items-center justify-center">
-//           <div className="absolute inset-0 max-w-full rounded-full bg-rose-500/20 blur-xl"></div>
-//           <CheckCircle2 className="relative h-20 w-20 text-rose-500" strokeWidth={1.5} />
-//         </div>
-//         <h2 className="mt-6 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Grant Successfully Created!</h2>
-//         <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-500">
-//           Your grant has been deployed to the GrantEscrow smart contract on Arbitrum One and is now live.
-//         </p>
-//       </div>
+  const freshIdentity = useMemo<GrantIdentity | null>(() => {
+    if (!data) return null;
+    return {
+      zkVerified: data[0],
+      githubHandle: data[1],
+      accountCreationYear: Number(data[2]),
+      contributionTier: Number(data[3]),
+      reputationScore: data[4],
+    };
+  }, [data]);
 
-//       {/* Grant ID & Link Section */}
-//       <div className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-5 shadow-inner">
-//         <div className="flex items-center justify-between">
-//           <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Grant ID</p>
-//           {grantId ? (
-//             <div className="flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-700">
-//               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-//               Confirmed
-//             </div>
-//           ) : (
-//              <div className="flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-700">
-//               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500"></span>
-//               Pending
-//             </div>
-//           )}
-//         </div>
-//         <div className="mt-2 text-2xl font-bold font-mono text-slate-900">
-//           {grantId ? `GRT-2026-${grantId.padStart(6, '0')}` : 'Indexing...'}
-//         </div>
-        
-//         {hasGrantLink && (
-//           <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
-//             <input 
-//               readOnly 
-//               value={shareableUrl} 
-//               className="w-full bg-transparent px-3 py-1.5 text-sm font-medium text-slate-600 outline-none"
-//             />
-//             <button 
-//               type="button" 
-//               onClick={() => navigator.clipboard.writeText(shareableUrl)} 
-//               className="flex items-center justify-center rounded-lg bg-slate-100 p-2 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-900"
-//             >
-//               <Copy className="h-4 w-4" />
-//             </button>
-//           </div>
-//         )}
-//       </div>
+  const identity = freshIdentity ?? builderIdentity;
+  const repScore = identity ? Number(identity.reputationScore).toFixed(1) : '0.0';
+  const github = identity?.githubHandle ? `@${identity.githubHandle}` : '@unknown';
+  const tier = tierLabel(identity?.contributionTier ?? 0);
+  const isVerified = Boolean(identity?.zkVerified);
+  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/grants/${grantId}` : `/grants/${grantId}`;
 
-//       {/* Builder Identity Card */}
-//       <div className="mt-6 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-//         <div className="h-1.5 w-full bg-linear-to-r from-rose-500 via-teal-500 to-amber-500"></div>
-//         <div className="p-5">
-//           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-//              <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Builder Identity Verified</p>
-//              <ZKVerifiedBadge verified={zkVerified || true} />
-//           </div>
-//           <div className="mt-5 flex items-center gap-4">
-//              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-lg font-bold text-slate-700">
-//                 {builderAddress.slice(2, 4).toUpperCase()}
-//              </div>
-//              <div className="flex flex-col">
-//                 <span className="font-bold text-slate-900">{builderAddress.slice(0, 10)}...{builderAddress.slice(-8)}</span>
-//                 <span className="mt-0.5 text-sm font-medium text-slate-500">Rep Score: <span className="font-bold text-slate-700">{reputation}</span></span>
-//              </div>
-//           </div>
-//         </div>
-//       </div>
-      
-//       {createHash && (
-//          <div className="mt-6 flex w-full justify-center">
-//            <a href={`https://arbiscan.io/tx/${createHash}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-blue-600 hover:underline hover:text-blue-700">
-//              View transaction on Arbiscan ↗
-//            </a>
-//          </div>
-//       )}
+  return (
+    <main className="mx-auto w-full max-w-[760px] px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mb-5 flex items-center justify-between px-1 text-xs font-medium text-slate-400 sm:text-sm">
+        <Link href="/" className="text-slate-400 transition hover:text-slate-600">
+          ← Back to Dashboard
+        </Link>
+        <span>Grant Creation Complete</span>
+      </div>
 
-//       {/* Action Buttons */}
-//       <div className="mt-8 flex w-full flex-col gap-3 sm:flex-row">
-//         {hasGrantLink ? (
-//           <Link
-//             href={`/grants/${grantId}`}
-//             className="flex flex-1 items-center justify-center rounded-xl bg-[#FF5C35] px-6 py-3.5 text-sm font-bold text-white shadow-md transition-all hover:bg-[#E84E29] hover:shadow-lg focus:ring-4 focus:ring-rose-500/20"
-//           >
-//             View Grant →
-//           </Link>
-//         ) : (
-//           <button disabled className="flex flex-1 items-center justify-center rounded-xl bg-slate-200 px-6 py-3.5 text-sm font-bold text-slate-400">
-//             View Grant (Wait...)
-//           </button>
-//         )}
-//         <button
-//           onClick={reset}
-//           type="button"
-//           className="flex flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
-//         >
-//           Create Another Grant
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
+      <section className="rounded-xl border border-slate-200 bg-white px-4 py-6 shadow-[0_10px_30px_rgba(15,23,42,0.05)] sm:px-8 sm:py-9">
+        <div className="mx-auto flex w-full max-w-[420px] flex-col items-center text-center">
+          <div className="relative mb-5 flex h-20 w-20 items-center justify-center">
+            <span className="absolute inset-0 rounded-full bg-rose-100/90" />
+            <span className="absolute inset-2 rounded-full bg-rose-50" />
+            <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#ff6b4a] text-white">
+              <Check className="h-4 w-4" strokeWidth={3} />
+            </span>
+          </div>
+
+          <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-slate-900">
+            Grant Successfully Created!
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Your grant has been deployed to the GrantEscrow smart contract on Arbitrum One and is now
+            live.
+          </p>
+        </div>
+
+        <div className="mx-auto mt-6 w-full max-w-[420px] rounded-lg border border-slate-200 bg-slate-50 p-3.5">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Grant ID</p>
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+              Confirmed
+            </span>
+          </div>
+          <p className="font-mono text-base font-semibold text-slate-900">GRT-2026-{grantId}</p>
+
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left font-mono text-[11px] text-slate-500">
+              <span className="block truncate">{shareUrl}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(shareUrl).catch(() => {})}
+              className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-5 w-full max-w-[420px] overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="h-1 w-full bg-linear-to-r from-cyan-500 via-amber-500 to-teal-500" />
+          <div className="px-3.5 py-3.5">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2">
+              <p className="text-xs font-semibold text-slate-700">Builder Identity Verified</p>
+              <ZKVerifiedBadge verified={isVerified} />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                {builderAddress.slice(2, 4).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{shortAddress(builderAddress)}</p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                  <span className="inline-flex items-center gap-1">
+                    <Star className="h-3 w-3 text-amber-500" fill="currentColor" />
+                    {repScore}
+                  </span>
+                  <span>{github}</span>
+                  <span>{tier}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-6 flex w-full max-w-[420px] flex-col gap-2.5 sm:flex-row">
+          <Link
+            href={`/grants/${grantId}`}
+            className="inline-flex flex-1 items-center justify-center rounded-md bg-[#ff5b37] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#f04f29]"
+          >
+            View Grant →
+          </Link>
+          <button
+            type="button"
+            onClick={onCreateAnotherGrant}
+            className="inline-flex flex-1 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Create Another Grant
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}

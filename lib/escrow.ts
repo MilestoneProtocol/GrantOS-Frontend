@@ -23,6 +23,42 @@ export const identityRegistryAbi = [
   },
 ] as const satisfies Abi;
 
+/**
+ * Read-only GrantEscrow shape aligned with `createGrant` inputs plus `createdAt`.
+ * Override this fragment if your deployed contract differs.
+ */
+export const grantEscrowReadAbi = [
+  {
+    type: 'function',
+    name: 'getGrant',
+    stateMutability: 'view',
+    inputs: [{ name: 'grantId', type: 'uint256' }],
+    outputs: [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'builder', type: 'address' },
+          { name: 'streaming', type: 'bool' },
+          { name: 'committee', type: 'address[]' },
+          { name: 'quorum', type: 'uint256' },
+          { name: 'createdAt', type: 'uint256' },
+          {
+            type: 'tuple[]',
+            name: 'milestones',
+            components: [
+              { name: 'title', type: 'string' },
+              { name: 'description', type: 'string' },
+              { name: 'amount', type: 'uint256' },
+              { name: 'deadline', type: 'uint256' },
+              { name: 'proofType', type: 'uint8' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+] as const satisfies Abi;
+
 export const grantEscrowAbi: Abi | undefined = undefined;
 
 export const CONTRACTS_READY = Boolean(grantEscrowAbi);

@@ -5,6 +5,7 @@ import PaymentModeStep from '@/app/grants/new/steps/PaymentMode';
 import ReviewConfirm from '@/app/grants/new/steps/ReviewConfirm';
 import MilestoneDefinition from '@/app/grants/new/steps/MilestoneDefinition';
 import CommitteeSetup from '@/app/grants/new/steps/CommitteeSetup';
+import SuccessScreen from '@/components/SuccessScreen';
 import {
   GrantIdentity,
   MilestoneInput,
@@ -69,6 +70,9 @@ export default function CreateGrantPage() {
     setPaymentMode,
     grantName,
     category,
+    setCreatedTxHash,
+    setCreatedGrantId,
+    createdGrantId,
   } = useGrantCreationStore();
 
   const stepError = useMemo(() => {
@@ -127,6 +131,11 @@ export default function CreateGrantPage() {
   const isCommitteeStep = currentStep === 2;
   const isPaymentStep = currentStep === 3;
   const isReviewStep = currentStep === 4;
+  const isSuccessStep = currentStep === 5;
+  const resolvedGrantId = useMemo(() => {
+    if (createdGrantId) return createdGrantId;
+    return builderAddress ? builderAddress.slice(2, 8).toUpperCase() : '000000';
+  }, [builderAddress, createdGrantId]);
   const handleIdentityLoaded = useCallback(
     (identity: GrantIdentity | null) => {
       setBuilderIdentity(identity);
@@ -261,6 +270,14 @@ export default function CreateGrantPage() {
         </div>
       </header>
 
+      {isSuccessStep ? (
+        <SuccessScreen
+          grantId={resolvedGrantId}
+          builderAddress={builderAddress}
+          builderIdentity={builderIdentity}
+          onCreateAnotherGrant={() => reset()}
+        />
+      ) : (
       <main className="mx-auto w-full max-w-[820px] px-5 py-8 pb-24 sm:px-8 sm:py-10 md:pb-10 lg:px-10">
         {currentStep === 0 ? (
           <div className="mb-6 flex items-start justify-between gap-4">
@@ -384,6 +401,8 @@ export default function CreateGrantPage() {
                 onBack={() => setStep(3)}
                 onSuccess={(hash) => {
                   console.log('Grant created:', hash);
+                  setCreatedTxHash(hash as `0x${string}`);
+                  setCreatedGrantId(hash.slice(2, 8).toUpperCase());
                   setStep(5);
                 }}
               />
@@ -444,7 +463,9 @@ export default function CreateGrantPage() {
           ) : null}
         </section>
       </main>
+      )}
 
+      {!isSuccessStep ? (
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/90 bg-white/95 px-4 py-2 backdrop-blur md:hidden">
         <div className="grid grid-cols-3 gap-2">
           {headerLinks.map(({ label, href, icon: Icon }) => (
@@ -459,6 +480,7 @@ export default function CreateGrantPage() {
           ))}
         </div>
       </nav>
+      ) : null}
     </div>
   );
 }

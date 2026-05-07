@@ -1,198 +1,546 @@
-// import Link from 'next/link';
-// import { ArrowLeft, CheckCircle2, Lock, ShieldCheck, Wallet, Settings, ShieldAlert, Award, FileText } from 'lucide-react';
-// import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
+'use client';
 
-// type GrantDetailPageProps = {
-//   params: Promise<{ id: string }>;
-// };
+import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
+import ConnectButton from '@/components/ConnectButton';
+import {
+  GRANT_ESCROW_ADDRESS,
+  grantEscrowReadAbi,
+  IDENTITY_REGISTRY_ADDRESS,
+  identityRegistryAbi,
+} from '@/lib/escrow';
+import { USDC_DECIMALS } from '@/lib/usdc';
+import {
+  ArrowLeft,
+  ChevronRight,
+  Clock,
+  Copy,
+  Gavel,
+  Check,
+  Lock,
+  ThumbsUp,
+  PenLine,
+  ExternalLink,
+  UserRound,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
+import { formatUnits, type Address } from 'viem';
+import { useAccount, useReadContract } from 'wagmi';
 
-// export default async function GrantDetailPage({ params }: GrantDetailPageProps) {
-//   const { id } = await params;
+function parseGrantIdFromPath(raw: string): bigint | undefined {
+  const trimmed = decodeURIComponent(raw).trim();
+  if (!trimmed) return undefined;
 
-//   return (
-//     <div className="min-h-screen bg-[#FBFCFD] p-6 font-sans lg:p-12">
-//       <div className="mx-auto max-w-6xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-        
-//         {/* Header */}
-//         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-//           <div className="flex items-center gap-4">
-//             <Link href="/" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm transition-transform hover:scale-105">
-//               <ArrowLeft className="h-5 w-5 text-slate-700" />
-//             </Link>
-//             <div className="h-6 w-px bg-slate-200"></div>
-//             <h1 className="text-xl font-bold tracking-tight text-slate-900">GrantOS v3</h1>
-//           </div>
-//           <div className="flex items-center gap-3">
-//             <span className="font-mono text-sm font-bold uppercase text-slate-500">Grant #{id.padStart(4, '0')}</span>
-//             <div className="flex items-center gap-1.5 rounded-full bg-teal-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-teal-700">
-//               <span className="h-2 w-2 animate-pulse rounded-full bg-teal-500"></span>
-//               Active
-//             </div>
-//           </div>
-//         </div>
+  let s = trimmed;
+  const grit = /^GRT-\d{4}-(.+)$/i.exec(s);
+  if (grit) s = grit[1]!;
 
-//         <div className="flex flex-col items-start gap-8 lg:flex-row">
-          
-//           {/* Main Content (Left Column) */}
-//           <div className="w-full space-y-6 lg:w-2/3">
-            
-//             {/* Title & Meta */}
-//             <div className="space-y-3">
-//               <h2 className="text-4xl font-black tracking-tight text-[#1B1B1B]">DeFi Aggregator Protocol</h2>
-//               <p className="text-sm font-medium text-slate-500">
-//                 Created on {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} • {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
-//               </p>
-//             </div>
+  if (/^\d+$/.test(s)) {
+    try {
+      return BigInt(s);
+    } catch {
+      return undefined;
+    }
+  }
 
-//             {/* Builder Details */}
-//             <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-//               <div className="flex items-center gap-4">
-//                 <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-100 bg-slate-50">
-//                   <Wallet className="h-6 w-6 text-slate-400" />
-//                 </div>
-//                 <div>
-//                   <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Primary Recipient</p>
-//                   <p className="mt-0.5 font-mono text-sm font-bold text-slate-700">0x71C...976F</p>
-//                 </div>
-//               </div>
-//               <ZKVerifiedBadge verified={true} />
-//             </div>
+  const hex = s.startsWith('0x') || s.startsWith('0X') ? s : `0x${s}`;
+  try {
+    if (/^0x[0-9a-f]*$/i.test(hex) && hex.length > 2) return BigInt(hex);
+  } catch {
+    /* fallthrough */
+  }
+  return undefined;
+}
 
-//             {/* Milestone Progress */}
-//             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-//               <h3 className="mb-6 text-lg font-bold text-slate-900">Milestone Pipeline</h3>
-              
-//               <div className="relative space-y-8 before:absolute before:inset-0 before:-translate-x-px before:ml-5 before:h-full before:w-0.5 before:bg-slate-200 md:before:mx-auto md:before:translate-x-0">
-                
-//                 {/* Completed */}
-//                 <div className="group is-active relative flex items-start justify-between md:justify-normal md:odd:flex-row-reverse">
-//                   <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 border-white bg-teal-500 shadow md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2">
-//                     <CheckCircle2 className="h-5 w-5 text-white" />
-//                   </div>
-//                   <div className="relative w-[calc(100%-4rem)] rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm md:w-[calc(50%-2.5rem)]">
-//                     <div className="absolute right-4 top-4 text-xs font-bold text-slate-400">12,500 USDC</div>
-//                     <div className="mb-2 flex items-center gap-2">
-//                        <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-teal-700">Completed Oct 28</span>
-//                     </div>
-//                     <h4 className="font-bold text-slate-900">Architecture Specification</h4>
-//                     <p className="mt-2 text-sm text-slate-500">Delivery of detailed smart contract diagrams and security models.</p>
-//                   </div>
-//                 </div>
+function shortenAddress(addr: string) {
+  if (!addr || addr.length < 10) return addr || '—';
+  return `${addr.slice(0, 5)}...${addr.slice(-4)}`;
+}
 
-//                 {/* Current */}
-//                 <div className="group is-active relative flex items-start justify-between md:justify-normal md:odd:flex-row-reverse">
-//                   <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 border-white bg-[#F97316] shadow-md md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2">
-//                     <span className="h-3 w-3 rounded-full bg-white"></span>
-//                   </div>
-//                   <div className="relative w-[calc(100%-4rem)] rounded-2xl border-2 border-[#F97316] bg-white p-5 shadow-md md:w-[calc(50%-2.5rem)]">
-//                     <div className="absolute right-4 top-4 text-sm font-black text-[#F97316]">20,000 USDC</div>
-//                     <div className="mb-2 flex items-center gap-2">
-//                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-orange-700">In Progress</span>
-//                     </div>
-//                     <h4 className="text-lg font-bold text-slate-900">Smart Contract Alpha V1</h4>
-//                     <p className="mb-4 mt-2 text-sm text-slate-600">Initial deployment of core lending logic on Arbitrum Sepolia.</p>
-//                     <button disabled className="flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-400">
-//                        Submit Proof (Coming soon)
-//                     </button>
-//                   </div>
-//                 </div>
+function escrowAddressDisplay(addr: Address) {
+  const a = `${addr}`;
+  return `${a.slice(0, 7)}…${a.slice(-4)}`;
+}
 
-//                 {/* Locked */}
-//                 <div className="group is-active relative flex items-start justify-between md:justify-normal md:odd:flex-row-reverse">
-//                   <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 border-white bg-slate-200 shadow-sm md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2">
-//                     <Lock className="h-4 w-4 text-slate-400" />
-//                   </div>
-//                   <div className="relative w-[calc(100%-4rem)] rounded-2xl border border-slate-100 bg-slate-50 p-5 opacity-70 md:w-[calc(50%-2.5rem)]">
-//                     <div className="absolute right-4 top-4 text-xs font-bold text-slate-400">17,500 USDC</div>
-//                      <div className="mb-2 flex items-center gap-2">
-//                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Locked</span>
-//                     </div>
-//                     <h4 className="font-bold text-slate-500">Mainnet Audit & Launch</h4>
-//                     <p className="mt-2 text-sm text-slate-400">Third-party audit completion and final deployment.</p>
-//                   </div>
-//                 </div>
+function formatUsdcLabel(amountWei: bigint) {
+  const n = Number(formatUnits(amountWei, USDC_DECIMALS));
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 
-//               </div>
-//             </div>
+function milestoneVisualState(
+  index: number,
+  total: number
+): 'done' | 'active' | 'locked' {
+  if (total <= 0) return 'locked';
+  if (total === 1) return index === 0 ? 'active' : 'locked';
+  if (index === 0) return 'done';
+  if (index === 1) return 'active';
+  return 'locked';
+}
 
-//           </div>
+export default function GrantDetailPage() {
+  const params = useParams<{ id: string }>();
+  const routeId = params?.id ?? '';
+  const numericGrantId = useMemo(() => parseGrantIdFromPath(routeId), [routeId]);
+  const { chain, isConnected } = useAccount();
 
-//           {/* Sidebar (Right Column) */}
-//           <div className="w-full space-y-6 lg:w-1/3">
-             
-//              {/* Total Allocation Card */}
-//              <div className="rounded-3xl bg-[#1B1B1B] p-6 text-white shadow-xl">
-//                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Grant Allocation</p>
-//                <p className="mt-2 text-4xl font-black tracking-tight">50,000 <span className="text-xl text-[#FF5C35]">USDC</span></p>
-               
-//                <div className="mb-2 mt-6 flex items-center justify-between text-xs font-bold">
-//                  <span className="text-teal-400">12,500 Disbursed</span>
-//                  <span className="text-slate-500">25%</span>
-//                </div>
-//                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
-//                  <div className="h-full w-1/4 rounded-full bg-teal-500"></div>
-//                </div>
-//              </div>
+  const enabled = numericGrantId !== undefined;
 
-//              {/* Configuration Card */}
-//              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-//                <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-slate-400">Configuration</h3>
-//                <ul className="space-y-4">
-//                  <li className="flex items-start gap-4">
-//                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50">
-//                      <Settings className="h-4 w-4 text-indigo-500" />
-//                    </div>
-//                    <div>
-//                      <p className="text-sm font-bold text-slate-900">Payment Mode</p>
-//                      <p className="text-xs font-medium text-slate-500">Milestone-based</p>
-//                    </div>
-//                  </li>
-//                  <li className="flex items-start gap-4">
-//                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50">
-//                      <ShieldCheck className="h-4 w-4 text-amber-500" />
-//                    </div>
-//                    <div>
-//                      <p className="text-sm font-bold text-slate-900">Committee Constraints</p>
-//                      <p className="text-xs font-medium text-slate-500">5 Members (3/5 Approvals Required)</p>
-//                    </div>
-//                  </li>
-//                  <li className="flex items-start gap-4">
-//                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-//                      <FileText className="h-4 w-4 text-blue-500" />
-//                    </div>
-//                    <div>
-//                      <p className="text-sm font-bold text-slate-900">Smart Contract</p>
-//                      <a href="#" className="text-xs font-medium text-blue-600 hover:underline">0x81B2...A149 ↗</a>
-//                    </div>
-//                  </li>
-//                </ul>
-//              </div>
+  const {
+    data: grantData,
+    isLoading: grantLoading,
+    isError: grantError,
+  } = useReadContract({
+    address: GRANT_ESCROW_ADDRESS,
+    abi: grantEscrowReadAbi,
+    functionName: 'getGrant',
+    args: enabled ? [numericGrantId] : undefined,
+    query: { enabled },
+  });
 
-//              {/* Actions Card */}
-//              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-//                <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-slate-400">Committee Actions</h3>
-//                <div className="space-y-3">
-//                  <button className="flex w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-4 text-left transition-colors hover:border-slate-200 hover:bg-slate-100">
-//                    <div className="flex items-center gap-3">
-//                      <Award className="h-5 w-5 text-slate-400" />
-//                      <span className="text-sm font-bold text-slate-700">Approve Payment</span>
-//                    </div>
-//                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-slate-400">Coming soon</span>
-//                  </button>
-//                  <button className="flex w-full items-center justify-between rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-left transition-colors hover:border-rose-200 hover:bg-rose-50">
-//                    <div className="flex items-center gap-3">
-//                      <ShieldAlert className="h-5 w-5 text-rose-400" />
-//                      <span className="text-sm font-bold text-rose-700">Slash Grant</span>
-//                    </div>
-//                    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-slate-400">Coming soon</span>
-//                  </button>
-//                </div>
-//              </div>
+  const builderAddress = grantData?.builder as Address | undefined;
 
-//           </div>
+  const { data: identityData } = useReadContract({
+    address: IDENTITY_REGISTRY_ADDRESS,
+    abi: identityRegistryAbi,
+    functionName: 'getIdentity',
+    args: builderAddress ? [builderAddress] : undefined,
+    query: { enabled: Boolean(builderAddress) },
+  });
 
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
+  const zkVerified = Boolean(identityData?.[0]);
+
+  const milestones = useMemo(() => grantData?.milestones ?? [], [grantData]);
+
+  const totalAllocationWei = useMemo(
+    () => milestones.reduce((sum, m) => sum + m.amount, BigInt(0)),
+    [milestones]
+  );
+
+  const disbursedWei = useMemo(() => {
+    if (milestones.length === 0) return BigInt(0);
+    let sum = BigInt(0);
+    for (let i = 0; i < milestones.length; i++) {
+      if (milestoneVisualState(i, milestones.length) === 'done') sum += milestones[i]!.amount;
+    }
+    return sum;
+  }, [milestones]);
+
+  const disbursedPercent =
+    totalAllocationWei > BigInt(0)
+      ? Math.min(
+          100,
+          Number((disbursedWei * BigInt(100)) / totalAllocationWei)
+        )
+      : 0;
+
+  const createdAtTs = grantData?.createdAt;
+  const createdDate =
+    typeof createdAtTs === 'bigint' && createdAtTs > BigInt(0)
+      ? new Date(Number(createdAtTs) * 1000)
+      : null;
+
+  const grantLabel = useMemo(() => {
+    if (numericGrantId === undefined) return routeId ? routeId.slice(0, 16) : '—';
+    if (numericGrantId <= BigInt(Number.MAX_SAFE_INTEGER)) {
+      return numericGrantId.toString();
+    }
+    return `#${numericGrantId.toString(16).slice(0, 8)}`.toUpperCase();
+  }, [numericGrantId, routeId]);
+
+  const grantHeading = useMemo(() => {
+    if (grantLoading) return 'Loading grant…';
+    if (grantError) return `Grant · ${grantLabel}`;
+    const titled = milestones.find((m) => m.title.trim())?.title;
+    return titled || 'Grant program';
+  }, [grantError, grantLabel, grantLoading, milestones]);
+
+  const paymentModeLabel = grantData?.streaming ? 'Streaming' : 'Milestone-based';
+
+  const committee = grantData?.committee ?? [];
+
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f7f9fb] text-slate-900">
+      <header className="border-b border-slate-200/90 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 lg:px-8">
+          <Link href="/" className="flex min-w-0 items-center gap-2 text-[#ff6a00]">
+            <ArrowLeft className="h-5 w-5 shrink-0 stroke-[2.25]" />
+            <span className="truncate text-base font-semibold md:text-[1.05rem]">GrantOS v3</span>
+          </Link>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div className="hidden min-[375px]:inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 sm:text-xs">
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  aria-hidden
+                />
+                {chain?.name ?? 'Arbitrum One'}
+              </div>
+            <ConnectButton variant="avatar" />
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:pb-12">
+        {!enabled ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Invalid grant id in URL. Expected a numeric id, hex id, or <code>GRT-2026-…</code> slug.
+          </p>
+        ) : null}
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:gap-8">
+          <div className="min-w-0 space-y-5">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="inline-flex shrink-0 items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white bg-teal-500">
+                  Active
+                </span>
+                <span className="text-sm font-normal text-slate-500">
+                  Grant #{grantLoading ? '…' : grantError ? routeId.slice(0, 12) : grantLabel}
+                </span>
+              </div>
+
+              <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-[1.85rem] md:text-[2rem] lg:text-[2.1rem]">
+                {grantHeading}
+              </h1>
+
+              <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-slate-500">
+                <Clock className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.75} />
+                {grantLoading ? (
+                  'Fetching creation date…'
+                ) : grantError ? (
+                  'Could not load grant from chain.'
+                ) : createdDate ? (
+                  <>
+                    Created on{' '}
+                    {createdDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}{' '}
+                    ·{' '}
+                    {createdDate.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                      timeZoneName: 'short',
+                    })}
+                  </>
+                ) : (
+                  'Creation time not indexed'
+                )}
+              </p>
+
+              {!grantLoading && enabled && grantError ? (
+                <p className="text-xs leading-relaxed text-slate-500">
+                  Confirm <code className="text-[11px]">NEXT_PUBLIC_GRANT_ESCROW_ADDRESS</code> matches
+                  your deployment and that <code className="text-[11px]">getGrant(uint256)</code> matches{' '}
+                  <code className="text-[11px]">lib/escrow.ts grantEscrowReadAbi</code>.
+                </p>
+              ) : null}
+            </div>
+
+            <section className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:p-6">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Builder details
+              </h2>
+              <div className="mt-3 rounded-lg border border-slate-100 bg-[#fafbfc] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ff6a00] text-white shadow-sm">
+                      <UserRound className="h-5 w-5" strokeWidth={2} aria-hidden />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold tracking-tight text-slate-900">
+                          {builderAddress ? shortenAddress(builderAddress) : '—'}
+                        </span>
+                        {builderAddress ? (
+                          <button
+                            type="button"
+                            onClick={() => copyText(builderAddress)}
+                            className="inline-flex shrink-0 items-center text-slate-400 transition hover:text-slate-600"
+                            aria-label="Copy wallet address"
+                          >
+                            <Copy className="h-4 w-4" strokeWidth={1.75} />
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-sm text-slate-500">Primary Recipient</p>
+                    </div>
+                  </div>
+                  <ZKVerifiedBadge verified={zkVerified} />
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:p-6">
+              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  Milestone progress ({milestones.length} total)
+                </h2>
+                <p className="text-[11px] font-medium text-slate-500 sm:text-right">
+                  Escrowed:{' '}
+                  <span className="font-semibold text-slate-700">
+                    {grantLoading ? '…' : formatUsdcLabel(totalAllocationWei)} USDC
+                  </span>
+                </p>
+              </div>
+
+              <div className="relative space-y-0 pl-[18px] sm:pl-[22px]">
+                <span
+                  className="absolute left-[17px] top-2 bottom-2 w-[2px] -translate-x-1/2 bg-slate-200 sm:left-[21px]"
+                  aria-hidden
+                />
+
+                {grantLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={`sk-${i}`}
+                      className="relative animate-pulse rounded-lg border border-slate-100 bg-slate-50 p-4 pl-10"
+                    >
+                      <div className="absolute left-[3px] top-4 h-3 w-3 rounded-full bg-slate-300" />
+                      <div className="mb-2 h-4 max-w-[60%] rounded bg-slate-200" />
+                      <div className="mb-3 h-3 max-w-[90%] rounded bg-slate-100" />
+                      <div className="h-8 max-w-[40%] rounded bg-slate-200" />
+                    </div>
+                  ))
+                ) : milestones.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                    No milestones for this grant.
+                  </p>
+                ) : (
+                  milestones.map((m, i) => {
+                    const visual = milestoneVisualState(i, milestones.length);
+                    return (
+                      <div key={`${numericGrantId}-${i}-${m.title}`} className="relative pb-5 last:pb-0">
+                        <div className="absolute left-0 top-4 z-1 -translate-x-1/2 sm:top-4.5">
+                          {visual === 'done' ? (
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-emerald-500 text-white shadow-sm">
+                                <Check className="h-4 w-4 stroke-3" />
+                            </span>
+                          ) : visual === 'active' ? (
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-orange-400 shadow-sm">
+                              <span className="h-2 w-2 rounded-full bg-white" />
+                            </span>
+                          ) : (
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-[#dfe3e9] bg-slate-50 text-[12px] font-bold text-slate-400 shadow-sm">
+                              {i + 1}
+                            </span>
+                          )}
+                        </div>
+
+                        <div
+                          className={`ml-[22px] rounded-lg border p-4 pt-4 sm:ml-[30px] ${
+                            visual === 'active'
+                              ? 'border-[#ffb480] bg-white shadow-[0_0_0_1px_rgba(255,106,0,0.08)]'
+                              : visual === 'done'
+                                ? 'border-[#eaecef] bg-white'
+                                : 'border-transparent bg-[#fafbfc] opacity-95'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <h3
+                                className={`text-[15px] font-bold leading-snug ${visual === 'locked' ? 'text-slate-500' : 'text-slate-900'}`}
+                              >
+                                M{i + 1}: {m.title || 'Untitled milestone'}
+                              </h3>
+                              <p
+                                className={`mt-1.5 text-sm leading-relaxed ${visual === 'locked' ? 'text-slate-400' : 'text-slate-500'}`}
+                              >
+                                {m.description || '—'}
+                              </p>
+                            </div>
+                            <p
+                              className={`text-right text-[15px] font-bold whitespace-nowrap sm:pl-4 ${visual === 'locked' ? 'text-slate-400' : 'text-slate-900'}`}
+                            >
+                              {formatUsdcLabel(m.amount)} USDC
+                            </p>
+                          </div>
+
+                          {visual === 'done' ? (
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                              <span className="inline-flex rounded bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                Completed{' '}
+                                {m.deadline > BigInt(0)
+                                  ? new Date(Number(m.deadline) * 1000).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                    })
+                                  : '—'}
+                              </span>
+                            </div>
+                          ) : null}
+
+                          {visual === 'active' ? (
+                            <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                              <span className="text-xs font-semibold text-teal-600">● In Progress</span>
+                              <button
+                                type="button"
+                                disabled
+                                className="relative inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-400"
+                              >
+                                Submit Proof
+                                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-500">
+                                  Coming soon
+                                </span>
+                              </button>
+                            </div>
+                          ) : null}
+
+                          {visual === 'locked' ? (
+                            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-400">
+                              <Lock className="h-3.5 w-3.5" strokeWidth={2} />
+                              Locked
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          </div>
+
+          <aside className="flex min-w-0 flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+            <section className="rounded-xl border border-slate-200/90 bg-white p-6 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Total allocation
+              </p>
+              <p className="mt-3 text-[2.25rem] font-bold tracking-tight text-slate-900 sm:text-[2.5rem]">
+                {grantLoading ? '…' : formatUsdcLabel(totalAllocationWei)}
+                <span className="ml-2 text-lg font-semibold normal-case text-slate-500"> USDC</span>
+              </p>
+              <div className="mt-5 space-y-2">
+                <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-[#ff6a00] transition-[width]"
+                    style={{ width: `${disbursedPercent}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>{formatUsdcLabel(disbursedWei)} Disbursed</span>
+                  <span>{disbursedPercent}%</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-slate-200/90 bg-white px-6 py-5 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Configuration
+              </h3>
+              <dl className="mt-4 space-y-4 border-t border-slate-50 pt-2">
+                <div className="flex items-baseline justify-between gap-3 pt-3 first:pt-0">
+                  <dt className="text-xs text-slate-500">Payment Mode</dt>
+                  <dd className="text-right text-sm font-semibold text-slate-900">
+                    {grantLoading ? '…' : paymentModeLabel}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 pt-3 border-t border-slate-100">
+                  <dt className="text-xs text-slate-500">Committee Size</dt>
+                  <dd className="text-right text-sm font-semibold text-slate-900">
+                    {grantLoading ? '…' : `${committee.length} Members`}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 pt-3 border-t border-slate-100">
+                  <dt className="text-xs text-slate-500">Approval Threshold</dt>
+                  <dd className="text-right text-sm font-semibold text-slate-900">
+                    {grantLoading
+                      ? '…'
+                      : grantData && committee.length > 0
+                        ? `${Number(grantData.quorum)} of ${committee.length} Signatures`
+                        : `${Number(grantData?.quorum ?? BigInt(0))} Signatures`}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  <dt className="text-xs text-slate-500">Contract</dt>
+                  <dd>
+                    <a
+                      href={`https://arbiscan.io/address/${GRANT_ESCROW_ADDRESS}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-teal-600 underline-offset-4 hover:text-teal-700 hover:underline"
+                    >
+                      {escrowAddressDisplay(GRANT_ESCROW_ADDRESS)}
+                      <ExternalLink className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                    </a>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="rounded-xl border border-slate-200/90 bg-white px-6 py-5 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                Committee Actions
+              </h3>
+              <ul className="mt-1 divide-y divide-slate-100">
+                <li>
+                  <button
+                    type="button"
+                    disabled
+                    className="flex w-full items-center gap-3 py-3.5 text-left text-sm font-semibold text-slate-800"
+                  >
+                    <ThumbsUp className="h-5 w-5 shrink-0 text-slate-500" strokeWidth={1.75} />
+                    <span className="flex-1">Approve Payment</span>
+                    <span className="text-[10px] font-bold uppercase text-slate-400">Coming soon</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    disabled
+                    className="flex w-full items-center gap-3 py-3.5 text-left text-sm font-semibold text-slate-800"
+                  >
+                    <Gavel className="h-5 w-5 shrink-0 text-slate-500" strokeWidth={1.75} />
+                    <span className="flex-1">Slash Grant</span>
+                    <span className="text-[10px] font-bold uppercase text-slate-400">Coming soon</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    disabled
+                    className="flex w-full items-center gap-3 py-3.5 text-left text-sm font-semibold text-slate-800"
+                  >
+                    <PenLine className="h-5 w-5 shrink-0 text-slate-500" strokeWidth={1.75} />
+                    <span className="flex-1">Edit Metadata</span>
+                    <span className="text-[10px] font-bold uppercase text-slate-400">Coming soon</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  </button>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </main>
+
+      <footer className="mx-auto mt-10 max-w-6xl px-4 pb-10 pt-6 text-[11px] text-slate-400 md:px-6 lg:mt-14 lg:flex lg:items-center lg:justify-between lg:border-t lg:border-slate-200/70 lg:px-8 lg:pt-8">
+        <span>© 2026 GrantOS. Secured by Arbitrum.</span>
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 lg:mt-0">
+          <a href="#" className="hover:text-slate-600">
+            Documentation
+          </a>
+          <a href="#" className="hover:text-slate-600">
+            Explorer
+          </a>
+          <a href="#" className="hover:text-slate-600">
+            Support
+          </a>
+        </div>
+      </footer>
+    </div>
+  );
+}

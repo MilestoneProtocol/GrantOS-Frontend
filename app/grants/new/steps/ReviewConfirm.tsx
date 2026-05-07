@@ -15,7 +15,7 @@ import {
   Lock,
   ShieldCheck,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { parseUnits } from 'viem';
 import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
