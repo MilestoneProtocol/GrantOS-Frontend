@@ -1,6 +1,6 @@
 'use client';
 
-import { MilestoneInput } from '@/app/grants/new/store';
+import { MilestoneInput } from '@/grant-creation/store';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 type MilestoneCardProps = {

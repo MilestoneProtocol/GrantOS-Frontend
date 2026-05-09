@@ -1,6 +1,6 @@
 'use client';
 
-import { PaymentMode } from '@/app/grants/new/store';
+import { PaymentMode } from '@/grant-creation/store';
 import { AlertCircle, Banknote, Waves } from 'lucide-react';
 
 type PaymentModeStepProps = {

@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/grant-creation/*": ["./app/(committee)/grants/new/*"]
     }
   },
   "include": [

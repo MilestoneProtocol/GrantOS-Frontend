@@ -1,6 +1,6 @@
 'use client';
 
-import { GrantIdentity } from '@/app/grants/new/store';
+import { GrantIdentity } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
 import { Check, Copy, Star } from 'lucide-react';

@@ -10,6 +10,12 @@ import {
 } from '@/lib/escrow';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import {
+  buildUiDemoGrantSummary,
+  isUiDemoMode,
+  isUiDemoPathSegment,
+  UI_DEMO_GRANT_DISPLAY_ID,
+} from '@/demo';
+import {
   ArrowLeft,
   ChevronRight,
   Clock,
@@ -24,7 +30,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatUnits, type Address } from 'viem';
 import { useAccount, useReadContract } from 'wagmi';
 
@@ -84,23 +90,40 @@ export default function GrantDetailPage() {
   const params = useParams<{ id: string }>();
   const routeId = params?.id ?? '';
   const numericGrantId = useMemo(() => parseGrantIdFromPath(routeId), [routeId]);
-  const { chain, isConnected } = useAccount();
+  const isDemoPath = isUiDemoPathSegment(routeId);
+  const isDemoRoute = isUiDemoMode() && isDemoPath;
+  const { chain, isConnected, address } = useAccount();
 
-  const enabled = numericGrantId !== undefined;
+  const demoGrant = useMemo(
+    () => (isDemoRoute && address ? buildUiDemoGrantSummary(address) : null),
+    [address, isDemoRoute]
+  );
+
+  const routeValid =
+    Boolean(routeId.trim()) &&
+    (numericGrantId !== undefined || isDemoRoute);
+
+  const chainReadEnabled = numericGrantId !== undefined && !isDemoPath;
+  const [dismissedInvalidRouteId, setDismissedInvalidRouteId] = useState('');
+  const [dismissedGrantLoadErrorKey, setDismissedGrantLoadErrorKey] = useState('');
 
   const {
     data: grantData,
-    isLoading: grantLoading,
-    isError: grantError,
+    isLoading: grantLoadingChain,
+    isError: grantErrorChain,
   } = useReadContract({
     address: GRANT_ESCROW_ADDRESS,
     abi: grantEscrowReadAbi,
     functionName: 'getGrant',
-    args: enabled ? [numericGrantId] : undefined,
-    query: { enabled },
+    args: chainReadEnabled && numericGrantId !== undefined ? [numericGrantId] : undefined,
+    query: { enabled: chainReadEnabled },
   });
 
-  const builderAddress = grantData?.builder as Address | undefined;
+  const resolvedGrant = isDemoRoute ? demoGrant : grantData;
+  const grantLoading = isDemoRoute ? false : grantLoadingChain;
+  const grantError = isDemoRoute ? false : grantErrorChain;
+
+  const builderAddress = resolvedGrant?.builder as Address | undefined;
 
   const { data: identityData } = useReadContract({
     address: IDENTITY_REGISTRY_ADDRESS,
@@ -112,7 +135,7 @@ export default function GrantDetailPage() {
 
   const zkVerified = Boolean(identityData?.[0]);
 
-  const milestones = useMemo(() => grantData?.milestones ?? [], [grantData]);
+  const milestones = useMemo(() => resolvedGrant?.milestones ?? [], [resolvedGrant]);
 
   const totalAllocationWei = useMemo(
     () => milestones.reduce((sum, m) => sum + m.amount, BigInt(0)),
@@ -136,30 +159,55 @@ export default function GrantDetailPage() {
         )
       : 0;
 
-  const createdAtTs = grantData?.createdAt;
+  const createdAtTs = resolvedGrant?.createdAt;
   const createdDate =
     typeof createdAtTs === 'bigint' && createdAtTs > BigInt(0)
       ? new Date(Number(createdAtTs) * 1000)
       : null;
 
   const grantLabel = useMemo(() => {
+    if (isDemoRoute) return 'Demo';
     if (numericGrantId === undefined) return routeId ? routeId.slice(0, 16) : '—';
     if (numericGrantId <= BigInt(Number.MAX_SAFE_INTEGER)) {
       return numericGrantId.toString();
     }
     return `#${numericGrantId.toString(16).slice(0, 8)}`.toUpperCase();
-  }, [numericGrantId, routeId]);
+  }, [isDemoRoute, numericGrantId, routeId]);
+
+  const milestoneRowKeyPrefix = isDemoRoute ? UI_DEMO_GRANT_DISPLAY_ID.toString() : numericGrantId?.toString() ?? routeId;
 
   const grantHeading = useMemo(() => {
+    if (isDemoRoute && !address) return 'Demo grant (connect wallet)';
     if (grantLoading) return 'Loading grant…';
     if (grantError) return `Grant · ${grantLabel}`;
     const titled = milestones.find((m) => m.title.trim())?.title;
     return titled || 'Grant program';
-  }, [grantError, grantLabel, grantLoading, milestones]);
+  }, [address, grantError, grantLabel, grantLoading, isDemoRoute, milestones]);
 
-  const paymentModeLabel = grantData?.streaming ? 'Streaming' : 'Milestone-based';
+  const paymentModeLabel = resolvedGrant?.streaming ? 'Streaming' : 'Milestone-based';
 
-  const committee = grantData?.committee ?? [];
+  const committee = resolvedGrant?.committee ?? [];
+  const invalidRouteKey = routeValid ? '' : routeId.trim() || '__empty__';
+  const showInvalidIdError = Boolean(invalidRouteKey) && dismissedInvalidRouteId !== invalidRouteKey;
+  const grantLoadErrorKey =
+    !grantLoading && chainReadEnabled && grantErrorChain ? `${routeId}-grant-load-error` : '';
+  const showGrantLoadError =
+    Boolean(grantLoadErrorKey) && dismissedGrantLoadErrorKey !== grantLoadErrorKey;
+
+  useEffect(() => {
+    if (!showInvalidIdError) return;
+    const timeoutId = window.setTimeout(() => setDismissedInvalidRouteId(invalidRouteKey), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [invalidRouteKey, showInvalidIdError]);
+
+  useEffect(() => {
+    if (!showGrantLoadError) return;
+    const timeoutId = window.setTimeout(
+      () => setDismissedGrantLoadErrorKey(grantLoadErrorKey),
+      2000
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [grantLoadErrorKey, showGrantLoadError]);
 
   async function copyText(text: string) {
     try {
@@ -191,9 +239,20 @@ export default function GrantDetailPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8 lg:px-8 lg:pb-12">
-        {!enabled ? (
+        {isDemoRoute && address ? (
+          <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <span className="font-semibold">UI demo grant.</span> This page uses mock data from{' '}
+            <code className="rounded bg-amber-100/80 px-1.5 py-0.5 text-xs">demo/ui-demo.ts</code> — not{' '}
+            <code className="rounded bg-amber-100/80 px-1.5 py-0.5 text-xs">getGrant</code>. Disable with{' '}
+            <code className="rounded bg-amber-100/80 px-1.5 py-0.5 text-xs">NEXT_PUBLIC_GRANTOS_UI_DEMO=false</code>.
+          </p>
+        ) : null}
+
+        {showInvalidIdError ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Invalid grant id in URL. Expected a numeric id, hex id, or <code>GRT-2026-…</code> slug.
+            Invalid grant id in URL. Expected a numeric id, hex id, <code>GRT-2026-…</code> slug, or{' '}
+            <code className="text-[11px]">ui-demo</code> when{' '}
+            <code className="text-[11px]">NEXT_PUBLIC_GRANTOS_UI_DEMO=true</code>.
           </p>
         ) : null}
 
@@ -217,7 +276,7 @@ export default function GrantDetailPage() {
                 <Clock className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.75} />
                 {grantLoading ? (
                   'Fetching creation date…'
-                ) : grantError ? (
+                ) : showGrantLoadError ? (
                   'Could not load grant from chain.'
                 ) : createdDate ? (
                   <>
@@ -240,7 +299,7 @@ export default function GrantDetailPage() {
                 )}
               </p>
 
-              {!grantLoading && enabled && grantError ? (
+              {showGrantLoadError ? (
                 <p className="text-xs leading-relaxed text-slate-500">
                   Confirm <code className="text-[11px]">NEXT_PUBLIC_GRANT_ESCROW_ADDRESS</code> matches
                   your deployment and that <code className="text-[11px]">getGrant(uint256)</code> matches{' '}
@@ -316,13 +375,15 @@ export default function GrantDetailPage() {
                   ))
                 ) : milestones.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                    No milestones for this grant.
+                    {isDemoRoute && !address
+                      ? 'Connect your wallet to preview mock milestones for this demo grant.'
+                      : 'No milestones for this grant.'}
                   </p>
                 ) : (
                   milestones.map((m, i) => {
                     const visual = milestoneVisualState(i, milestones.length);
                     return (
-                      <div key={`${numericGrantId}-${i}-${m.title}`} className="relative pb-5 last:pb-0">
+                      <div key={`${milestoneRowKeyPrefix}-${i}-${m.title}`} className="relative pb-5 last:pb-0">
                         <div className="absolute left-0 top-4 z-1 -translate-x-1/2 sm:top-4.5">
                           {visual === 'done' ? (
                             <span className="flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-emerald-500 text-white shadow-sm">
@@ -385,16 +446,25 @@ export default function GrantDetailPage() {
                           {visual === 'active' ? (
                             <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
                               <span className="text-xs font-semibold text-teal-600">● In Progress</span>
-                              <button
-                                type="button"
-                                disabled
-                                className="relative inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-400"
-                              >
-                                Submit Proof
-                                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-500">
-                                  Coming soon
-                                </span>
-                              </button>
+                              {isDemoRoute ? (
+                                <Link
+                                  href={`/grants/ui-demo/milestones/${i}/submit`}
+                                  className="inline-flex items-center justify-center rounded-md border border-violet-200 bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+                                >
+                                  Open milestone submission
+                                </Link>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="relative inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-400"
+                                >
+                                  Submit Proof
+                                  <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-500">
+                                    Coming soon
+                                  </span>
+                                </button>
+                              )}
                             </div>
                           ) : null}
 
@@ -458,9 +528,9 @@ export default function GrantDetailPage() {
                   <dd className="text-right text-sm font-semibold text-slate-900">
                     {grantLoading
                       ? '…'
-                      : grantData && committee.length > 0
-                        ? `${Number(grantData.quorum)} of ${committee.length} Signatures`
-                        : `${Number(grantData?.quorum ?? BigInt(0))} Signatures`}
+                      : resolvedGrant && committee.length > 0
+                        ? `${Number(resolvedGrant.quorum)} of ${committee.length} Signatures`
+                        : `${Number(resolvedGrant?.quorum ?? BigInt(0))} Signatures`}
                   </dd>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">

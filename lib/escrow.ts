@@ -57,7 +57,24 @@ export const grantEscrowReadAbi = [
       },
     ],
   },
+  /**
+   * Milestone lifecycle status for submission gating. Convention: `0` = Pending (open for submission).
+   * Align with your deployed `GrantEscrow` enum; update if your contract uses different values.
+   */
+  {
+    type: 'function',
+    name: 'getMilestoneStatus',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'grantId', type: 'uint256' },
+      { name: 'milestoneIndex', type: 'uint256' },
+    ],
+    outputs: [{ name: 'status', type: 'uint8' }],
+  },
 ] as const satisfies Abi;
+
+/** Pending = open for builder submission (must match `getMilestoneStatus` onchain enum). */
+export const MILESTONE_STATUS_PENDING = 0;
 
 export const grantEscrowAbi: Abi | undefined = undefined;
 

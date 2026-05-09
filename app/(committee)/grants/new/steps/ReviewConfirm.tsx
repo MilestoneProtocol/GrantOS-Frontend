@@ -1,6 +1,6 @@
 'use client';
 
-import { MilestoneInput, PaymentMode } from '@/app/grants/new/store';
+import { MilestoneInput, PaymentMode } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { GRANT_ESCROW_ADDRESS, grantEscrowAbi, CONTRACTS_READY } from '@/lib/escrow';
 import { USDC_ADDRESS, USDC_DECIMALS, usdcAbi } from '@/lib/usdc';
@@ -15,7 +15,7 @@ import {
   Lock,
   ShieldCheck,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { parseUnits } from 'viem';
 import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
@@ -53,6 +53,8 @@ export default function ReviewConfirm({
   onBack,
   onSuccess,
 }: ReviewConfirmProps) {
+  const [dismissedApproveErrorKey, setDismissedApproveErrorKey] = useState('');
+  const [dismissedCreateErrorKey, setDismissedCreateErrorKey] = useState('');
   const totalUsdc = useMemo(
     () => milestones.reduce((sum, m) => sum + Number(m.amount || 0), 0),
     [milestones]
@@ -105,6 +107,22 @@ export default function ReviewConfirm({
     (approveReceiptError as Error | null)?.message;
   const createError =
     (createWriteError as Error | null)?.message;
+  const approveErrorKey = approveError ?? '';
+  const createErrorKey = createError ?? '';
+  const showApproveError = Boolean(approveError) && dismissedApproveErrorKey !== approveErrorKey;
+  const showCreateError = Boolean(createError) && dismissedCreateErrorKey !== createErrorKey;
+
+  useEffect(() => {
+    if (!showApproveError) return;
+    const timeoutId = window.setTimeout(() => setDismissedApproveErrorKey(approveErrorKey), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [approveErrorKey, showApproveError]);
+
+  useEffect(() => {
+    if (!showCreateError) return;
+    const timeoutId = window.setTimeout(() => setDismissedCreateErrorKey(createErrorKey), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [createErrorKey, showCreateError]);
 
   /* ── Derived states ──────────────────────────────────────────── */
   const approveStage: 'idle' | 'signing' | 'confirming' | 'done' = approveIsConfirmed
@@ -448,9 +466,9 @@ export default function ReviewConfirm({
                   </>
                 )}
               </button>
-              {approveError && (
+              {showApproveError && approveError ? (
                 <p className="text-center text-xs text-red-600 leading-snug px-1">{approveError}</p>
-              )}
+              ) : null}
               {approveHash && (
                 <a
                   href={`https://arbiscan.io/tx/${approveHash}`}
@@ -505,9 +523,9 @@ export default function ReviewConfirm({
                   </>
                 )}
               </button>
-              {createError && (
+              {showCreateError && createError ? (
                 <p className="text-center text-xs text-red-600 leading-snug px-1">{createError}</p>
-              )}
+              ) : null}
               {createHash && (
                 <a
                   href={`https://arbiscan.io/tx/${createHash}`}

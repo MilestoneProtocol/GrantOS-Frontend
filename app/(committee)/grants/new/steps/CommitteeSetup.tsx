@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { isAddress } from 'viem';
 import { ArrowLeft, Minus, Plus, Wallet, X } from 'lucide-react';
 
@@ -41,6 +41,12 @@ export default function CommitteeSetup({
 }: CommitteeSetupProps) {
   const [input, setInput] = useState('');
   const [localError, setLocalError] = useState('');
+
+  useEffect(() => {
+    if (!localError) return;
+    const timeoutId = window.setTimeout(() => setLocalError(''), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [localError]);
 
   const safeQuorum = Math.max(1, Math.min(quorum, Math.max(1, members.length)));
 

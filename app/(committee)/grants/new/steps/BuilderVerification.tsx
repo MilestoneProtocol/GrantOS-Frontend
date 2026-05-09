@@ -1,10 +1,10 @@
 'use client';
 
-import { GrantIdentity } from '@/app/grants/new/store';
+import { GrantIdentity } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
 import { Trophy } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Address, isAddress } from 'viem';
 import { useReadContract } from 'wagmi';
 
@@ -28,6 +28,8 @@ export default function BuilderVerification({
   onIdentityLoaded,
 }: BuilderVerificationProps) {
   const valid = isAddress(builderAddress);
+  const [dismissedAddressValue, setDismissedAddressValue] = useState('');
+  const [dismissedReadErrorKey, setDismissedReadErrorKey] = useState('');
 
   const { data, isLoading, isError, error } = useReadContract({
     abi: identityRegistryAbi,
@@ -56,6 +58,23 @@ export default function BuilderVerification({
   useEffect(() => {
     onIdentityLoaded(identity);
   }, [identity, onIdentityLoaded]);
+
+  const invalidAddressValue = !valid && builderAddress.trim().length > 0 ? builderAddress.trim() : '';
+  const showAddressError = Boolean(invalidAddressValue) && dismissedAddressValue !== invalidAddressValue;
+  const readErrorKey = valid && isError ? (error?.message ?? 'identity-read-error') : '';
+  const showReadError = Boolean(readErrorKey) && dismissedReadErrorKey !== readErrorKey;
+
+  useEffect(() => {
+    if (!showAddressError) return;
+    const timeoutId = window.setTimeout(() => setDismissedAddressValue(invalidAddressValue), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [invalidAddressValue, showAddressError]);
+
+  useEffect(() => {
+    if (!showReadError) return;
+    const timeoutId = window.setTimeout(() => setDismissedReadErrorKey(readErrorKey), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [readErrorKey, showReadError]);
 
   return (
     <div className="space-y-7">
@@ -97,7 +116,7 @@ export default function BuilderVerification({
             Paste
           </button>
         </div>
-        {!valid && builderAddress ? (
+        {showAddressError ? (
           <p className="text-sm text-red-500">Enter a valid wallet address.</p>
         ) : null}
       </div>
@@ -106,7 +125,7 @@ export default function BuilderVerification({
         <p className="text-sm text-slate-500">Loading identity from GrantIdentityRegistry…</p>
       ) : null}
 
-      {valid && isError ? (
+      {showReadError ? (
         <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           Could not read identity: {error?.message ?? 'RPC or contract error.'}
         </p>

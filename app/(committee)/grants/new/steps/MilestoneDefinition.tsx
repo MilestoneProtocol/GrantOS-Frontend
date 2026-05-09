@@ -1,6 +1,6 @@
 'use client';
 
-import { MilestoneInput, ProofType } from '@/app/grants/new/store';
+import { MilestoneInput, ProofType } from '@/grant-creation/store';
 import {
   ArrowLeft,
   CalendarDays,
