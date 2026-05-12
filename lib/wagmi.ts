@@ -1,6 +1,14 @@
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { connectorsForWallets, getDefaultConfig } from '@rainbow-me/rainbowkit';
+import {
+  rainbowWallet,
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+  phantomWallet,
+  rabbyWallet,
+} from '@rainbow-me/rainbowkit/wallets';
 import { createStorage } from 'wagmi';
-import { arbitrum } from 'wagmi/chains';
+import { arbitrumSepolia } from 'wagmi/chains';
 
 const sessionStorageAdapter = {
   getItem(key: string) {
@@ -17,11 +25,28 @@ const sessionStorageAdapter = {
   },
 };
 
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'default';
+
+const wallets = [
+  {
+    groupName: 'Recommended',
+    wallets: [
+      metaMaskWallet,
+      rainbowWallet,
+      coinbaseWallet,
+      walletConnectWallet,
+      rabbyWallet,
+      phantomWallet,
+    ],
+  },
+];
+
 export const config = getDefaultConfig({
   appName: 'GrantOS v3',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'default',
-  chains: [arbitrum],
+  projectId,
+  chains: [arbitrumSepolia],
   ssr: true,
+  wallets,
   storage: createStorage({
     storage: sessionStorageAdapter,
   }),
