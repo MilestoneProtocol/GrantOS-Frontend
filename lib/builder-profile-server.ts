@@ -7,8 +7,8 @@ import {
   identityRegistryAbi,
 } from '@/lib/escrow';
 import { USDC_DECIMALS } from '@/lib/usdc';
+import { arbitrum } from 'viem/chains';
 import {
-  arbitrum,
   createPublicClient,
   formatUnits,
   getAddress,
@@ -458,7 +458,7 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
       const statuses: number[] = [];
       for (let i = 0; i < tuple.milestones.length; i++) {
         const r = statusResults[statusIdx++];
-        if (r?.status === 'success') statuses.push(Number(r.result as bigint));
+        if (r?.status === 'success') statuses.push(Number(r.result));
         else statuses.push(MILESTONE_PENDING);
       }
 
@@ -517,7 +517,7 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
         for (let i = 0; i < tuple.milestones.length; i++) {
           const st =
             statusResults[si]?.status === 'success'
-              ? Number(statusResults[si]!.result as bigint)
+              ? Number(statusResults[si]!.result)
               : MILESTONE_PENDING;
           si++;
           if (st !== MILESTONE_PENDING) {

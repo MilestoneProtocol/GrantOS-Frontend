@@ -5,12 +5,14 @@ import {
   Calendar,
   Check,
   ExternalLink,
-  Github,
+  GitBranch,
   Link2,
   Trophy,
   Wallet,
 } from 'lucide-react';
 import Link from 'next/link';
+
+function shorten(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
@@ -252,7 +254,7 @@ export default function BuilderProfileContent({ data }: { data: BuilderProfileDa
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 font-semibold text-violet-700 hover:text-violet-900"
                   >
-                    <Github className="h-4 w-4" />
+                    <GitBranch className="h-4 w-4" />
                     @{gh.replace(/^@/, '')}
                     <Link2 className="h-3.5 w-3.5 opacity-70" />
                   </a>
