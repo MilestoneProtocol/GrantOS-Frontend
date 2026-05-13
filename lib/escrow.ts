@@ -10,6 +10,13 @@ export const IDENTITY_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_IDENTITY_REGIS
 export const identityRegistryAbi = [
   {
     type: 'function',
+    name: 'isVerified',
+    stateMutability: 'view',
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [{ name: 'verified', type: 'bool' }],
+  },
+  {
+    type: 'function',
     name: 'getIdentity',
     stateMutability: 'view',
     inputs: [{ name: 'user', type: 'address' }],
@@ -79,3 +86,37 @@ export const MILESTONE_STATUS_PENDING = 0;
 export const grantEscrowAbi: Abi | undefined = undefined;
 
 export const CONTRACTS_READY = Boolean(grantEscrowAbi);
+
+/**
+ * Read-only ABI fragments for resolving the list of grants where `member` sits on the committee.
+ * Different deployments may expose different view function names — call all and union the results.
+ */
+export const committeeMembershipAbis = {
+  getCommitteeGrantIds: [
+    {
+      type: 'function',
+      name: 'getCommitteeGrantIds',
+      stateMutability: 'view',
+      inputs: [{ name: 'member', type: 'address' }],
+      outputs: [{ type: 'uint256[]' }],
+    },
+  ] as const satisfies Abi,
+  getGrantsByCommittee: [
+    {
+      type: 'function',
+      name: 'getGrantsByCommittee',
+      stateMutability: 'view',
+      inputs: [{ name: 'member', type: 'address' }],
+      outputs: [{ type: 'uint256[]' }],
+    },
+  ] as const satisfies Abi,
+  getCommitteeGrants: [
+    {
+      type: 'function',
+      name: 'getCommitteeGrants',
+      stateMutability: 'view',
+      inputs: [{ name: 'member', type: 'address' }],
+      outputs: [{ type: 'uint256[]' }],
+    },
+  ] as const satisfies Abi,
+};

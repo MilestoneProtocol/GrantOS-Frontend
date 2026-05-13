@@ -6,6 +6,7 @@ import ReviewConfirm from '@/grant-creation/steps/ReviewConfirm';
 import MilestoneDefinition from '@/grant-creation/steps/MilestoneDefinition';
 import CommitteeSetup from '@/grant-creation/steps/CommitteeSetup';
 import SuccessScreen from '@/components/SuccessScreen';
+import { useAuthGuard } from '@/lib/authGuard';
 import {
   GrantIdentity,
   MilestoneInput,
@@ -46,6 +47,7 @@ function milestoneIsComplete(m: MilestoneInput) {
 }
 
 export default function CreateGrantPage() {
+  const guard = useAuthGuard('committee');
   const [attemptedStep, setAttemptedStep] = useState<number | null>(null);
   const {
     currentStep,
@@ -178,6 +180,7 @@ export default function CreateGrantPage() {
   }
 
   return (
+    guard.state === 'blocked' ? null : (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <AppShellHeader />
 
@@ -393,5 +396,6 @@ export default function CreateGrantPage() {
       </nav>
       ) : null}
     </div>
+    )
   );
 }

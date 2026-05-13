@@ -1,10 +1,16 @@
 'use client';
 
 import ConnectButton from '@/components/ConnectButton';
+import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
+import { Check, Circle } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { api } from '@/lib/api';
 import { Check, Circle } from 'lucide-react';
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
+import { useReadContract } from 'wagmi';
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -13,6 +19,26 @@ const GithubIcon = ({ className }: { className?: string }) => (
 );
 
 export default function VerifyIdentity() {
+  const router = useRouter();
+  const { isConnected, chain, address, status } = useAccount();
+
+  const { data: verified, isLoading: verifying } = useReadContract({
+    address: IDENTITY_REGISTRY_ADDRESS,
+    abi: identityRegistryAbi,
+    functionName: 'isVerified',
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address) },
+  });
+
+  const walletResolved = status !== 'connecting' && status !== 'reconnecting';
+
+  useEffect(() => {
+    if (!walletResolved) return;
+    if (!address) return;
+    if (verifying) return;
+    if (!verified) return;
+    router.replace('/dashboard?toast=already_verified');
+  }, [address, router, verified, verifying, walletResolved]);
   const { isConnected, chain, address } = useAccount();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -2,6 +2,8 @@
 
 import BuilderAppShell from '@/components/builder/BuilderAppShell';
 import BuilderDashboardToast from '@/components/builder/BuilderDashboardToast';
+import WarningBannerStack from '@/components/builder/dashboard/WarningBannerStack';
+import { useAuthGuard } from '@/lib/authGuard';
 import { GRANT_ESCROW_ADDRESS, grantEscrowReadAbi, IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import {
@@ -50,8 +52,23 @@ function formatUsdc(amount: bigint) {
 }
 
 export default function BuilderDashboardPage() {
+  const guard = useAuthGuard('builder');
   const { address } = useAccount();
   const [expandedGrantKeys, setExpandedGrantKeys] = useState<Record<string, boolean>>({});
+
+  if (guard.state === 'loading') {
+    return (
+      <BuilderAppShell>
+        <main className="flex min-h-[50vh] w-full items-center justify-center px-5 py-16 text-sm text-slate-500 md:px-8 lg:px-10">
+          Detecting your role…
+        </main>
+      </BuilderAppShell>
+    );
+  }
+
+  if (guard.state === 'blocked') {
+    return null;
+  }
 
   const { data: identityData } = useReadContract({
     address: IDENTITY_REGISTRY_ADDRESS,
@@ -172,6 +189,13 @@ export default function BuilderDashboardPage() {
       </Suspense>
       <main className="w-full px-5 py-5 md:px-8 lg:px-10">
         <div className="w-full space-y-5">
+          {/*
+           * Active warning banners ride at the very top of the main content
+           * area — per PRD they must sit above the page header / summary
+           * cards / grant list so the builder cannot scroll past them.
+           */}
+          <WarningBannerStack />
+
           <header className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
             <h1 className="text-2xl font-bold tracking-tight">Active Grants</h1>
             <p className="mt-1 text-sm text-slate-500">

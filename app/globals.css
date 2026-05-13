@@ -110,3 +110,158 @@ body {
 .animate-success-ring {
   animation: success-ring-pulse 2.4s ease-in-out 0.75s infinite;
 }
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-in 0.22s ease-out both;
+}
+
+@keyframes quorum-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-quorum-banner-in {
+  animation: quorum-banner-in 0.36s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/*
+ * Brief red flash for the builder's reputation pill when a warning or
+ * slash is recorded onchain. Pulses the background + ring (rather than the
+ * text colour) so the resting score remains readable through the
+ * animation. Triggered by setting `data-flash="true"` on the pill.
+ */
+@keyframes grantos-rep-flash {
+  0% {
+    background-color: rgb(255 255 255 / 1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+
+  20% {
+    background-color: rgb(254 226 226 / 1);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.35);
+  }
+
+  60% {
+    background-color: rgb(254 242 242 / 1);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    background-color: rgb(255 255 255 / 1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/** Subtle upward pop when DAO slash / ZK counters tick up on poll */
+@keyframes dao-metric-rise {
+  0% {
+    transform: translateY(0);
+    color: rgb(15 23 42);
+  }
+
+  35% {
+    transform: translateY(-4px);
+    color: rgb(22 101 52);
+  }
+
+  100% {
+    transform: translateY(0);
+    color: rgb(15 23 42);
+  }
+}
+
+/* Onboarding landing — gentle float for the floating proof card. */
+@keyframes grantos-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-grantos-float {
+  animation: grantos-float 7s ease-in-out infinite;
+}
+
+/* Pulsing dot used on "live" indicators across onboarding + explorer. */
+@keyframes grantos-pulse-dot {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  }
+
+  70% {
+    box-shadow: 0 0 0 9px rgba(16, 185, 129, 0);
+  }
+}
+
+.animate-grantos-pulse {
+  animation: grantos-pulse-dot 2s ease-out infinite;
+}
+
+/* Slow horizontal marquee for the activity ticker. */
+@keyframes grantos-marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-grantos-marquee {
+  animation: grantos-marquee 38s linear infinite;
+}
+
+/* Soft conic shimmer for the hero accent. */
+@keyframes grantos-conic-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-grantos-conic {
+  animation: grantos-conic-spin 14s linear infinite;
+}
+
+/* Reveal animation used on cards as they mount. */
+@keyframes grantos-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-grantos-reveal {
+  animation: grantos-reveal 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
