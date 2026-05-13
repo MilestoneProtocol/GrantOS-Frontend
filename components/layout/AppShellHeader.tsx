@@ -11,9 +11,18 @@ import { useAccount, useReadContract } from 'wagmi';
 type AppShellHeaderProps = {
   /** When true, shows ZK status from GrantIdentityRegistry.getIdentity for the connected wallet. */
   showZkBadge?: boolean;
+  /**
+   * Optional element rendered into the right-hand trailing area on
+   * desktop (sits before the network indicator). Used by the builder
+   * shell to surface the live reputation pill in the persistent header.
+   */
+  trailingExtras?: React.ReactNode;
 };
 
-export default function AppShellHeader({ showZkBadge = false }: AppShellHeaderProps) {
+export default function AppShellHeader({
+  showZkBadge = false,
+  trailingExtras,
+}: AppShellHeaderProps) {
   const { address, chain, isConnected } = useAccount();
 
   const { data: identityData } = useReadContract({
@@ -76,6 +85,8 @@ export default function AppShellHeader({ showZkBadge = false }: AppShellHeaderPr
           </nav>
 
           <div className="flex w-full min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3 lg:w-auto lg:flex-1">
+            {trailingExtras}
+
             <button
               type="button"
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50"

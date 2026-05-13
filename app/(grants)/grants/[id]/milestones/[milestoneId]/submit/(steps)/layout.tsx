@@ -3,12 +3,14 @@
 import BuilderAppShell from '@/components/builder/BuilderAppShell';
 import { MilestoneSubmitProvider, useMilestoneSubmit } from '@/components/builder/milestone-submit/MilestoneSubmitProvider';
 import SubmissionStepper from '@/components/builder/milestone-submit/SubmissionStepper';
+import { useAuthGuard } from '@/lib/authGuard';
 import { ArrowLeft, Circle } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 function SubmitStepsChrome({ children }: { children: ReactNode }) {
+  const guard = useAuthGuard('builder');
   const pathname = usePathname();
   const isSuccessRoute = pathname.includes('/submit/success');
 
@@ -21,6 +23,18 @@ function SubmitStepsChrome({ children }: { children: ReactNode }) {
     grantHeaderSubtitle,
     isDemoRoute,
   } = useMilestoneSubmit();
+
+  if (guard.state === 'loading') {
+    return (
+      <BuilderAppShell navActive="none">
+        <main className="flex min-h-[50vh] w-full items-center justify-center px-5 py-16 text-sm text-slate-500 md:px-8 lg:px-10">
+          Detecting your role…
+        </main>
+      </BuilderAppShell>
+    );
+  }
+
+  if (guard.state === 'blocked') return null;
 
   if (gate.kind !== 'ok' || milestoneIndex === null || !displayTuple || !displayMilestone) {
     return (

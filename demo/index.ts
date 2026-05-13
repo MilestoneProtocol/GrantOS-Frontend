@@ -3,3 +3,5 @@
  * @see ./ui-demo.ts
  */
 export * from './ui-demo';
+export * from './committee-demo';
+export * from './dao-dashboard';

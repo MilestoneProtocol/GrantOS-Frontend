@@ -1,18 +1,47 @@
-type BuilderProfilePageProps = {
-  params: Promise<{ address: string }>;
-};
+import OnboardingShell from '@/app/(onboarding)/OnboardingShell';
+import BuilderProfileContent from '@/components/builders/BuilderProfileContent';
+import { getDaoDashboardSnapshot } from '@/demo/dao-dashboard';
+import { formatBuilderPageTitle, loadBuilderProfile } from '@/lib/builder-profile-server';
+import { getAddress, isAddress, type Address } from 'viem';
+import type { Metadata } from 'next';
 
-export default async function BuilderProfilePage({ params }: BuilderProfilePageProps) {
-  const { address } = await params;
+export const dynamicParams = true;
 
-  return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Builder Profile</h1>
-        <p className="mt-2 text-sm text-slate-500">Profile route is scaffolded for dashboard navigation.</p>
-        <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 font-mono text-sm text-slate-700">{address}</p>
-      </div>
-    </main>
-  );
+export function generateStaticParams(): { address: string }[] {
+  const snap = getDaoDashboardSnapshot(0);
+  const builders = [...new Set(snap.grants.map((g) => g.builder))];
+  return builders.map((address) => ({ address: address.toLowerCase() }));
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ address: string }>;
+}): Promise<Metadata> {
+  const { address: raw } = await params;
+  const trimmed = decodeURIComponent(raw ?? '').trim();
+  if (!trimmed || !isAddress(trimmed)) {
+    return { title: 'Builder — GrantOS v3' };
+  }
+  try {
+    const address = getAddress(trimmed) as Address;
+    return { title: formatBuilderPageTitle(address) };
+  } catch {
+    return { title: 'Builder — GrantOS v3' };
+  }
+}
+
+export default async function BuilderProfilePage({
+  params,
+}: {
+  params: Promise<{ address: string }>;
+}) {
+  const { address: raw } = await params;
+  const data = await loadBuilderProfile(raw ?? '');
+
+  return (
+    <OnboardingShell>
+      <BuilderProfileContent data={data} />
+    </OnboardingShell>
+  );
+}
