@@ -3,8 +3,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --font-geist-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-geist-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-geist-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
 }
 
 @theme inline {
@@ -193,7 +197,8 @@ body {
 
 /* Onboarding landing — gentle float for the floating proof card. */
 @keyframes grantos-float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
 
@@ -208,7 +213,8 @@ body {
 
 /* Pulsing dot used on "live" indicators across onboarding + explorer. */
 @keyframes grantos-pulse-dot {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
   }
 
@@ -291,11 +297,93 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   @keyframes grantos-drawer-left-in {
-    from { transform: translateX(0); }
-    to { transform: translateX(0); }
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(0);
+    }
   }
   @keyframes grantos-drawer-right-in {
-    from { transform: translateX(0); }
-    to { transform: translateX(0); }
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(0);
+    }
   }
+}
+
+/* ─── Wallet connect modal animations ─────────────────────────────────────── */
+
+/* Backdrop fade */
+@keyframes wallet-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Mobile: bottom sheet slides up from below */
+@keyframes wallet-sheet-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Tablet/desktop: modal scales in */
+@keyframes wallet-modal-in {
+  from {
+    transform: scale(0.95) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Loading dots pulse */
+@keyframes wallet-dot-pulse {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-wallet-backdrop {
+  animation: wallet-backdrop-in 0.2s ease both;
+}
+
+.animate-wallet-sheet {
+  animation: wallet-sheet-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Centered wallet modal (all breakpoints) */
+.animate-wallet-modal {
+  animation: wallet-modal-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* sm+ overrides sheet with centered scale */
+@media (min-width: 640px) {
+  .sm\:animate-wallet-modal {
+    animation: wallet-modal-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+
+.animate-wallet-dot {
+  animation: wallet-dot-pulse 1.2s ease-in-out infinite;
 }

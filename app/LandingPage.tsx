@@ -1,13 +1,10 @@
 'use client';
 
-import ConnectButton from '@/components/ConnectButton';
 import {
-  ArrowRight,
   ArrowUpRight,
   BadgeCheck,
   Check,
   CircleDollarSign,
-  Compass,
   FileCheck2,
   Gauge,
   Layers,
@@ -90,16 +87,9 @@ function HeroSection() {
               evidence verifies onchain.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <ConnectButton variant="black" />
-              <Link
-                href="/grants"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                Explore Public Grants
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
+            <p className="mt-8 max-w-md text-sm font-medium leading-relaxed text-slate-600">
+              When you are ready, connect your wallet or browse public grants from the top bar.
+            </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs font-medium text-slate-500">
               <div className="inline-flex items-center gap-2">
@@ -588,19 +578,9 @@ function CtaBand() {
               the moment proofs verify.
             </h3>
             <p className="mt-4 max-w-xl text-sm leading-7 text-white/70">
-              Connect a wallet to open your dashboard. Or browse public grants to see what
-              the protocol enforces in production today.
+              Connect a wallet to open your dashboard, or browse public grants to see what the
+              protocol enforces in production today — use the sticky header on any page.
             </p>
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <ConnectButton variant="default" />
-              <Link
-                href="/grants"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-white/10"
-              >
-                <Compass className="h-4 w-4" />
-                Open Public Explorer
-              </Link>
-            </div>
           </div>
 
           <div className="relative">

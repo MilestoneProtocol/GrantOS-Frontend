@@ -10,12 +10,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 
+/** Minimum time on `/` before auto-redirecting a returning connected wallet (lets the shell land visually). */
+const MIN_MS_ON_HOME_BEFORE_REDIRECT = 3000;
+
 function EntryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected, status } = useAccount();
   const roles = useRoleDetection();
   const redirectedRef = useRef(false);
+  const homeEnteredAtRef = useRef(Date.now());
 
   const walletResolved = status !== 'connecting' && status !== 'reconnecting';
   const forceRoleSelect = searchParams.get('select') === '1';
@@ -30,29 +34,32 @@ function EntryPageInner() {
     // 1) New wallet → role selection
     if (roles.isNewWallet) return;
 
+    let target: string | null = null;
+
     // 2) Builder only, unverified → /verify with toast
     if (roles.isBuilder && !roles.isVerified && !roles.isCommittee) {
-      redirectedRef.current = true;
-      router.replace('/verify?toast=complete_verification');
+      target = '/verify?toast=complete_verification';
+    } else if (roles.isBuilder && roles.isVerified && !roles.isCommittee) {
+      // 3) Builder only, verified → /builder
+      target = '/builder';
+    } else if (roles.isCommittee && !roles.isBuilder) {
+      // 4) Committee only (DAO admin check comes first)
+      target = roles.isDaoAdmin ? '/dao' : '/committee';
+    } else if (roles.hasMultipleRoles) {
+      // 5) Both builder + committee → role selection (no redirect)
+      return;
+    } else {
       return;
     }
 
-    // 3) Builder only, verified → /builder
-    if (roles.isBuilder && roles.isVerified && !roles.isCommittee) {
+    const elapsed = Date.now() - homeEnteredAtRef.current;
+    const waitMs = Math.max(0, MIN_MS_ON_HOME_BEFORE_REDIRECT - elapsed);
+    const timer = window.setTimeout(() => {
+      if (redirectedRef.current) return;
       redirectedRef.current = true;
-      router.replace('/builder');
-      return;
-    }
-
-    // 4) Committee only (DAO admin check comes first)
-    if (roles.isCommittee && !roles.isBuilder) {
-      redirectedRef.current = true;
-      router.replace(roles.isDaoAdmin ? '/dao' : '/committee');
-      return;
-    }
-
-    // 5) Both builder + committee → role selection
-    if (roles.hasMultipleRoles) return;
+      router.replace(target!);
+    }, waitMs);
+    return () => window.clearTimeout(timer);
   }, [
     isConnected,
     roles.hasMultipleRoles,
