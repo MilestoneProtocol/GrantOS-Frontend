@@ -37,10 +37,10 @@ function EntryPageInner() {
       return;
     }
 
-    // 3) Builder only, verified → /dashboard
+    // 3) Builder only, verified → /builder
     if (roles.isBuilder && roles.isVerified && !roles.isCommittee) {
       redirectedRef.current = true;
-      router.replace('/dashboard');
+      router.replace('/builder');
       return;
     }
 

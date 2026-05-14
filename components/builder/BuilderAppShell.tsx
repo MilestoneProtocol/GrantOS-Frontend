@@ -1,6 +1,5 @@
 'use client';
 
-import BuilderReputationBadge from '@/components/builder/BuilderReputationBadge';
 import BuilderSidebarContent, {
   type BuilderSidebarNavActive,
 } from '@/components/builder/BuilderSidebarContent';
@@ -15,16 +14,16 @@ import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
 
 /**
  * Map the current path to a sidebar slot when the caller didn't pin one.
- * `/warnings` and any `/grants/.../warning` sub-route share the Warnings
- * highlight so the breadcrumb feels rooted; `/dashboard` keeps Dashboard.
+ * `/builder/warnings` and any `/grants/.../warning` sub-route share the
+ * Warnings highlight so the breadcrumb feels rooted; `/builder` keeps Dashboard.
  */
 function autoNavActiveFromPath(
   pathname: string | null,
 ): BuilderSidebarNavActive {
   if (!pathname) return 'dashboard';
-  if (pathname === '/warnings' || pathname.startsWith('/warnings/')) return 'warnings';
+  if (pathname === '/builder/warnings' || pathname.startsWith('/builder/warnings/')) return 'warnings';
   if (pathname.endsWith('/warning') && pathname.startsWith('/grants/')) return 'warnings';
-  if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) return 'dashboard';
+  if (pathname === '/builder' || pathname.startsWith('/builder/')) return 'dashboard';
   return 'none';
 }
 
@@ -84,7 +83,7 @@ export default function BuilderAppShell({ children, navActive }: BuilderAppShell
     <div className="flex min-h-screen w-full flex-col bg-slate-50 text-slate-900">
       <AppShellHeader
         showZkBadge
-        trailingExtras={<BuilderReputationBadge />}
+        showNetworkBadge={false}
         onOpenMobileNav={() => setMobileNavOpen(true)}
         mobileNavOpen={mobileNavOpen}
       />

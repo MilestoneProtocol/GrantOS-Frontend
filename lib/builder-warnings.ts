@@ -368,7 +368,7 @@ export function useBuilderWarning(milestoneId: string | undefined): BuilderWarni
 
 /**
  * Subscribe to every warning record targeting the connected builder —
- * active *and* slashed. Used by the `/warnings` history list, which needs
+ * active *and* slashed. Used by the `/builder/warnings` history list, which needs
  * to surface slashed records even after the dashboard banner has retired.
  *
  * Ordering: most recent activity first. We sort by either `slash.slashedAtIso`

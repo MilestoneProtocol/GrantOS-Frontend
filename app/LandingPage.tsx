@@ -661,7 +661,7 @@ function SiteFooter() {
           links={[
             { label: 'Explore Grants', href: '/grants' },
             { label: 'Verification', href: '/verify' },
-            { label: 'Builder Dashboard', href: '/dashboard' },
+            { label: 'Builder Dashboard', href: '/builder' },
             { label: 'Committee', href: '/committee' },
           ]}
         />

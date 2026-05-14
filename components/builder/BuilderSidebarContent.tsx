@@ -67,20 +67,20 @@ export default function BuilderSidebarContent({
   }> = [
     {
       label: 'Dashboard',
-      href: '/dashboard',
+      href: '/builder',
       icon: Home,
       activeKey: 'dashboard',
       pillTone: 'indigo',
     },
     {
       label: 'My Grants',
-      href: '/dashboard',
+      href: '/builder',
       icon: ShieldCheck,
       pillTone: 'default',
     },
     {
       label: 'Warnings',
-      href: '/warnings',
+      href: '/builder/warnings',
       icon: AlertTriangle,
       activeKey: 'warnings',
       badge: warningCount > 0 ? warningCount : undefined,

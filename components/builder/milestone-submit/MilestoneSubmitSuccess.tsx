@@ -184,7 +184,7 @@ export default function MilestoneSubmitSuccess() {
 
       <div className="mt-10 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-center">
         <Link
-          href="/dashboard"
+          href="/builder"
           className="inline-flex flex-1 items-center justify-center rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:flex-initial sm:min-w-[160px]"
         >
           Back to Dashboard

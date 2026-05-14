@@ -11,6 +11,8 @@ import { useAccount, useReadContract } from 'wagmi';
 type AppShellHeaderProps = {
   /** When true, shows ZK status from GrantIdentityRegistry.getIdentity for the connected wallet. */
   showZkBadge?: boolean;
+  /** Controls whether the desktop network pill is rendered. */
+  showNetworkBadge?: boolean;
   /**
    * Optional element rendered into the right-hand trailing area on
    * desktop (sits before the network indicator). Used by the builder
@@ -29,6 +31,7 @@ type AppShellHeaderProps = {
 
 export default function AppShellHeader({
   showZkBadge = false,
+  showNetworkBadge = true,
   trailingExtras,
   onOpenMobileNav,
   mobileNavOpen = false,
@@ -131,10 +134,12 @@ export default function AppShellHeader({
 
             {isConnected ? (
               <>
-                <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm xl:inline-flex">
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
-                  <span className="truncate">{chain?.name ?? 'Arbitrum One'}</span>
-                </div>
+                {showNetworkBadge ? (
+                  <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm xl:inline-flex">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+                    <span className="truncate">{chain?.name ?? 'Arbitrum One'}</span>
+                  </div>
+                ) : null}
                 {showZkBadge && address ? <ZKVerifiedBadge verified={zkVerified} /> : null}
                 <ConnectButton variant="header" />
               </>

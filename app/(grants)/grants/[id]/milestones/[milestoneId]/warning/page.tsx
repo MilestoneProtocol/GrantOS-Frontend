@@ -84,14 +84,14 @@ function Breadcrumb({ grantIdLabel }: { grantIdLabel: string }) {
       className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500"
     >
       <Link
-        href="/dashboard"
+        href="/builder"
         className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition hover:text-slate-900"
       >
         <Home className="h-3 w-3" /> Dashboard
       </Link>
       <ChevronRight className="h-3 w-3 text-slate-400" aria-hidden />
       <Link
-        href="/warnings"
+        href="/builder/warnings"
         className="rounded-md px-1.5 py-0.5 transition hover:text-slate-900"
       >
         Warnings
@@ -127,7 +127,7 @@ function NotFoundState() {
         link is stale, or the warning was dismissed by the committee.
       </p>
       <Link
-        href="/dashboard"
+        href="/builder"
         className="mt-5 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
       >
         Back to Dashboard

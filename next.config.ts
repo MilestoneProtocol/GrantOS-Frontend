@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
+  /** Heavy WASM / ESM packages used by `lib/zk/prover.ts` for client-side proofs. */
+  transpilePackages: ['@aztec/bb.js', '@noir-lang/noir_js'],
   allowedDevOrigins: ['192.168.88.159'],
   async headers() {
     return [

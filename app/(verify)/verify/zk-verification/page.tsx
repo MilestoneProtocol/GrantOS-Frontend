@@ -2,15 +2,12 @@
 
 import ConnectButton from '@/components/ConnectButton';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
+import { api } from '@/lib/api';
 import { Check, Circle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { api } from '@/lib/api';
-import { Check, Circle } from 'lucide-react';
-import { useState } from 'react';
-import { useAccount } from 'wagmi';
-import { useReadContract } from 'wagmi';
+import { useEffect, useState } from 'react';
+import { useAccount, useReadContract } from 'wagmi';
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -37,9 +34,9 @@ export default function VerifyIdentity() {
     if (!address) return;
     if (verifying) return;
     if (!verified) return;
-    router.replace('/dashboard?toast=already_verified');
+    router.replace('/builder?toast=already_verified');
   }, [address, router, verified, verifying, walletResolved]);
-  const { isConnected, chain, address } = useAccount();
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -118,8 +118,8 @@ export default function RoleSelection({
               { icon: <CircleDollarSign className="h-3.5 w-3.5" />, label: 'Receive streamed USDC' },
               { icon: <BadgeCheck className="h-3.5 w-3.5" />, label: 'ZK-verified identity' },
             ]}
-            ctaLabel={builderUnverifiedNudge ? 'Verify Identity First' : 'Go to Dashboard'}
-            href={builderUnverifiedNudge ? '/verify' : '/dashboard'}
+            ctaLabel={builderUnverifiedNudge ? 'Verify Identity First' : 'Go to Builder'}
+            href={builderUnverifiedNudge ? '/verify' : '/builder'}
             badge={
               builderUnverifiedNudge ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
