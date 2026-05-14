@@ -265,3 +265,35 @@ body {
 .animate-grantos-reveal {
   animation: grantos-reveal 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
+
+/* Mobile / tablet navigation drawer slide-in. Paired with `MobileNavDrawer`. */
+@keyframes grantos-drawer-left-in {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes grantos-drawer-right-in {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes grantos-drawer-left-in {
+    from { transform: translateX(0); }
+    to { transform: translateX(0); }
+  }
+  @keyframes grantos-drawer-right-in {
+    from { transform: translateX(0); }
+    to { transform: translateX(0); }
+  }
+}
