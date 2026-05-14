@@ -20,6 +20,9 @@ export interface ProveInputs {
   wallet_address_lo:  string;
 }
 
+import { Barretenberg, BackendType, UltraHonkBackend } from '../../node_modules/@aztec/bb.js/dest/browser/index.js';
+import { Noir } from '@noir-lang/noir_js';
+
 // Singleton backend — reuse across calls to avoid re-initialising WASM
 let backendPromise: Promise<any> | null = null;
 let cachedBytecode: string | null = null;
@@ -33,7 +36,6 @@ async function getBackend(bytecode: string) {
   if (!backendPromise) {
     backendPromise = (async () => {
       try {
-        const { Barretenberg, UltraHonkBackend, BackendType } = await import('@aztec/bb.js');
         const hasSAB = typeof SharedArrayBuffer !== 'undefined';
         const threads = hasSAB
           ? Math.min(typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 1, 4)
@@ -90,8 +92,10 @@ function assertFieldScalar(name: string, value: string | number | bigint): strin
 
 // ── secp256k1 low-s normalisation ────────────────────────────────────────────
 
-const SECP256K1_N      = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
-const SECP256K1_HALF_N = SECP256K1_N / 2n;
+const SECP256K1_N = BigInt(
+  '0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141'
+);
+const SECP256K1_HALF_N = SECP256K1_N / BigInt(2);
 
 function bytesToBigInt(bytes: number[]): bigint {
   return BigInt('0x' + bytes.map(b => b.toString(16).padStart(2, '0')).join(''));
@@ -112,8 +116,8 @@ function sanitizeSignatureForNoir(signature: number[]): number[] {
     s = bytesToBigInt(normalized.slice(32, 64));
   }
   const r = bytesToBigInt(normalized.slice(0, 32));
-  if (r <= 0n || r >= SECP256K1_N) throw new Error('signature r is out of secp256k1 range');
-  if (s <= 0n || s >= SECP256K1_N) throw new Error('signature s is out of secp256k1 range');
+  if (r <= BigInt(0) || r >= SECP256K1_N) throw new Error('signature r is out of secp256k1 range');
+  if (s <= BigInt(0) || s >= SECP256K1_N) throw new Error('signature s is out of secp256k1 range');
   if (s > SECP256K1_HALF_N) {
     const normS = SECP256K1_N - s;
     normalized.splice(32, 32, ...bigIntTo32Bytes(normS));
@@ -171,8 +175,7 @@ export async function generateProof(inputs: ProveInputs): Promise<
     const backend = await getBackend(circuit.bytecode);
 
     console.log('[ZK] Creating Noir instance...');
-    const { Noir } = await import('@noir-lang/noir_js');
-    const noir    = new Noir(circuit as any);
+    const noir = new Noir(circuit as any);
 
     const rawSignature   = assertFixedBytes('signature',     Array.from(inputs.signature), 64);
     const rawMessageHash = assertFixedBytes('message_hash',  Array.from(inputs.message_hash), 32);

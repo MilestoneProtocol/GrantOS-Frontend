@@ -3,13 +3,13 @@
 import CommitteeAccessDeniedToast from '@/components/committee/CommitteeAccessDeniedToast';
 import CommitteeAppShell from '@/components/committee/CommitteeAppShell';
 import CommitteeReviewSkeleton from '@/components/committee/CommitteeReviewSkeleton';
+import SubHeaderBackButton from '@/components/navigation/SubHeaderBackButton';
 import ReviewPanel from '@/components/committee/reviews/ReviewPanel';
 import { getCommitteeDemoSubmissionById } from '@/demo/committee-demo';
 import { useAuthGuard } from '@/lib/authGuard';
-import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 /**
  * Single-milestone review view.
@@ -23,10 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  */
 
 const MIN_VALIDATION_MS = 1500;
-const ACCESS_DENIED_LINGER_MS = 1600;
-
 export default function CommitteeSingleReviewPage() {
-  const router = useRouter();
   const params = useParams<{ id: string }>();
   const submissionId = decodeURIComponent(params?.id ?? '');
 
@@ -104,13 +101,10 @@ export default function CommitteeSingleReviewPage() {
 
 function BackToDashboardLink() {
   return (
-    <Link
-      href="/committee"
-      className="inline-flex w-fit items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-slate-800"
-    >
-      <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-      Back to Committee Actions
-    </Link>
+    <SubHeaderBackButton
+      label="Back to Committee Actions"
+      fallbackHref="/committee"
+    />
   );
 }
 

@@ -14,7 +14,7 @@ export default function BuilderDashboardToast() {
   useEffect(() => {
     if (!toastKey || !message) return;
     const hide = window.setTimeout(() => {
-      router.replace('/dashboard');
+      router.replace('/builder');
     }, 4000);
     return () => window.clearTimeout(hide);
   }, [toastKey, message, router]);
@@ -31,7 +31,7 @@ export default function BuilderDashboardToast() {
         <button
           type="button"
           onClick={() => {
-            router.replace('/dashboard');
+            router.replace('/builder');
           }}
           className="shrink-0 rounded-lg p-1 text-red-700 hover:bg-red-100"
           aria-label="Dismiss"

@@ -13,7 +13,7 @@ import WarningBanner from './WarningBanner';
  *
  * Source of truth is the cross-route `useBuilderWarnings` store — committee
  * mutations (issue warning / execute slash) flow into this list via
- * localStorage, so navigating from `/committee → /dashboard` immediately
+ * localStorage, so navigating from `/committee → /builder` immediately
  * reflects the new warning without any wallet round-trip.
  *
  * Render strategy: this stack is strictly client-only. Two inputs make

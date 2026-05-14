@@ -41,9 +41,10 @@ function assertFieldScalar(name: string, value: string | number | bigint): strin
   return text;
 }
 
-const SECP256K1_N =
-  0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
-const SECP256K1_HALF_N = SECP256K1_N / 2n;
+const SECP256K1_N = BigInt(
+  '0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141'
+);
+const SECP256K1_HALF_N = SECP256K1_N / BigInt(2);
 
 function bytesToBigInt(bytes: number[]): bigint {
   const hex = bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -71,10 +72,10 @@ function sanitizeSignatureForNoir(signature: number[]): number[] {
     s = bytesToBigInt(normalized.slice(32, 64));
   }
 
-  if (r <= 0n || r >= SECP256K1_N) {
+  if (r <= BigInt(0) || r >= SECP256K1_N) {
     throw new Error('signature r is out of secp256k1 scalar range');
   }
-  if (s <= 0n || s >= SECP256K1_N) {
+  if (s <= BigInt(0) || s >= SECP256K1_N) {
     throw new Error('signature s is out of secp256k1 scalar range');
   }
 
@@ -85,7 +86,12 @@ function sanitizeSignatureForNoir(signature: number[]): number[] {
 
   r = bytesToBigInt(normalized.slice(0, 32));
   s = bytesToBigInt(normalized.slice(32, 64));
-  if (r <= 0n || r >= SECP256K1_N || s <= 0n || s > SECP256K1_HALF_N) {
+  if (
+    r <= BigInt(0) ||
+    r >= SECP256K1_N ||
+    s <= BigInt(0) ||
+    s > SECP256K1_HALF_N
+  ) {
     throw new Error('signature could not be normalized to Noir-compatible low-s form');
   }
 

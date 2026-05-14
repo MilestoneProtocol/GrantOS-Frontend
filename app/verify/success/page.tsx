@@ -140,7 +140,8 @@ function SuccessContent() {
     try {
       const hi = BigInt(attestation.walletAddressHi);
       const lo = BigInt(attestation.walletAddressLo);
-      return '0x' + ((hi << 128n) | lo).toString(16).padStart(40, '0').toLowerCase();
+      const addressShiftBits = BigInt(128);
+      return '0x' + ((hi << addressShiftBits) | lo).toString(16).padStart(40, '0').toLowerCase();
     } catch (e) {
       console.error('Failed to reconstruct bound address', e);
       return null;
@@ -304,7 +305,9 @@ function SuccessContent() {
 
   function handleSubmitOnChain() {
     if (!zkProof || !zkPublicInputs) return;
-    if (!attestation?.githubLogin) {
+    const githubLogin = attestation?.githubLogin;
+
+    if (!githubLogin) {
       setError('GitHub handle missing from attestation. Please restart verification.');
       return;
     }
@@ -353,7 +356,7 @@ function SuccessContent() {
         address:      IDENTITY_REGISTRY_ADDRESS,
         abi:          IDENTITY_REGISTRY_ABI,
         functionName: 'verifyIdentity',
-        args:         [proofHex, pubInputsBytes32, attestation.githubLogin],
+        args:         [proofHex, pubInputsBytes32, githubLogin],
         account:      client.account,
         chain:        arbitrumSepolia,
       })
