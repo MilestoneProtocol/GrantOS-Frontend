@@ -1,6 +1,6 @@
 'use client';
 
-import { GrantIdentity } from '@/grant-creation/store';
+import { GrantIdentity, useGrantCreationStore } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
 import { Check, Copy, Star } from 'lucide-react';
@@ -33,6 +33,7 @@ export default function SuccessScreen({
   builderIdentity,
   onCreateAnotherGrant,
 }: SuccessScreenProps) {
+  const fromDao = useGrantCreationStore((s) => s.grantCreationSource) === 'dao';
   const canReadIdentity = isAddress(builderAddress);
   const { data } = useReadContract({
     abi: identityRegistryAbi,
@@ -63,8 +64,11 @@ export default function SuccessScreen({
   return (
     <main className="mx-auto w-full max-w-[760px] px-4 py-6 sm:px-6 sm:py-8">
       <div className="mb-5 flex items-center justify-between px-1 text-xs font-medium text-slate-400 sm:text-sm">
-        <Link href="/" className="text-slate-400 transition hover:text-slate-600">
-          ← Back to Dashboard
+        <Link
+          href={fromDao ? '/dao' : '/'}
+          className="text-slate-400 transition hover:text-slate-600"
+        >
+          {fromDao ? '← Back to DAO Dashboard' : '← Back to Dashboard'}
         </Link>
         <span>Grant Creation Complete</span>
       </div>
@@ -142,10 +146,10 @@ export default function SuccessScreen({
 
         <div className="mx-auto mt-6 flex w-full max-w-[420px] flex-col gap-2.5 sm:flex-row">
           <Link
-            href={`/grants/${grantId}`}
+            href={fromDao ? '/dao' : `/grants/${grantId}`}
             className="inline-flex flex-1 items-center justify-center rounded-md bg-[#ff5b37] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#f04f29]"
           >
-            View Grant →
+            {fromDao ? 'Back to DAO Dashboard' : 'View Grant →'}
           </Link>
           <button
             type="button"

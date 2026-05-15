@@ -5,7 +5,10 @@ import ConnectButton from '@/components/ConnectButton';
 import MobileNavDrawer from '@/components/layout/MobileNavDrawer';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
-import { Bell, ChevronRight, Menu } from 'lucide-react';
+import NotificationBell from '@/components/NotificationBell';
+import TasksBadgeSync from '@/components/tasks/TasksBadgeSync';
+import { useTasksStore } from '@/store/tasksStore';
+import { ChevronRight, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -48,6 +51,7 @@ export default function CommitteeAppShell({
     query: { enabled: Boolean(address) },
   });
   const zkVerified = Boolean(identityData?.[0]);
+  const tasksBadge = useTasksStore((s) => s.queue.badgeCount);
 
   // Close drawer on route change so back / forward navigation never leaves a
   // mobile drawer stuck open.
@@ -59,6 +63,7 @@ export default function CommitteeAppShell({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-slate-50 text-slate-900">
+      <TasksBadgeSync />
       <div className="flex min-h-0 min-w-0 flex-1 flex-row">
         {/* Tablet icon rail (md..lg). */}
         <aside
@@ -75,6 +80,7 @@ export default function CommitteeAppShell({
           <CommitteeSidebarContent
             pathname={pathname}
             reviewsBadge={reviewsBadge}
+            tasksBadge={tasksBadge}
             variant="rail"
           />
         </aside>
@@ -97,6 +103,7 @@ export default function CommitteeAppShell({
             <CommitteeSidebarContent
               pathname={pathname}
               reviewsBadge={reviewsBadge}
+              tasksBadge={tasksBadge}
               variant="full"
             />
           </div>
@@ -135,13 +142,7 @@ export default function CommitteeAppShell({
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50"
-              >
-                <Bell className="h-4 w-4" strokeWidth={2} aria-hidden />
-              </button>
+              <NotificationBell />
 
               {isConnected && address ? (
                 <div className="hidden md:block">
@@ -189,6 +190,7 @@ export default function CommitteeAppShell({
         <CommitteeSidebarContent
           pathname={pathname}
           reviewsBadge={reviewsBadge}
+          tasksBadge={tasksBadge}
           variant="full"
           onNavigate={closeDrawer}
         />

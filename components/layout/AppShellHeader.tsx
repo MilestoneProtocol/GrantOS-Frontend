@@ -4,7 +4,8 @@ import ConnectButton from '@/components/ConnectButton';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
 import { APP_SHELL_PRIMARY_LINKS } from '@/lib/app-shell-nav';
-import { Bell, Menu } from 'lucide-react';
+import NotificationBell from '@/components/NotificationBell';
+import { Menu } from 'lucide-react';
 import Link from 'next/link';
 import { useAccount, useReadContract } from 'wagmi';
 
@@ -75,13 +76,7 @@ export default function AppShellHeader({
         </Link>
 
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" strokeWidth={2} />
-          </button>
+          <NotificationBell />
           {isConnected ? (
             <ConnectButton variant="avatar" />
           ) : (
@@ -124,13 +119,7 @@ export default function AppShellHeader({
           <div className="flex shrink-0 items-center gap-2 xl:gap-3">
             {trailingExtras}
 
-            <button
-              type="button"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50"
-              aria-label="Notifications"
-            >
-              <Bell className="h-4 w-4" strokeWidth={2} aria-hidden />
-            </button>
+            <NotificationBell />
 
             {isConnected ? (
               <>

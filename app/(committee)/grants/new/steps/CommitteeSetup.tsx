@@ -1,8 +1,10 @@
 'use client';
 
+import { useGrantCreationStore } from '@/grant-creation/store';
 import { useEffect, useMemo, useState } from 'react';
 import { isAddress } from 'viem';
-import { ArrowLeft, Minus, Plus, Wallet, X } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { ArrowLeft, Lock, Minus, Plus, Wallet, X } from 'lucide-react';
 
 type CommitteeSetupProps = {
   members: string[];
@@ -41,6 +43,16 @@ export default function CommitteeSetup({
 }: CommitteeSetupProps) {
   const [input, setInput] = useState('');
   const [localError, setLocalError] = useState('');
+  const { address } = useAccount();
+  const grantCreationSource = useGrantCreationStore((s) => s.grantCreationSource);
+  const lockedMember =
+    grantCreationSource === 'dao' && address && isAddress(address) ? address : undefined;
+
+  useEffect(() => {
+    if (!lockedMember) return;
+    const already = members.some((m) => m.toLowerCase() === lockedMember.toLowerCase());
+    if (!already) onAddMember(lockedMember);
+  }, [lockedMember, members, onAddMember]);
 
   useEffect(() => {
     if (!localError) return;
@@ -70,9 +82,18 @@ export default function CommitteeSetup({
       setLocalError('Committee can have at most 7 members.');
       return;
     }
+    if (lockedMember && value.toLowerCase() === lockedMember.toLowerCase()) {
+      setLocalError('You are already added as a committee member.');
+      return;
+    }
     onAddMember(value);
     setInput('');
     setLocalError('');
+  };
+
+  const removeMember = (member: string) => {
+    if (lockedMember && member.toLowerCase() === lockedMember.toLowerCase()) return;
+    onRemoveMember(member);
   };
 
   const canMinus = safeQuorum > 1;
@@ -124,24 +145,44 @@ export default function CommitteeSetup({
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex flex-wrap gap-2">
-            {members.map((member, idx) => (
-              <div
-                key={member}
-                className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm"
-              >
-                <span className={`h-2 w-2 rounded-full ${dotColor(idx)}`} aria-hidden />
-                <span className="tabular-nums">{shortAddr(member)}</span>
-                <button
-                  type="button"
-                  onClick={() => onRemoveMember(member)}
-                  className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                  aria-label="Remove member"
+            {members.map((member, idx) => {
+              const isLocked =
+                lockedMember && member.toLowerCase() === lockedMember.toLowerCase();
+              return (
+                <div
+                  key={member}
+                  className={`flex items-center gap-2 rounded-full border bg-white px-3 py-2 text-sm font-medium shadow-sm ${
+                    isLocked
+                      ? 'border-slate-300 text-slate-800 ring-1 ring-slate-200'
+                      : 'border-slate-200 text-slate-700'
+                  }`}
                 >
-                  <X className="h-3 w-3" strokeWidth={2} />
-                </button>
-              </div>
-            ))}
+                  {isLocked ? (
+                    <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" strokeWidth={2} aria-hidden />
+                  ) : (
+                    <span className={`h-2 w-2 rounded-full ${dotColor(idx)}`} aria-hidden />
+                  )}
+                  <span className="tabular-nums">{shortAddr(member)}</span>
+                  {!isLocked ? (
+                    <button
+                      type="button"
+                      onClick={() => removeMember(member)}
+                      className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Remove member"
+                    >
+                      <X className="h-3 w-3" strokeWidth={2} />
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+
           </div>
+          {lockedMember ? (
+            <p className="mt-2 text-xs text-slate-500">
+              You are automatically added as a committee member.
+            </p>
+          ) : null}
           <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
             <span>{members.length} members added</span>
             <span>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import RouteHistoryTracker from "@/components/navigation/RouteHistoryTracker";
+import ThemeScript from "@/components/settings/ThemeScript";
 import "./globals.css";
 import { Web3Provider } from "@/providers/Web3Provider";
 import { Suspense } from "react";
@@ -22,7 +23,10 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col font-sans" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
+      <body className="flex min-h-full flex-col bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100" suppressHydrationWarning>
         <Web3Provider>
           <Suspense fallback={null}>
             <RouteHistoryTracker />

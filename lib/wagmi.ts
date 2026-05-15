@@ -8,7 +8,7 @@ import {
   rabbyWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { createStorage } from 'wagmi';
-import { arbitrumSepolia } from 'wagmi/chains';
+import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
 
 const sessionStorageAdapter = {
   getItem(key: string) {
@@ -44,7 +44,7 @@ const wallets = [
 export const config = getDefaultConfig({
   appName: 'GrantOS v3',
   projectId,
-  chains: [arbitrumSepolia],
+  chains: [arbitrum, arbitrumSepolia],
   ssr: true,
   wallets,
   storage: createStorage({

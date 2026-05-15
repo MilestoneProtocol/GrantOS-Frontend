@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -18,11 +20,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0f1117;
+  --foreground: #ededed;
 }
 
 body {
@@ -295,7 +295,53 @@ body {
   }
 }
 
+@keyframes settings-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes settings-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-settings-backdrop {
+  animation: settings-backdrop-in 0.2s ease-out forwards;
+}
+
+.animate-settings-modal {
+  animation: settings-modal-in 0.25s ease-out forwards;
+}
+
+@keyframes notification-badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.2);
+  }
+}
+
+.animate-notification-badge {
+  animation: notification-badge-pulse 0.55s ease-in-out 2;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .animate-notification-badge {
+    animation: none;
+  }
+
   @keyframes grantos-drawer-left-in {
     from {
       transform: translateX(0);
@@ -386,4 +432,76 @@ body {
 
 .animate-wallet-dot {
   animation: wallet-dot-pulse 1.2s ease-in-out infinite;
+}
+
+/* ─── Guidelines page ─────────────────────────────────────────────────────── */
+
+.guidelines-pills-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.guidelines-pills-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.guidelines-table-wrap::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2rem;
+  background: linear-gradient(to left, var(--background), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+@media (max-width: 1279px) {
+  .guidelines-table-scroll {
+    scrollbar-width: thin;
+  }
+
+  .guidelines-table-wrap::after {
+    opacity: 1;
+  }
+}
+
+.guidelines-table--sticky-col tbody th[scope='row'],
+.guidelines-table--sticky-col thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+  box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.08);
+}
+
+.dark .guidelines-table--sticky-col tbody th[scope='row'],
+.dark .guidelines-table--sticky-col thead th:first-child {
+  box-shadow: 4px 0 8px -4px rgb(0 0 0 / 0.35);
+}
+
+.guidelines-table--sticky-col thead th:first-child {
+  background: rgb(248 250 252);
+}
+
+.dark .guidelines-table--sticky-col thead th:first-child {
+  background: rgb(30 41 59 / 0.8);
+}
+
+.guidelines-table--sticky-col tbody th[scope='row'] {
+  background: white;
+}
+
+.dark .guidelines-table--sticky-col tbody th[scope='row'] {
+  background: rgb(15 23 42);
+}
+
+.guidelines-table--sticky-col tbody tr:nth-child(even) th[scope='row'] {
+  background: rgb(248 250 252 / 0.6);
+}
+
+.dark .guidelines-table--sticky-col tbody tr:nth-child(even) th[scope='row'] {
+  background: rgb(30 41 59 / 0.3);
 }

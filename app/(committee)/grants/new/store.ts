@@ -23,7 +23,10 @@ export type GrantIdentity = {
   reputationScore: bigint;
 };
 
+export type GrantCreationSource = 'dao' | null;
+
 type GrantCreationState = {
+  grantCreationSource: GrantCreationSource;
   currentStep: number;
   builderAddress: string;
   builderIdentity: GrantIdentity | null;
@@ -53,10 +56,12 @@ type GrantCreationState = {
   setApprovedTxHash: (hash?: `0x${string}`) => void;
   setCreatedTxHash: (hash?: `0x${string}`) => void;
   setCreatedGrantId: (id?: string) => void;
+  setGrantCreationSource: (source: GrantCreationSource) => void;
   reset: () => void;
 };
 
 type PersistedGrantCreationState = {
+  grantCreationSource: GrantCreationSource;
   currentStep: number;
   builderAddress: string;
   builderIdentity: (Omit<GrantIdentity, 'reputationScore'> & { reputationScore: string }) | null;
@@ -81,6 +86,7 @@ const blankMilestone = (): MilestoneInput => ({
 });
 
 const initialState = {
+  grantCreationSource: null as GrantCreationSource,
   currentStep: 0,
   builderAddress: '',
   builderIdentity: null,
@@ -172,12 +178,19 @@ export const useGrantCreationStore = create<GrantCreationState>()(
       setApprovedTxHash: (hash) => set({ approvedTxHash: hash }),
       setCreatedTxHash: (hash) => set({ createdTxHash: hash }),
       setCreatedGrantId: (id) => set({ createdGrantId: id }),
-      reset: () => set({ ...initialState, milestones: [blankMilestone()] }),
+      setGrantCreationSource: (source) => set({ grantCreationSource: source }),
+      reset: () =>
+        set((state) => ({
+          ...initialState,
+          milestones: [blankMilestone()],
+          grantCreationSource: state.grantCreationSource,
+        })),
     }),
     {
       name: 'grant-creation-store-v1',
       storage: createJSONStorage(() => localStorage),
       partialize: (state): PersistedGrantCreationState => ({
+        grantCreationSource: state.grantCreationSource,
         currentStep: state.currentStep,
         builderAddress: state.builderAddress,
         builderIdentity: state.builderIdentity
