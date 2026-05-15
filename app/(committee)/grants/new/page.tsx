@@ -6,6 +6,7 @@ import ReviewConfirm from '@/grant-creation/steps/ReviewConfirm';
 import MilestoneDefinition from '@/grant-creation/steps/MilestoneDefinition';
 import CommitteeSetup from '@/grant-creation/steps/CommitteeSetup';
 import SuccessScreen from '@/components/SuccessScreen';
+import { useAuthGuard } from '@/lib/authGuard';
 import {
   GrantIdentity,
   MilestoneInput,
@@ -15,8 +16,9 @@ import {
 import AppShellHeader from '@/components/layout/AppShellHeader';
 import { APP_SHELL_PRIMARY_LINKS } from '@/lib/app-shell-nav';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Check, X } from 'lucide-react';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { isAddress } from 'viem';
 
 const STEP_LABELS = ['Builder', 'Milestones', 'Committee', 'Payment', 'Review'] as const;
@@ -45,8 +47,11 @@ function milestoneIsComplete(m: MilestoneInput) {
   );
 }
 
-export default function CreateGrantPage() {
+function CreateGrantPageContent() {
+  const guard = useAuthGuard('committee');
+  const searchParams = useSearchParams();
   const [attemptedStep, setAttemptedStep] = useState<number | null>(null);
+  const setGrantCreationSource = useGrantCreationStore((s) => s.setGrantCreationSource);
   const {
     currentStep,
     setStep,
@@ -73,6 +78,12 @@ export default function CreateGrantPage() {
     setCreatedGrantId,
     createdGrantId,
   } = useGrantCreationStore();
+
+  useEffect(() => {
+    if (searchParams.get('from') === 'dao') {
+      setGrantCreationSource('dao');
+    }
+  }, [searchParams, setGrantCreationSource]);
 
   const stepError = useMemo(() => {
     if (currentStep === 0) {
@@ -178,6 +189,7 @@ export default function CreateGrantPage() {
   }
 
   return (
+    guard.state === 'blocked' ? null : (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <AppShellHeader />
 
@@ -393,5 +405,20 @@ export default function CreateGrantPage() {
       </nav>
       ) : null}
     </div>
+    )
+  );
+}
+
+export default function CreateGrantPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
+          Loading grant form…
+        </div>
+      }
+    >
+      <CreateGrantPageContent />
+    </Suspense>
   );
 }

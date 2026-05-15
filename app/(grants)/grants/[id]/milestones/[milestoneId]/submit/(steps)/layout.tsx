@@ -3,12 +3,14 @@
 import BuilderAppShell from '@/components/builder/BuilderAppShell';
 import { MilestoneSubmitProvider, useMilestoneSubmit } from '@/components/builder/milestone-submit/MilestoneSubmitProvider';
 import SubmissionStepper from '@/components/builder/milestone-submit/SubmissionStepper';
-import { ArrowLeft, Circle } from 'lucide-react';
-import Link from 'next/link';
+import SubHeaderBackButton from '@/components/navigation/SubHeaderBackButton';
+import { useAuthGuard } from '@/lib/authGuard';
+import { Circle } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 function SubmitStepsChrome({ children }: { children: ReactNode }) {
+  const guard = useAuthGuard('builder');
   const pathname = usePathname();
   const isSuccessRoute = pathname.includes('/submit/success');
 
@@ -21,6 +23,18 @@ function SubmitStepsChrome({ children }: { children: ReactNode }) {
     grantHeaderSubtitle,
     isDemoRoute,
   } = useMilestoneSubmit();
+
+  if (guard.state === 'loading') {
+    return (
+      <BuilderAppShell navActive="none">
+        <main className="flex min-h-[50vh] w-full items-center justify-center px-5 py-16 text-sm text-slate-500 md:px-8 lg:px-10">
+          Detecting your role…
+        </main>
+      </BuilderAppShell>
+    );
+  }
+
+  if (guard.state === 'blocked') return null;
 
   if (gate.kind !== 'ok' || milestoneIndex === null || !displayTuple || !displayMilestone) {
     return (
@@ -50,13 +64,11 @@ function SubmitStepsChrome({ children }: { children: ReactNode }) {
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              <Link
-                href={`/grants/${encodeURIComponent(routeGrantId)}`}
-                className="inline-flex shrink-0 items-center gap-1 font-medium text-slate-500 hover:text-slate-800"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Back to Milestone
-              </Link>
+              <SubHeaderBackButton
+                label="Back to Milestone"
+                fallbackHref={`/grants/${encodeURIComponent(routeGrantId)}`}
+                className="shrink-0"
+              />
               <span className="text-slate-300">/</span>
               <span className="min-w-0 truncate font-semibold text-slate-900">{milestoneTitle}</span>
             </div>

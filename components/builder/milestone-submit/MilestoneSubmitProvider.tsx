@@ -349,7 +349,7 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     if (redirected.current) return;
     if (gate.kind !== 'redirect') return;
     redirected.current = true;
-    router.replace(`/dashboard?toast=${gate.toast}`);
+    router.replace(`/builder?toast=${gate.toast}`);
   }, [gate, router]);
 
   useEffect(() => {

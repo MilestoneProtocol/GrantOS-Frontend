@@ -1,9 +1,13 @@
 'use client';
 
 import ConnectButton from '@/components/ConnectButton';
+import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
+import { api } from '@/lib/api';
 import { Check, Circle } from 'lucide-react';
 import Link from 'next/link';
-import { useAccount } from 'wagmi';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useAccount, useReadContract } from 'wagmi';
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -12,7 +16,29 @@ const GithubIcon = ({ className }: { className?: string }) => (
 );
 
 export default function VerifyIdentity() {
-  const { isConnected, chain } = useAccount();
+  const router = useRouter();
+  const { isConnected, chain, address, status } = useAccount();
+
+  const { data: verified, isLoading: verifying } = useReadContract({
+    address: IDENTITY_REGISTRY_ADDRESS,
+    abi: identityRegistryAbi,
+    functionName: 'isVerified',
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address) },
+  });
+
+  const walletResolved = status !== 'connecting' && status !== 'reconnecting';
+
+  useEffect(() => {
+    if (!walletResolved) return;
+    if (!address) return;
+    if (verifying) return;
+    if (!verified) return;
+    router.replace('/builder?toast=already_verified');
+  }, [address, router, verified, verifying, walletResolved]);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const steps = [
     {
@@ -30,6 +56,30 @@ export default function VerifyIdentity() {
     { title: 'ZK Proof Generation', status: 'pending' },
     { title: 'Onchain Submission', status: 'pending' },
   ];
+
+  async function handleConnectGitHub() {
+    if (!isConnected || !address) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { requestId } = await api.post<{ success: boolean; requestId: string }>(
+        '/identity/init',
+        { walletAddress: address },
+      );
+      const { oauthUrl } = await api.get<{ oauthUrl: string; requestId: string }>(
+        `/identity/oauth-url/${requestId}`,
+      );
+      window.location.href = oauthUrl;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('409') || msg.includes('already completed')) {
+        window.location.href = '/verify/success';
+        return;
+      }
+      setError(msg);
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -67,13 +117,10 @@ export default function VerifyIdentity() {
                     {idx !== steps.length - 1 && (
                       <div
                         className={`absolute left-[11px] top-6 h-full w-px ${
-                          step.status === 'completed'
-                            ? 'bg-blue-500'
-                            : 'bg-slate-200'
+                          step.status === 'completed' ? 'bg-blue-500' : 'bg-slate-200'
                         }`}
                       />
                     )}
-
                     <div className="relative z-10 flex items-start gap-3">
                       <div className="mt-0.5 shrink-0">
                         {step.status === 'completed' ? (
@@ -94,9 +141,7 @@ export default function VerifyIdentity() {
                       <div className="pt-0.5">
                         <p
                           className={`text-sm font-bold ${
-                            step.status === 'pending'
-                              ? 'text-slate-400'
-                              : 'text-slate-900'
+                            step.status === 'pending' ? 'text-slate-400' : 'text-slate-900'
                           }`}
                         >
                           {step.title}
@@ -104,9 +149,7 @@ export default function VerifyIdentity() {
                         {step.description ? (
                           <p
                             className={`mt-0.5 text-xs ${
-                              step.status === 'active'
-                                ? 'text-blue-500'
-                                : 'text-slate-500'
+                              step.status === 'active' ? 'text-blue-500' : 'text-slate-500'
                             }`}
                           >
                             {step.description}
@@ -138,18 +181,22 @@ export default function VerifyIdentity() {
                 </div>
 
                 <div className="flex flex-col items-center px-5 py-10 text-center sm:px-6 sm:py-14">
-                  <Link
-                    href="/verify/proof"
+                  <button
+                    onClick={handleConnectGitHub}
+                    disabled={!isConnected || loading}
                     className={`inline-flex min-h-11 w-full max-w-[240px] items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all ${
-                      isConnected
+                      isConnected && !loading
                         ? 'bg-[#24292e] text-white shadow-md hover:bg-[#1b1f23]'
-                        : 'pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400'
+                        : 'cursor-not-allowed bg-slate-200 text-slate-400'
                     }`}
-                    aria-disabled={!isConnected}
                   >
                     <GithubIcon className="h-4 w-4" />
-                    Connect GitHub Account
-                  </Link>
+                    {loading ? 'Redirecting...' : 'Connect GitHub Account'}
+                  </button>
+
+                  {error && (
+                    <p className="mt-3 text-xs text-red-500">{error}</p>
+                  )}
 
                   <p className="mt-4 max-w-[290px] text-[11px] leading-5 text-slate-400">
                     By connecting, you agree to generate a Zero-Knowledge proof

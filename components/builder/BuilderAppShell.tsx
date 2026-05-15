@@ -1,29 +1,47 @@
 'use client';
 
+import BuilderSidebarContent, {
+  type BuilderSidebarNavActive,
+} from '@/components/builder/BuilderSidebarContent';
 import AppShellHeader from '@/components/layout/AppShellHeader';
-import { BadgeCheck, BookOpen, CircleAlert, Home, ShieldCheck, User } from 'lucide-react';
+import MobileNavDrawer from '@/components/layout/MobileNavDrawer';
+import { useBuilderActiveGrantCount } from '@/hooks/useMyGrants';
+import { useAllBuilderWarnings } from '@/lib/builder-warnings';
 import Link from 'next/link';
-import { useReadContract } from 'wagmi';
-import { useAccount } from 'wagmi';
+import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { useAccount, useReadContract } from 'wagmi';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
 
-function letterGrade(reputation: bigint) {
-  const score = Number(reputation);
-  if (score >= 95) return 'A+';
-  if (score >= 90) return 'A';
-  if (score >= 80) return 'B';
-  if (score >= 70) return 'C';
-  return 'D';
+/**
+ * Map the current path to a sidebar slot when the caller didn't pin one.
+ * `/builder/warnings` and any `/grants/.../warning` sub-route share the
+ * Warnings highlight so the breadcrumb feels rooted; `/builder` keeps Dashboard.
+ */
+function autoNavActiveFromPath(
+  pathname: string | null,
+): BuilderSidebarNavActive {
+  if (!pathname) return 'dashboard';
+  if (pathname === '/my-grants' || pathname.startsWith('/my-grants/')) return 'my-grants';
+  if (pathname === '/profile' || pathname.startsWith('/profile/')) return 'profile';
+  if (pathname === '/builder/warnings' || pathname.startsWith('/builder/warnings/')) return 'warnings';
+  if (pathname.endsWith('/warning') && pathname.startsWith('/grants/')) return 'warnings';
+  if (pathname === '/builder' || pathname.startsWith('/builder/')) return 'dashboard';
+  return 'none';
 }
 
 type BuilderAppShellProps = {
   children: React.ReactNode;
   /** Which sidebar item shows active styles; use `none` on flows like milestone submit. */
-  navActive?: 'dashboard' | 'none';
+  navActive?: BuilderSidebarNavActive;
 };
 
-export default function BuilderAppShell({ children, navActive = 'dashboard' }: BuilderAppShellProps) {
+export default function BuilderAppShell({ children, navActive }: BuilderAppShellProps) {
   const { address, chain } = useAccount();
+  const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const resolvedNavActive = navActive ?? autoNavActiveFromPath(pathname);
 
   const { data: identityData } = useReadContract({
     address: IDENTITY_REGISTRY_ADDRESS,
@@ -36,68 +54,90 @@ export default function BuilderAppShell({ children, navActive = 'dashboard' }: B
   const zkVerified = Boolean(identityData?.[0]);
   const reputationScore = (identityData?.[4] ?? BigInt(0)) as bigint;
 
+  const activeGrantCount = useBuilderActiveGrantCount();
+  const warnings = useAllBuilderWarnings(address);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const warningCount = mounted ? warnings.length : 0;
+  const activeWarningCount = mounted
+    ? warnings.filter((w) => !w.slash).length
+    : 0;
+
+  // Always close the drawer on route change so back / forward navigation
+  // doesn't leave the page in a "stuck open" state on mobile.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  const closeDrawer = useCallback(() => setMobileNavOpen(false), []);
+
+  const sharedSidebarProps = {
+    navActive: resolvedNavActive,
+    address: address as `0x${string}` | undefined,
+    zkVerified,
+    warningCount,
+    activeWarningCount,
+    reputationScore,
+    activeGrantCount,
+    chainName: chain?.name ?? 'Arbitrum One',
+  };
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-slate-50 text-slate-900">
-      <AppShellHeader showZkBadge />
+      <AppShellHeader
+        showZkBadge
+        showNetworkBadge={false}
+        onOpenMobileNav={() => setMobileNavOpen(true)}
+        mobileNavOpen={mobileNavOpen}
+      />
 
       <div className="flex w-full min-w-0 flex-1">
-        <aside className="sticky top-0 hidden h-screen max-h-screen w-[280px] shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-5 lg:flex lg:flex-col">
-          <nav className="space-y-2">
-            <Link
-              href="/dashboard"
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-                navActive === 'dashboard'
-                  ? 'bg-indigo-50 font-semibold text-indigo-700'
-                  : 'font-medium text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <Home className="h-4 w-4" /> Dashboard
-            </Link>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              <ShieldCheck className="h-4 w-4" /> My Grants
-            </Link>
-            <Link
-              href={address ? `/builders/${address}` : '/builders/unknown'}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              <User className="h-4 w-4" /> Builder Profile
-            </Link>
-            <Link
-              href="/verify"
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
-                zkVerified
-                  ? 'pointer-events-none bg-emerald-50 text-emerald-700'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              {zkVerified ? <BadgeCheck className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}
-              Verify Identity
-            </Link>
-          </nav>
+        {/* Tablet icon rail (md..lg) — icons only, sticky. */}
+        <aside
+          aria-label="Builder navigation rail"
+          className="sticky top-0 hidden h-screen max-h-screen w-[68px] shrink-0 overflow-y-auto border-r border-slate-200 bg-white py-4 md:flex md:flex-col lg:hidden"
+        >
+          <BuilderSidebarContent {...sharedSidebarProps} variant="rail" />
+        </aside>
 
-          <div className="mt-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs text-slate-500">Reputation</p>
-            <p className="mt-1 text-lg font-semibold">
-              {Number(reputationScore).toFixed(1)}{' '}
-              <span className="text-sm text-indigo-600">{letterGrade(reputationScore)}</span>
-            </p>
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-              <Link href="/verify" className="inline-flex items-center gap-1 hover:text-slate-700">
-                <BookOpen className="h-3.5 w-3.5" /> How it works
-              </Link>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                {chain?.name ?? 'Arbitrum One'}
-              </span>
-            </div>
-          </div>
+        {/* Desktop full sidebar (lg+). */}
+        <aside
+          aria-label="Builder navigation"
+          className="sticky top-0 hidden h-screen max-h-screen w-[268px] shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-5 lg:flex lg:flex-col"
+        >
+          <BuilderSidebarContent {...sharedSidebarProps} variant="full" />
         </aside>
 
         <div className="min-h-0 min-w-0 flex-1">{children}</div>
       </div>
+
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={closeDrawer}
+        ariaLabel="Builder navigation"
+        header={
+          <Link
+            href="/"
+            onClick={closeDrawer}
+            className="flex items-center gap-2.5"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
+              G
+            </span>
+            <span className="text-base font-bold tracking-tight text-slate-900">
+              GrantOS v3
+            </span>
+          </Link>
+        }
+      >
+        <BuilderSidebarContent
+          {...sharedSidebarProps}
+          variant="full"
+          onNavigate={closeDrawer}
+        />
+      </MobileNavDrawer>
     </div>
   );
 }

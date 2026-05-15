@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --font-geist-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-geist-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
 }
 
 @theme inline {
@@ -12,11 +20,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0f1117;
+  --foreground: #ededed;
 }
 
 body {
@@ -109,4 +115,393 @@ body {
 
 .animate-success-ring {
   animation: success-ring-pulse 2.4s ease-in-out 0.75s infinite;
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-in 0.22s ease-out both;
+}
+
+@keyframes quorum-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-quorum-banner-in {
+  animation: quorum-banner-in 0.36s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/*
+ * Brief red flash for the builder's reputation pill when a warning or
+ * slash is recorded onchain. Pulses the background + ring (rather than the
+ * text colour) so the resting score remains readable through the
+ * animation. Triggered by setting `data-flash="true"` on the pill.
+ */
+@keyframes grantos-rep-flash {
+  0% {
+    background-color: rgb(255 255 255 / 1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+
+  20% {
+    background-color: rgb(254 226 226 / 1);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.35);
+  }
+
+  60% {
+    background-color: rgb(254 242 242 / 1);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    background-color: rgb(255 255 255 / 1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/** Subtle upward pop when DAO slash / ZK counters tick up on poll */
+@keyframes dao-metric-rise {
+  0% {
+    transform: translateY(0);
+    color: rgb(15 23 42);
+  }
+
+  35% {
+    transform: translateY(-4px);
+    color: rgb(22 101 52);
+  }
+
+  100% {
+    transform: translateY(0);
+    color: rgb(15 23 42);
+  }
+}
+
+/* Onboarding landing — gentle float for the floating proof card. */
+@keyframes grantos-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-grantos-float {
+  animation: grantos-float 7s ease-in-out infinite;
+}
+
+/* Pulsing dot used on "live" indicators across onboarding + explorer. */
+@keyframes grantos-pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  }
+
+  70% {
+    box-shadow: 0 0 0 9px rgba(16, 185, 129, 0);
+  }
+}
+
+.animate-grantos-pulse {
+  animation: grantos-pulse-dot 2s ease-out infinite;
+}
+
+/* Slow horizontal marquee for the activity ticker. */
+@keyframes grantos-marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-grantos-marquee {
+  animation: grantos-marquee 38s linear infinite;
+}
+
+/* Soft conic shimmer for the hero accent. */
+@keyframes grantos-conic-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-grantos-conic {
+  animation: grantos-conic-spin 14s linear infinite;
+}
+
+/* Reveal animation used on cards as they mount. */
+@keyframes grantos-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-grantos-reveal {
+  animation: grantos-reveal 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Mobile / tablet navigation drawer slide-in. Paired with `MobileNavDrawer`. */
+@keyframes grantos-drawer-left-in {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes grantos-drawer-right-in {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes settings-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes settings-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-settings-backdrop {
+  animation: settings-backdrop-in 0.2s ease-out forwards;
+}
+
+.animate-settings-modal {
+  animation: settings-modal-in 0.25s ease-out forwards;
+}
+
+@keyframes notification-badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.2);
+  }
+}
+
+.animate-notification-badge {
+  animation: notification-badge-pulse 0.55s ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-notification-badge {
+    animation: none;
+  }
+
+  @keyframes grantos-drawer-left-in {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes grantos-drawer-right-in {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+}
+
+/* ─── Wallet connect modal animations ─────────────────────────────────────── */
+
+/* Backdrop fade */
+@keyframes wallet-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Mobile: bottom sheet slides up from below */
+@keyframes wallet-sheet-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Tablet/desktop: modal scales in */
+@keyframes wallet-modal-in {
+  from {
+    transform: scale(0.95) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Loading dots pulse */
+@keyframes wallet-dot-pulse {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-wallet-backdrop {
+  animation: wallet-backdrop-in 0.2s ease both;
+}
+
+.animate-wallet-sheet {
+  animation: wallet-sheet-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Centered wallet modal (all breakpoints) */
+.animate-wallet-modal {
+  animation: wallet-modal-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* sm+ overrides sheet with centered scale */
+@media (min-width: 640px) {
+  .sm\:animate-wallet-modal {
+    animation: wallet-modal-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+
+.animate-wallet-dot {
+  animation: wallet-dot-pulse 1.2s ease-in-out infinite;
+}
+
+/* ─── Guidelines page ─────────────────────────────────────────────────────── */
+
+.guidelines-pills-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.guidelines-pills-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.guidelines-table-wrap::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2rem;
+  background: linear-gradient(to left, var(--background), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+@media (max-width: 1279px) {
+  .guidelines-table-scroll {
+    scrollbar-width: thin;
+  }
+
+  .guidelines-table-wrap::after {
+    opacity: 1;
+  }
+}
+
+.guidelines-table--sticky-col tbody th[scope='row'],
+.guidelines-table--sticky-col thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+  box-shadow: 4px 0 8px -4px rgb(15 23 42 / 0.08);
+}
+
+.dark .guidelines-table--sticky-col tbody th[scope='row'],
+.dark .guidelines-table--sticky-col thead th:first-child {
+  box-shadow: 4px 0 8px -4px rgb(0 0 0 / 0.35);
+}
+
+.guidelines-table--sticky-col thead th:first-child {
+  background: rgb(248 250 252);
+}
+
+.dark .guidelines-table--sticky-col thead th:first-child {
+  background: rgb(30 41 59 / 0.8);
+}
+
+.guidelines-table--sticky-col tbody th[scope='row'] {
+  background: white;
+}
+
+.dark .guidelines-table--sticky-col tbody th[scope='row'] {
+  background: rgb(15 23 42);
+}
+
+.guidelines-table--sticky-col tbody tr:nth-child(even) th[scope='row'] {
+  background: rgb(248 250 252 / 0.6);
+}
+
+.dark .guidelines-table--sticky-col tbody tr:nth-child(even) th[scope='row'] {
+  background: rgb(30 41 59 / 0.3);
 }

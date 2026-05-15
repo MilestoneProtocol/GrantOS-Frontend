@@ -1,17 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import RouteHistoryTracker from "@/components/navigation/RouteHistoryTracker";
+import ThemeScript from "@/components/settings/ThemeScript";
 import "./globals.css";
 import { Web3Provider } from "@/providers/Web3Provider";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { Suspense } from "react";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -26,10 +20,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col font-sans">
+      <head>
+        <ThemeScript />
+      </head>
+      <body className="flex min-h-full flex-col bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100" suppressHydrationWarning>
         <Web3Provider>
+          <Suspense fallback={null}>
+            <RouteHistoryTracker />
+          </Suspense>
           <main className="flex min-h-screen flex-1 flex-col">
             {children}
           </main>
