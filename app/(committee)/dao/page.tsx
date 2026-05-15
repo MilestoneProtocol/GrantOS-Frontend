@@ -12,6 +12,7 @@ import { useAuthGuard } from '@/lib/authGuard';
 import { filterDaoGrants } from '@/lib/dao-dashboard-data';
 import { useDaoDashboardStore } from '@/lib/dao-dashboard-store';
 import { Download, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 const MIN_VALIDATION_MS = 1500;
@@ -22,6 +23,7 @@ const MIN_VALIDATION_MS = 1500;
  * placeholder until the follow-up screen ships.
  */
 export default function DaoDashboardPage() {
+  const router = useRouter();
   const guard = useAuthGuard('dao');
   const { search, setSearch, selected, onToggle } = useDaoFilters();
   const snapshot = useDaoDashboardStore((s) => s.snapshot);
@@ -81,6 +83,7 @@ export default function DaoDashboardPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => router.push('/grants/new?from=dao')}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
                   >
                     <Plus className="h-4 w-4" aria-hidden />

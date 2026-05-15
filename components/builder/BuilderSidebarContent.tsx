@@ -9,9 +9,10 @@ import {
   ShieldCheck,
   User,
 } from 'lucide-react';
+import SidebarUtilityFooter from '@/components/sidebar/SidebarUtilityFooter';
 import Link from 'next/link';
 
-export type BuilderSidebarNavActive = 'dashboard' | 'warnings' | 'none';
+export type BuilderSidebarNavActive = 'dashboard' | 'my-grants' | 'warnings' | 'profile' | 'none';
 
 type BuilderSidebarContentProps = {
   navActive: BuilderSidebarNavActive;
@@ -20,6 +21,7 @@ type BuilderSidebarContentProps = {
   warningCount: number;
   activeWarningCount: number;
   reputationScore: bigint;
+  activeGrantCount?: number;
   chainName: string;
   /** When in mobile drawer, every link click should close the drawer. */
   onNavigate?: () => void;
@@ -49,6 +51,7 @@ export default function BuilderSidebarContent({
   warningCount,
   activeWarningCount,
   reputationScore,
+  activeGrantCount = 0,
   chainName,
   onNavigate,
   variant = 'full',
@@ -74,9 +77,12 @@ export default function BuilderSidebarContent({
     },
     {
       label: 'My Grants',
-      href: '/builder',
+      href: '/my-grants',
       icon: ShieldCheck,
-      pillTone: 'default',
+      activeKey: 'my-grants',
+      badge: activeGrantCount > 0 ? activeGrantCount : undefined,
+      badgeTone: 'slate',
+      pillTone: 'indigo',
     },
     {
       label: 'Warnings',
@@ -89,8 +95,9 @@ export default function BuilderSidebarContent({
     },
     {
       label: 'Builder Profile',
-      href: address ? `/builders/${address}` : '/builders/unknown',
+      href: '/profile',
       icon: User,
+      activeKey: 'profile',
       pillTone: 'default',
     },
     {
@@ -165,6 +172,11 @@ export default function BuilderSidebarContent({
               <span className="flex min-w-0 items-center gap-2.5">
                 <Icon className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                 <span className="truncate">{item.label}</span>
+                {item.activeKey === 'profile' && item.label === 'Builder Profile' ? (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-emerald-500 px-1 text-[10px] font-bold text-white">
+                    {letterGrade(reputationScore).replace('+', '')}
+                  </span>
+                ) : null}
               </span>
               {item.badge ? (
                 <span
@@ -182,9 +194,9 @@ export default function BuilderSidebarContent({
         })}
       </nav>
 
-      {!isRail ? (
-        <div className="mt-auto pt-4">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+      <div className={`mt-auto pt-4 ${isRail ? 'flex flex-col items-center gap-3' : 'space-y-3'}`}>
+        {!isRail ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-800/50">
             <p className="text-xs font-medium text-slate-500">Reputation</p>
             <p className="mt-1 text-lg font-bold tabular-nums">
               {Number(reputationScore).toFixed(1)}{' '}
@@ -206,8 +218,9 @@ export default function BuilderSidebarContent({
               </span>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+        <SidebarUtilityFooter variant={isRail ? 'rail' : 'full'} onNavigate={onNavigate} />
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import ConnectButton from '@/components/ConnectButton';
 import MobileNavDrawer from '@/components/layout/MobileNavDrawer';
+import SidebarUtilityFooter from '@/components/sidebar/SidebarUtilityFooter';
 import {
   Activity,
   ArrowUpRight,
@@ -132,18 +133,19 @@ export default function OnboardingShell({
             </div>
           </nav>
 
-          <div className="border-t border-slate-100 px-4 py-4">
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+          <div className="border-t border-slate-100 px-3 py-4 dark:border-slate-800">
+            <SidebarUtilityFooter variant="full" />
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900">
               <span
                 aria-hidden
                 className={`relative h-2 w-2 rounded-full ${
                   isConnected ? 'bg-emerald-500 animate-grantos-pulse' : 'bg-slate-300'
                 }`}
               />
-              <span className="font-semibold text-slate-700">{chainName}</span>
-              <Activity className="ml-auto h-3.5 w-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-700 dark:text-slate-300">{chainName}</span>
+              <Activity className="ml-auto h-3.5 w-3.5 text-slate-400" aria-hidden />
             </div>
-            <p className="mt-2 px-1 text-[10px] text-slate-400">
+            <p className="mt-2 px-1 text-[10px] text-slate-400 dark:text-slate-500">
               © {new Date().getFullYear()} GrantOS Protocol
             </p>
           </div>
@@ -273,14 +275,16 @@ export default function OnboardingShell({
               </Link>
             </div>
 
-            <div className="mt-6 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+            <SidebarUtilityFooter variant="full" onNavigate={closeDrawer} className="mt-6" />
+
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900">
               <span
                 aria-hidden
                 className={`relative h-2 w-2 rounded-full ${
                   isConnected ? 'bg-emerald-500 animate-grantos-pulse' : 'bg-slate-300'
                 }`}
               />
-              <span className="font-semibold text-slate-700">{chainName}</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300">{chainName}</span>
               <Activity className="ml-auto h-3.5 w-3.5 text-slate-400" aria-hidden />
             </div>
           </nav>

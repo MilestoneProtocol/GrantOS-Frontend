@@ -5,6 +5,7 @@ import BuilderSidebarContent, {
 } from '@/components/builder/BuilderSidebarContent';
 import AppShellHeader from '@/components/layout/AppShellHeader';
 import MobileNavDrawer from '@/components/layout/MobileNavDrawer';
+import { useBuilderActiveGrantCount } from '@/hooks/useMyGrants';
 import { useAllBuilderWarnings } from '@/lib/builder-warnings';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -21,6 +22,8 @@ function autoNavActiveFromPath(
   pathname: string | null,
 ): BuilderSidebarNavActive {
   if (!pathname) return 'dashboard';
+  if (pathname === '/my-grants' || pathname.startsWith('/my-grants/')) return 'my-grants';
+  if (pathname === '/profile' || pathname.startsWith('/profile/')) return 'profile';
   if (pathname === '/builder/warnings' || pathname.startsWith('/builder/warnings/')) return 'warnings';
   if (pathname.endsWith('/warning') && pathname.startsWith('/grants/')) return 'warnings';
   if (pathname === '/builder' || pathname.startsWith('/builder/')) return 'dashboard';
@@ -51,6 +54,7 @@ export default function BuilderAppShell({ children, navActive }: BuilderAppShell
   const zkVerified = Boolean(identityData?.[0]);
   const reputationScore = (identityData?.[4] ?? BigInt(0)) as bigint;
 
+  const activeGrantCount = useBuilderActiveGrantCount();
   const warnings = useAllBuilderWarnings(address);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -76,6 +80,7 @@ export default function BuilderAppShell({ children, navActive }: BuilderAppShell
     warningCount,
     activeWarningCount,
     reputationScore,
+    activeGrantCount,
     chainName: chain?.name ?? 'Arbitrum One',
   };
 
