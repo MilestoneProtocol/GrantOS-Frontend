@@ -5,8 +5,9 @@ import CommitteeAppShell from '@/components/committee/CommitteeAppShell';
 import CommitteeReviewSkeleton from '@/components/committee/CommitteeReviewSkeleton';
 import SubHeaderBackButton from '@/components/navigation/SubHeaderBackButton';
 import ReviewPanel from '@/components/committee/reviews/ReviewPanel';
-import { getCommitteeDemoSubmissionById } from '@/demo/committee-demo';
 import { useAuthGuard } from '@/lib/authGuard';
+import { useCommitteeReviews } from '@/lib/hooks/useCommitteeReviews';
+import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -38,10 +39,12 @@ export default function CommitteeSingleReviewPage() {
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
 
-  const submission = useMemo(
-    () => getCommitteeDemoSubmissionById(submissionId),
-    [submissionId],
-  );
+  const { data: realData, loading: dataLoading } = useCommitteeReviews();
+
+  const submission = useMemo(() => {
+    const all = [...realData.pending, ...realData.approved, ...realData.rejected];
+    return all.find((s) => s.id === submissionId);
+  }, [realData, submissionId]);
 
   // The pending tab is the only one where the action buttons should be live;
   // approved/rejected submissions land here read-only.
@@ -69,7 +72,11 @@ export default function CommitteeSingleReviewPage() {
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
             <BackToDashboardLink />
 
-            {submission ? (
+            {dataLoading ? (
+              <div className="flex justify-center p-12 text-slate-400">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : submission ? (
               <>
                 <FocusedHeader
                   grantTitle={submission.grantTitle}

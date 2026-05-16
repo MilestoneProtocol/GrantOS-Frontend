@@ -75,11 +75,7 @@ function formatRelativeTime(ms: number): string {
   return months <= 1 ? '1 month ago' : `${months} months ago`;
 }
 
-const DEMO_REPUTATION_EVENTS = [
-  { label: 'Milestone Approved', delta: 15, ago: '2 days ago', positive: true },
-  { label: 'ZK Proof Validated', delta: 5, ago: '1 week ago', positive: true },
-  { label: 'Grant Completed', delta: 50, ago: '3 weeks ago', positive: true },
-];
+
 
 function CopyAddressButton({ address }: { address: string }) {
   const [copied, setCopied] = useState(false);
@@ -187,9 +183,7 @@ export default function PrivateBuilderProfileContent({
           ago: formatRelativeTime(e.timestampMs),
           positive: e.delta >= 0,
         }))
-      : hasProfileContent
-        ? DEMO_REPUTATION_EVENTS
-        : [];
+      : [];
 
   const handleReverifyConfirm = useCallback(() => {
     setReverifyOpen(false);

@@ -66,7 +66,7 @@ export default function MilestoneSubmitContextPage() {
             </div>
             <p className="mt-1 text-sm font-semibold text-slate-900">GitHub PR merge (ZK)</p>
             <span className="mt-2 inline-flex rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">
-              vlayer SDK
+              Noir SDK
             </span>
           </div>
         </div>
@@ -91,9 +91,9 @@ export default function MilestoneSubmitContextPage() {
               }`}
             />
             {repoError ? (
-              <p className="mt-1 text-xs text-red-600">Enter a valid owner/repo (e.g. vlayer/sdk).</p>
+              <p className="mt-1 text-xs text-red-600">Enter a valid owner/repo (e.g. noir-lang/noir).</p>
             ) : (
-              <p className="mt-1 text-xs text-slate-400">Format: owner/repo (e.g. vlayer/sdk)</p>
+              <p className="mt-1 text-xs text-slate-400">Format: owner/repo (e.g. noir-lang/noir)</p>
             )}
           </div>
           <div>

@@ -235,12 +235,12 @@ export default function BuilderProfileContent({ data }: { data: BuilderProfileDa
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <ZkBadgeLarge verified={Boolean(hasIdentityRecord && identity.zkVerified)} />
-              {!hasIdentityRecord ? (
+              <ZkBadgeLarge verified={Boolean(identity.zkVerified || stats.hasZkSubmission)} />
+              {!(identity.zkVerified || stats.hasZkSubmission) ? (
                 <p className="max-w-xl text-sm leading-relaxed text-slate-600">
                   <span className="font-semibold text-slate-800">Unverified</span>
                   {' — '}
-                  this builder has not completed ZK Identity Binding.
+                  this builder has not completed ZK Identity Binding or ZK milestone delivery.
                 </p>
               ) : null}
             </div>

@@ -46,11 +46,11 @@ export default function SuccessScreen({
   const freshIdentity = useMemo<GrantIdentity | null>(() => {
     if (!data) return null;
     return {
-      zkVerified: data[0],
-      githubHandle: data[1],
-      accountCreationYear: Number(data[2]),
-      contributionTier: Number(data[3]),
-      reputationScore: data[4],
+      zkVerified: data.isVerified,
+      githubHandle: data.githubHandle,
+      accountCreationYear: Number(data.createdYear),
+      contributionTier: Number(data.tier),
+      reputationScore: 0,
     };
   }, [data]);
 

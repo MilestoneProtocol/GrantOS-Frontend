@@ -7,7 +7,16 @@ import {
   letterGradeFromScore,
   type DaoGrantCardModel,
 } from '@/demo/dao-dashboard';
-import { useDaoDashboardData } from '@/lib/dao-dashboard-data';
+import {
+  GRANT_ESCROW_ADDRESS,
+  GRANT_FACTORY_ADDRESS,
+  IDENTITY_REGISTRY_ADDRESS,
+  grantEscrowReadAbi,
+  grantFactoryAbi,
+  identityRegistryAbi,
+} from '@/lib/escrow';
+import { formatUnits, zeroAddress } from 'viem';
+import { useReadContract, useReadContracts } from 'wagmi';
 import {
   AlertTriangle,
   ArrowRight,
@@ -44,8 +53,109 @@ const FILTERS: { id: ExplorerFilter; label: string; icon: React.ReactNode }[] = 
  * Cards link to `/grants/[slug]` for detail wiring downstream.
  */
 export default function GrantsExplorerPage() {
-  const { snapshot } = useDaoDashboardData();
-  const grants = snapshot.grants;
+  const { data: countData, isLoading: isCountLoading } = useReadContract({
+    address: GRANT_FACTORY_ADDRESS,
+    abi: grantFactoryAbi,
+    functionName: 'grantCount',
+  });
+
+  const grantCount = Number(countData || 0n);
+
+  const factoryGrantContracts = useMemo(() => {
+    return Array.from({ length: grantCount }, (_, i) => ({
+      address: GRANT_FACTORY_ADDRESS,
+      abi: grantFactoryAbi,
+      functionName: 'grants',
+      args: [BigInt(i)],
+    }));
+  }, [grantCount]);
+
+  const { data: escrowAddressesData, isLoading: isAddressesLoading } = useReadContracts({
+    contracts: factoryGrantContracts,
+    query: { enabled: grantCount > 0 },
+  });
+
+  const escrowAddresses = useMemo(() => {
+    if (!escrowAddressesData) return [];
+    return escrowAddressesData.map((r: any) =>
+      r.status === 'success' && r.result ? r.result : zeroAddress,
+    );
+  }, [escrowAddressesData]);
+
+  const grantContracts = useMemo(() => {
+    return escrowAddresses.map((address) => ({
+      address: address as `0x${string}`,
+      abi: grantEscrowReadAbi,
+      functionName: 'getGrant',
+    }));
+  }, [escrowAddresses]);
+
+  const { data: grantsData, isLoading: isGrantsLoading } = useReadContracts({
+    contracts: grantContracts,
+    query: { enabled: grantContracts.length > 0 },
+  });
+
+  const builderAddresses = useMemo(() => {
+    if (!grantsData) return [];
+    return grantsData.map((r: any) =>
+      r.status === 'success' && r.result ? r.result.builder : zeroAddress,
+    );
+  }, [grantsData]);
+
+  const identityContracts = useMemo(() => {
+    return builderAddresses.map((address) => ({
+      address: IDENTITY_REGISTRY_ADDRESS,
+      abi: identityRegistryAbi,
+      functionName: 'getIdentity',
+      args: [address],
+    }));
+  }, [builderAddresses]);
+
+  const { data: identitiesData, isLoading: isIdentitiesLoading } = useReadContracts({
+    contracts: identityContracts,
+    query: { enabled: builderAddresses.length > 0 },
+  });
+
+  const grants = useMemo((): DaoGrantCardModel[] => {
+    if (!grantsData) return [];
+    return grantsData
+      .map((row: any, i: number) => {
+        if (row.status !== 'success' || !row.result) return null;
+        const g = row.result;
+        const identity = (identitiesData?.[i] as any)?.result as
+          | { isVerified: boolean; tier: bigint; githubHandle: string }
+          | undefined;
+
+        const totalUsdc = Number(
+          g.milestones.reduce((s: bigint, m: any) => s + m.amount, 0n) / 1000000n,
+        );
+
+        return {
+          slug: i.toString(),
+          displayId: `#GRT-${i}`,
+          builder: g.builder,
+          contributionTier: identity ? `Tier ${identity.tier} Contributor` : 'Contributor',
+          reputationScore: identity ? Number(identity.tier) * 25 + 15 : 0,
+          milestoneTotal: g.milestones.length,
+          milestoneCompleted: 0,
+          paymentMode: g.streaming ? 'streaming' : 'lump-sum',
+          zkVerified: identity?.isVerified ?? false,
+          isStreamingActive: g.streaming,
+          streamAccumulatedUsdcAtEpoch: 0,
+          nextDeadlineIso:
+            g.milestones[0]?.deadline > 0n
+              ? new Date(Number(g.milestones[0].deadline) * 1000).toISOString()
+              : undefined,
+          totalGrantUsdc: totalUsdc,
+          hasWarning: false,
+          hasSlashed: false,
+          tags: g.streaming ? ['active', 'streaming'] : ['active'],
+        };
+      })
+      .filter((x): x is DaoGrantCardModel => x !== null);
+  }, [grantsData, identitiesData]);
+
+  const isLoading = isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading;
 
   const [filter, setFilter] = useState<ExplorerFilter>('all');
   const [query, setQuery] = useState('');
@@ -192,7 +302,12 @@ export default function GrantsExplorerPage() {
           </div>
 
           {/* Cards */}
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <div className="mt-10 flex flex-col items-center justify-center space-y-4 py-20">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+              <p className="text-sm font-medium text-slate-500 italic">Syncing live grant registry...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <EmptyState onClear={() => { setFilter('all'); setQuery(''); }} />
           ) : (
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

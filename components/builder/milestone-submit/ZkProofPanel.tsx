@@ -15,13 +15,14 @@ import {
   RefreshCw,
   Shield,
 } from 'lucide-react';
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
+import { useAccount } from 'wagmi';
 
 const PHASE_LABELS = [
-  'Connecting to vlayer Web Prover…',
-  'Establishing TLS session with GitHub API…',
-  'Running MPC-TLS protocol with notary server…',
-  'Compressing proof into ZK format…',
+  'Fetching Noir circuit...',
+  'Initializing UltraHonk backend...',
+  'Generating witness...',
+  'Generating proof...',
 ] as const;
 
 const PHASE_DELAYS_MS = [1800, 2000, 2400, 2000];
@@ -63,6 +64,12 @@ export default function ZkProofPanel({
   onTryAgain,
   onContinueToNextStep,
 }: ZkProofPanelProps) {
+  const { address } = useAccount();
+  const addressRef = useRef(address);
+  useEffect(() => {
+    addressRef.current = address;
+  }, [address]);
+
   const [phaseStates, setPhaseStates] = useState<PhaseUi[]>(['running', 'pending', 'pending', 'pending']);
   const [phaseTimes, setPhaseTimes] = useState<Record<number, string>>({});
 
@@ -99,7 +106,7 @@ export default function ZkProofPanel({
       await sleep(600);
       if (cancelled) return;
 
-      const built = buildMockZkProofResult(repo, pr, registeredGithubHandle);
+      const built = buildMockZkProofResult(repo, pr, registeredGithubHandle, addressRef.current || '0x');
       if (built.kind === 'failure') {
         onProofResolved({ outcome: 'failure', errorMessage: built.message });
       } else {
@@ -155,7 +162,7 @@ export default function ZkProofPanel({
         </div>
         <h2 className="text-center text-xl font-semibold text-slate-900">Generating Zero-Knowledge Proof</h2>
         <p className="mt-2 max-w-lg text-center text-sm leading-relaxed text-slate-500">
-          Cryptographically verifying your GitHub contributions via MPC-TLS without revealing your access tokens.
+          Cryptographically verifying your GitHub contributions via Noir ZK Coprocessor without revealing your access tokens.
         </p>
 
         <div className="mt-8 w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -163,7 +170,7 @@ export default function ZkProofPanel({
             <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-slate-500">
               execution log
             </p>
-            <span className="font-mono text-[10px] font-medium text-emerald-700">vlayer prover v2.1</span>
+            <span className="font-mono text-[10px] font-medium text-emerald-700">Noir coprocessor</span>
           </div>
           <div className="max-h-[min(40vh,320px)] overflow-y-auto bg-slate-50/40 px-3 py-3 font-mono text-[13px] leading-relaxed text-slate-800 sm:text-xs">
             <ul className="space-y-0">

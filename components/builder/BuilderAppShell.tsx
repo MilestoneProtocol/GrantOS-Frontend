@@ -51,8 +51,8 @@ export default function BuilderAppShell({ children, navActive }: BuilderAppShell
     query: { enabled: Boolean(address) },
   });
 
-  const zkVerified = Boolean(identityData?.[0]);
-  const reputationScore = (identityData?.[4] ?? BigInt(0)) as bigint;
+  const zkVerified = Boolean((identityData as any)?.isVerified);
+  const reputationScore = ((identityData as any)?.tier ?? BigInt(0)) as bigint;
 
   const activeGrantCount = useBuilderActiveGrantCount();
   const warnings = useAllBuilderWarnings(address);

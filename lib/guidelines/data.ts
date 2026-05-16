@@ -80,9 +80,9 @@ export const REPUTATION_GRADES = [
 
 export const GUIDELINES_FAQ = [
   {
-    question: 'What happens if vlayer proof generation fails?',
+    question: 'What happens if ZK proof generation fails?',
     answer:
-      'Proof generation can fail for several reasons: the PR does not exist, the repository is private, the GitHub API timed out, or the vlayer notary server was temporarily unavailable. In all cases, the failure is shown with a specific error reason and a retry button. No transaction is submitted and no fees are spent. You can retry as many times as needed before your deadline.',
+      'Proof generation can fail for several reasons: the PR does not exist, the repository is private, the GitHub API timed out, or the coprocessor backend was temporarily unavailable. In all cases, the failure is shown with a specific error reason and a retry button. No transaction is submitted and no fees are spent. You can retry as many times as needed before your deadline.',
   },
   {
     question: 'Can I resubmit after rejection?',

@@ -54,7 +54,7 @@ function SectionHowItWorks() {
           Before receiving any funds, the builder completes a one-time ZK identity binding at /verify. They cryptographically prove that their wallet is controlled by the same person as a real GitHub account with a verified contribution history. This proof is verified onchain. It is permanent. It cannot be faked.
         </GuidelinesStepBlock>
         <GuidelinesStepBlock title="Step 3 — Builder Submits ZK Proof">
-          When a milestone is complete, the builder does not paste a URL into a text box. They click Generate Proof. The app calls vlayer&apos;s Web Prover which runs the TLSNotary MPC-TLS protocol against the GitHub API. A cryptographic proof is generated confirming the PR exists, is merged, and is authored by the builder&apos;s verified GitHub account. The smart contract reads this proof. No human reads anything.
+          When a milestone is complete, the builder does not paste a URL into a text box. They click Generate Proof. The app calls the Noir ZK Coprocessor which runs the proof generation against the GitHub API. A cryptographic proof is generated confirming the PR exists, is merged, and is authored by the builder&apos;s verified GitHub account. The smart contract reads this proof. No human reads anything.
         </GuidelinesStepBlock>
         <GuidelinesStepBlock title="Step 4 — Committee Reviews Evidence">
           Committee members see the ZK proof verification status, the AI verifier verdict, and the builder&apos;s written summary side by side. The ZK Verified checkmark is the most important signal. The AI verdict is advisory. The committee votes approve or reject. When quorum is reached, payment executes automatically.
@@ -84,9 +84,9 @@ function SectionZkProof() {
       <GuidelinesBody>
         TLSNotary is a protocol developed by the Ethereum Foundation. When your browser makes a request to a website like GitHub, TLS encryption protects that connection. TLSNotary splits the TLS session keys between you and a notary server — neither party can alter the data without breaking the proof. The result is a cryptographic certificate that says: this specific API response genuinely came from GitHub&apos;s servers at this specific time and has not been modified by anyone.
       </GuidelinesBody>
-      <GuidelinesSubheading>What is vlayer?</GuidelinesSubheading>
+      <GuidelinesSubheading>What is the Noir ZK Coprocessor?</GuidelinesSubheading>
       <GuidelinesBody>
-        vlayer takes the TLSNotary proof and compresses it into a compact zero-knowledge proof that can be verified by a smart contract on Arbitrum in a single transaction. Without vlayer, the raw TLSNotary proof would be too large and expensive to verify onchain. vlayer makes onchain web proof verification practical.
+        The Noir ZK Coprocessor generates a compact zero-knowledge proof that can be verified by a smart contract on Arbitrum in a single transaction. Without it, the raw proof would be too large and expensive to verify onchain. The coprocessor makes onchain web proof verification practical.
       </GuidelinesBody>
       <GuidelinesSubheading>What does &quot;the contract verified this&quot; mean?</GuidelinesSubheading>
       <GuidelinesBody>

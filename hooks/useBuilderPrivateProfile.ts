@@ -6,6 +6,8 @@ import { tierFromReputationPoints } from '@/lib/builder-contribution-tiers';
 import type { BuilderProfileData } from '@/lib/builder-profile-server';
 import { scoreToLetterGrade } from '@/lib/builder-profile-server';
 import {
+  GRANT_FACTORY_ADDRESS,
+  grantFactoryAbi,
   GRANT_ESCROW_ADDRESS,
   grantEscrowReadAbi,
   IDENTITY_REGISTRY_ADDRESS,
@@ -54,26 +56,7 @@ function usdcFromWei(w: bigint): number {
   return Number(formatUnits(w, USDC_DECIMALS));
 }
 
-function syntheticBindingTx(address: Address): `0x${string}` {
-  const h = keccak256(stringToHex(`grantos:identity-binding:${address.toLowerCase()}`));
-  return `0x${h.slice(2, 66)}` as `0x${string}`;
-}
 
-function syntheticVerifiedAt(address: Address): string {
-  const n = Number(BigInt(`0x${address.slice(2, 10)}`) % BigInt(86400 * 400));
-  const ms = Date.UTC(2023, 9, 12, 14, 30) + n * 1000;
-  return (
-    new Date(ms).toLocaleDateString(undefined, {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    }) + ', ' +
-    new Date(ms).toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  );
-}
 
 function demoCardsForBuilder(address: string): DaoGrantCardModel[] {
   if (!isUiDemoMode()) return [];
@@ -170,72 +153,73 @@ export function useBuilderPrivateProfile() {
     query: { enabled: Boolean(address) },
   });
 
-  const builderIdsReadA = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: [{ type: 'function', name: 'getGrantsByBuilder', stateMutability: 'view', inputs: [{ name: 'builder', type: 'address' }], outputs: [{ type: 'uint256[]' }] }] as const,
-    functionName: 'getGrantsByBuilder',
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address) },
-  });
-  const builderIdsReadB = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: [{ type: 'function', name: 'getBuilderGrantIds', stateMutability: 'view', inputs: [{ name: 'builder', type: 'address' }], outputs: [{ type: 'uint256[]' }] }] as const,
-    functionName: 'getBuilderGrantIds',
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address) },
-  });
-  const builderIdsReadC = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: [{ type: 'function', name: 'getGrantsForBuilder', stateMutability: 'view', inputs: [{ name: 'builder', type: 'address' }], outputs: [{ type: 'uint256[]' }] }] as const,
-    functionName: 'getGrantsForBuilder',
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address) },
+  const { data: countData, isLoading: isCountLoading } = useReadContract({
+    address: GRANT_FACTORY_ADDRESS,
+    abi: grantFactoryAbi,
+    functionName: 'grantCount',
   });
 
-  const builderGrantIds = useMemo(() => {
-    const pick = (v: unknown): bigint[] => (Array.isArray(v) ? (v as bigint[]) : []);
-    const a = pick(builderIdsReadA.data);
-    if (a.length > 0) return a;
-    const b = pick(builderIdsReadB.data);
-    if (b.length > 0) return b;
-    return pick(builderIdsReadC.data);
-  }, [builderIdsReadA.data, builderIdsReadB.data, builderIdsReadC.data]);
+  const grantCount = Number(countData || BigInt(0));
 
-  const grantsRead = useReadContracts({
-    contracts: builderGrantIds.map((id) => ({
-      address: GRANT_ESCROW_ADDRESS,
+  const factoryGrantContracts = useMemo(() => {
+    return Array.from({ length: grantCount }, (_, i) => ({
+      address: GRANT_FACTORY_ADDRESS,
+      abi: grantFactoryAbi,
+      functionName: 'grants',
+      args: [BigInt(i)],
+    }));
+  }, [grantCount]);
+
+  const { data: escrowAddressesData, isLoading: isAddressesLoading } = useReadContracts({
+    contracts: factoryGrantContracts,
+    query: { enabled: grantCount > 0 },
+  });
+
+  const escrowAddresses = useMemo(() => {
+    if (!escrowAddressesData) return [];
+    return escrowAddressesData.map((r: any) =>
+      r.status === 'success' && r.result ? r.result : '0x0000000000000000000000000000000000000000',
+    );
+  }, [escrowAddressesData]);
+
+  const grantContracts = useMemo(() => {
+    return escrowAddresses.map((addr) => ({
+      address: addr as Address,
       abi: grantEscrowReadAbi,
       functionName: 'getGrant',
-      args: [id],
-    })),
-    query: { enabled: builderGrantIds.length > 0 },
+    }));
+  }, [escrowAddresses]);
+
+  const grantsRead = useReadContracts({
+    contracts: grantContracts,
+    query: { enabled: grantContracts.length > 0 },
   });
 
   const statusContracts = useMemo(() => {
     if (!grantsRead.data) return [];
     const out: Array<{
-      address: typeof GRANT_ESCROW_ADDRESS;
+      address: Address;
       abi: typeof grantEscrowReadAbi;
       functionName: 'getMilestoneStatus';
-      args: readonly [bigint, bigint];
+      args: readonly [bigint];
     }> = [];
     grantsRead.data.forEach((entry, gi) => {
       const row = entry as { status: string; result?: { milestones: unknown[] } };
       if (row.status !== 'success' || !row.result) return;
-      const id = builderGrantIds[gi];
-      if (id === undefined) return;
+      const addr = escrowAddresses[gi];
+      if (!addr || addr === '0x0000000000000000000000000000000000000000') return;
       const ms = row.result.milestones ?? [];
       for (let i = 0; i < ms.length; i++) {
         out.push({
-          address: GRANT_ESCROW_ADDRESS,
+          address: addr as Address,
           abi: grantEscrowReadAbi,
           functionName: 'getMilestoneStatus',
-          args: [id, BigInt(i)],
+          args: [BigInt(i)],
         });
       }
     });
     return out;
-  }, [builderGrantIds, grantsRead.data]);
+  }, [escrowAddresses, grantsRead.data]);
 
   const statusRead = useReadContracts({
     contracts: statusContracts,
@@ -243,10 +227,9 @@ export function useBuilderPrivateProfile() {
   });
 
   const grantsLoading =
-    builderIdsReadA.isLoading ||
-    builderIdsReadB.isLoading ||
-    builderIdsReadC.isLoading ||
-    (builderGrantIds.length > 0 && grantsRead.isLoading);
+    isCountLoading ||
+    isAddressesLoading ||
+    (grantContracts.length > 0 && grantsRead.isLoading);
 
   const statusesLoading = statusContracts.length > 0 && statusRead.isLoading;
 
@@ -260,9 +243,9 @@ export function useBuilderPrivateProfile() {
     let cancelled = false;
     setProfileLoading(true);
     fetch(`/api/builder-profile/${address}`)
-      .then((r) => r.json())
-      .then((json: BuilderProfileData) => {
-        if (!cancelled) setProfileData(json);
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json: BuilderProfileData | null) => {
+        if (!cancelled && json) setProfileData(json);
       })
       .catch(() => {
         if (!cancelled) setProfileData(null);
@@ -300,12 +283,12 @@ export function useBuilderPrivateProfile() {
 
   const identity = useMemo((): BuilderIdentitySnapshot | null => {
     if (!address) return null;
-    const idTuple = identityRead.data;
-    const zkVerified = Boolean(idTuple?.[0]) || Boolean(verifiedRead.data);
-    const githubHandle = typeof idTuple?.[1] === 'string' ? idTuple[1] : '';
-    const accountCreationYear = Number(idTuple?.[2] ?? 0);
-    const contributionTier = Number(idTuple?.[3] ?? 0);
-    const reputationScore = Number(idTuple?.[4] ?? 0);
+    const idTuple = identityRead.data as { isVerified?: boolean, githubHandle?: string, createdYear?: bigint, tier?: bigint } | undefined;
+    const zkVerified = Boolean(idTuple?.isVerified) || Boolean(verifiedRead.data);
+    const githubHandle = typeof idTuple?.githubHandle === 'string' ? idTuple.githubHandle : '';
+    const accountCreationYear = Number(idTuple?.createdYear ?? 0);
+    const contributionTier = Number(idTuple?.tier ?? 0);
+    const reputationScore = 0;
     const hasIdentityRecord =
       zkVerified ||
       githubHandle.trim().length > 0 ||
@@ -321,12 +304,12 @@ export function useBuilderPrivateProfile() {
       contributionTier,
       reputationScore,
       hasIdentityRecord,
-      verifiedAtDisplay: hasIdentityRecord ? syntheticVerifiedAt(addr) : null,
-      bindingTxHash: hasIdentityRecord ? syntheticBindingTx(addr) : null,
+      verifiedAtDisplay: null,
+      bindingTxHash: null,
     };
   }, [address, identityRead.data, verifiedRead.data]);
 
-  const hasBuilderHistory = builderGrantIds.length > 0 || demoCardsForBuilder(address ?? '').length > 0;
+  const hasBuilderHistory = escrowAddresses.length > 0 || demoCardsForBuilder(address ?? '').length > 0;
 
   const hasProfileContent =
     Boolean(identity?.hasIdentityRecord) ||
@@ -390,14 +373,14 @@ export function useBuilderPrivateProfile() {
       const grantUsdc = grant.milestones.reduce((s, m) => s + usdcFromWei(m.amount), 0);
       if (grantUsdc > largest) {
         largest = grantUsdc;
-        largestTitle = grant.milestones[0]?.title ?? `Grant ${builderGrantIds[gi]?.toString() ?? ''}`;
+        largestTitle = grant.milestones[0]?.title ?? `Grant ${gi}`;
       }
       if (grantTotal > 0 && grantApproved === grantTotal) completedGrants += 1;
     });
 
     if (streamingActive) {
-      streamRate = 0.0003;
-      streamAccum = 1241.044;
+      streamRate = 0;
+      streamAccum = 0;
     }
 
     return {
@@ -419,7 +402,7 @@ export function useBuilderPrivateProfile() {
         epochMs: Date.now() - 45 * 60 * 1000,
       },
     };
-  }, [address, builderGrantIds, grantsRead.data, statusRead.data]);
+  }, [address, escrowAddresses, grantsRead.data, statusRead.data]);
 
   const demoEarnings = useMemo(() => {
     if (!address) return null;
@@ -429,54 +412,21 @@ export function useBuilderPrivateProfile() {
   }, [address]);
 
   const mergedStats = useMemo(() => {
-    const api =
-      profileData?.kind === 'ok' ? profileData.stats : null;
+    const api = profileData?.kind === 'ok' ? profileData.stats : null;
     const chain = chainEarnings;
-    const demo = demoEarnings;
 
-    const totalUsdcEarned =
-      (chain?.totalUsdcEarned ?? 0) > 0
-        ? chain!.totalUsdcEarned
-        : demo?.totalUsdcEarned ?? api?.totalUsdcEarned ?? 0;
+    const totalUsdcEarned = (chain?.totalUsdcEarned ?? 0) > 0 ? chain!.totalUsdcEarned : api?.totalUsdcEarned ?? 0;
+    const pendingInEscrow = (chain?.pendingInEscrow ?? 0) > 0 ? chain!.pendingInEscrow : 0;
+    const largest = (chain?.largestSingleGrant.amount ?? 0) > 0 ? chain!.largestSingleGrant : { amount: 0, title: '—' };
+    const avg = (chain?.averageMilestoneValue ?? 0) > 0 ? chain!.averageMilestoneValue : 0;
+    const completed = (chain?.totalGrantsCompleted.count ?? 0) > 0 ? chain!.totalGrantsCompleted : { count: 0, completionRate: null };
+    const streaming = chain?.streaming.active 
+      ? chain!.streaming 
+      : { active: false, accumulatedUsdc: 0, rateUsdcPerSec: 0, epochMs: Date.now() };
 
-    const pendingInEscrow =
-      (chain?.pendingInEscrow ?? 0) > 0
-        ? chain!.pendingInEscrow
-        : demo?.pendingInEscrow ?? 0;
-
-    const largest =
-      (chain?.largestSingleGrant.amount ?? 0) > 0
-        ? chain!.largestSingleGrant
-        : demo?.largestSingleGrant ?? { amount: 0, title: '—' };
-
-    const avg =
-      (chain?.averageMilestoneValue ?? 0) > 0
-        ? chain!.averageMilestoneValue
-        : demo?.averageMilestoneValue ?? 0;
-
-    const completed =
-      (chain?.totalGrantsCompleted.count ?? 0) > 0
-        ? chain!.totalGrantsCompleted
-        : demo?.totalGrantsCompleted ?? { count: 0, completionRate: null };
-
-    const streaming =
-      chain?.streaming.active || demo?.streaming.active
-        ? demo?.streaming.active
-          ? demo.streaming
-          : chain!.streaming
-        : { active: false, accumulatedUsdc: 0, rateUsdcPerSec: 0, epochMs: Date.now() };
-
-    const repScore =
-      identity?.reputationScore && identity.reputationScore > 0
-        ? identity.reputationScore
-        : api?.reputationScore ?? reputation?.score ?? 0;
-
-    const deliveryRate =
-      api?.deliveryRatePercent ??
-      (reputation?.deliveryRatePercent != null ? reputation.deliveryRatePercent : null);
-
-    const zkFromRep =
-      reputation?.events?.filter((e) => e.kind === 'ZKProofSubmitted').length ?? 0;
+    const repScore = identity?.reputationScore && identity.reputationScore > 0 ? identity.reputationScore : api?.reputationScore ?? reputation?.score ?? 0;
+    const deliveryRate = api?.deliveryRatePercent ?? (reputation?.deliveryRatePercent != null ? reputation.deliveryRatePercent : null);
+    const zkFromRep = reputation?.events?.filter((e) => e.kind === 'ZKProofSubmitted').length ?? 0;
     const zkProofs = Math.max(api?.zkProofsSubmitted ?? 0, zkFromRep);
 
     return {
@@ -490,16 +440,15 @@ export function useBuilderPrivateProfile() {
       averageMilestoneValue: avg,
       totalGrantsCompleted: completed,
       streaming,
-      approvedMilestones: chain?.approvedMilestones ?? demo?.approvedMilestones ?? 0,
-      activeGrants: demo?.activeGrants ?? builderGrantIds.length,
+      approvedMilestones: chain?.approvedMilestones ?? 0,
+      activeGrants: escrowAddresses.length,
     };
   }, [
     profileData,
     chainEarnings,
-    demoEarnings,
     identity?.reputationScore,
     reputation,
-    builderGrantIds.length,
+    escrowAddresses.length,
   ]);
 
   const earnings: BuilderEarningsStats = useMemo(

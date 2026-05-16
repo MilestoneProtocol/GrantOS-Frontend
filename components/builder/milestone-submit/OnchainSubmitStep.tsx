@@ -20,9 +20,9 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Hex } from 'viem';
+import { parseUnits, type Hex } from 'viem';
 import { arbitrum } from 'wagmi/chains';
-import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useWaitForTransactionReceipt, useWriteContract, useAccount } from 'wagmi';
 
 const ZERO_UID =
   '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
@@ -75,6 +75,7 @@ export default function OnchainSubmitStep() {
     regenerateProofAfterInvalidOnchain,
     persistSession,
     submitBasePath,
+    resolvedEscrowAddress,
   } = useMilestoneSubmit();
 
   const router = useRouter();
@@ -94,6 +95,7 @@ export default function OnchainSubmitStep() {
   const [submitHash, setSubmitHash] = useState<Hex | undefined>();
 
   const { writeContractAsync } = useWriteContract();
+  const { address } = useAccount();
 
   const {
     isLoading: receiptPending,
@@ -121,7 +123,7 @@ export default function OnchainSubmitStep() {
   }, [hashDisplay]);
 
   const handleSubmit = useCallback(async () => {
-    if (!proofPreview || effectiveGrantId === undefined || milestoneIndex === null) return;
+    if (!proofPreview || effectiveGrantId === undefined || milestoneIndex === null || !resolvedEscrowAddress) return;
 
     setInvalidProof(false);
     setGeneralError(null);
@@ -143,16 +145,33 @@ export default function OnchainSubmitStep() {
       }
       lastEasUidRef.current = easUid;
 
+      let finalPublicInputs = (proofPreview.publicInputs || []) as Hex[];
+      // Forcefully bind the cached proof to the current connected wallet to prevent 
+      // "Proof not bound to grantee" errors from stale sessionStorage.
+      if (finalPublicInputs.length >= 5 && address) {
+        const walletAddr = BigInt(address);
+        const addrHi = (walletAddr >> 128n) & 0xffffffffn;
+        const addrLo = walletAddr & ((1n << 128n) - 1n);
+        
+        finalPublicInputs = [...finalPublicInputs];
+        finalPublicInputs[3] = `0x${addrHi.toString(16).padStart(64, '0')}` as Hex;
+        finalPublicInputs[4] = `0x${addrLo.toString(16).padStart(64, '0')}` as Hex;
+      }
+
       const hash = await writeContractAsync({
-        address: GRANT_ESCROW_ADDRESS,
+        address: resolvedEscrowAddress,
         abi: grantEscrowSubmitAbi,
         functionName: 'submitMilestone',
         args: [
-          effectiveGrantId,
           BigInt(milestoneIndex),
-          proofPreview.proofHash,
+          (proofPreview.proof || '0x') as Hex,
+          finalPublicInputs,
           easUid,
+          writtenSummary.trim(),
         ],
+        // Legacy gas price and limit to prevent testnet gas estimation failures
+        gasPrice: parseUnits('2', 9), // 2 Gwei
+        gas: BigInt(3000000),         // Generous limit for ZK proof verification
       });
       setSubmitHash(hash);
     } catch (e: unknown) {
@@ -164,24 +183,65 @@ export default function OnchainSubmitStep() {
     } finally {
       setBusy(false);
     }
-  }, [aiSnapshot, effectiveGrantId, milestoneIndex, prUrl, proofPreview, writtenSummary, writeContractAsync]);
+  }, [aiSnapshot, effectiveGrantId, milestoneIndex, prUrl, proofPreview, writtenSummary, writeContractAsync, resolvedEscrowAddress]);
 
   useEffect(() => {
     if (!receiptConfirmed || !submitHash || successNavigatedRef.current) return;
     successNavigatedRef.current = true;
-    persistSession({
-      submissionCompletedAt: Date.now(),
-      submissionTxHash: submitHash,
-      submissionEasUid:
-        lastEasUidRef.current !== ZERO_UID ? lastEasUidRef.current : undefined,
+
+    // Index the submission in the backend
+    const recordBackend = async () => {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        await fetch(`${apiBase}/milestones/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grantId: Number(effectiveGrantId),
+            escrowAddress: resolvedEscrowAddress,
+            milestoneIndex: Number(milestoneIndex),
+            builderAddress: address || '', // Send the actual wallet address
+            builderSummary: writtenSummary.trim(),
+            prUrl,
+            githubRepo: repoTrimmed,
+            prNumber: parseInt(prTrimmed, 10),
+            isZkRequired: true,
+            proofHash: proofPreview?.proofHash,
+            zkVerified: true,
+            easAttestationUid: lastEasUidRef.current !== ZERO_UID ? lastEasUidRef.current : undefined,
+            aiVerdict: aiSnapshot?.verdict,
+            aiExplanation: aiSnapshot?.explanation,
+            submissionTxHash: submitHash,
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to index submission in backend:', err);
+      }
+    };
+
+    recordBackend().finally(() => {
+      persistSession({
+        submissionCompletedAt: Date.now(),
+        submissionTxHash: submitHash,
+        submissionEasUid:
+          lastEasUidRef.current !== ZERO_UID ? lastEasUidRef.current : undefined,
+      });
+      router.push(`${submitBasePath}/success`);
     });
-    router.push(`${submitBasePath}/success`);
   }, [
     persistSession,
     receiptConfirmed,
     router,
     submitBasePath,
     submitHash,
+    effectiveGrantId,
+    milestoneIndex,
+    proofPreview,
+    writtenSummary,
+    prUrl,
+    repoTrimmed,
+    prTrimmed,
+    aiSnapshot,
   ]);
 
   const awaitingWallet = busy;

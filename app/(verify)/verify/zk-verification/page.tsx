@@ -173,7 +173,7 @@ export default function VerifyIdentity() {
                       Link GitHub Identity
                     </h2>
                     <p className="text-sm leading-7 text-slate-500">
-                      GrantOS uses vlayer&apos;s Web Prover to cryptographically
+                      GrantOS uses Noir ZK Coprocessor to cryptographically
                       bind your GitHub contributions to your Arbitrum wallet. We
                       will request read-only access to your public profile.
                     </p>
@@ -213,7 +213,7 @@ export default function VerifyIdentity() {
               GrantIdentityRegistry.sol connected
             </div>
             <div className="flex items-center gap-1.5">
-              Powered by <span className="font-bold text-slate-700">vlayer Web Prover</span>
+              Powered by <span className="font-bold text-slate-700">Noir ZK Coprocessor</span>
             </div>
           </footer>
         </div>

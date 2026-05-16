@@ -35,18 +35,35 @@ async function tryOpenAi(params: {
   prUrl: string;
   zkVerified: boolean;
 }): Promise<AiVerifierSuccessBody | null> {
-  const key = process.env.OPENAI_API_KEY?.trim();
-  if (!key) return null;
+  const openaiKey = process.env.OPENAI_API_KEY?.trim();
+  const groqKey = process.env.GROQ_API_KEY?.trim();
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  
+  if (!openaiKey && !groqKey && !geminiKey) return null;
+
+  let endpoint = 'https://api.openai.com/v1/chat/completions';
+  let model = 'gpt-4o';
+  let activeKey = openaiKey;
+
+  if (geminiKey) {
+    endpoint = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    model = 'gemini-2.5-flash';
+    activeKey = geminiKey;
+  } else if (groqKey) {
+    endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    model = 'llama3-70b-8192';
+    activeKey = groqKey;
+  }
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${activeKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model,
         temperature: 0.25,
         messages: [
           {
@@ -66,7 +83,7 @@ async function tryOpenAi(params: {
       }),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) { const text = await res.text(); return { verdict: "UNCERTAIN", explanation: "API error: " + res.status + " " + text, id: "err" }; }
 
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;

@@ -15,7 +15,7 @@ const GithubIcon = ({ className }: { className?: string }) => (
 const steps = [
   { title: 'Wallet Check', description: 'Registry verification complete', status: 'complete' as const },
   { title: 'Connect GitHub', description: 'Authenticate via OAuth', status: 'active' as const },
-  { title: 'Generate Proof', description: 'vlayer Web Prover MPC-TLS', status: 'pending' as const },
+  { title: 'Generate Proof', description: 'Noir ZK Coprocessor', status: 'pending' as const },
   { title: 'Submit Onchain', description: 'Register identity to Arbitrum', status: 'pending' as const },
 ];
 

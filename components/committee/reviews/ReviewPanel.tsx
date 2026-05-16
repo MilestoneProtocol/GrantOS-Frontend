@@ -6,7 +6,10 @@ import type {
   CommitteeApprover,
   CommitteeReviewSubmission,
 } from '@/demo/committee-demo';
-import { useDemoVoteFlow, type VoteFlowState } from '@/lib/committee-vote-flow';
+import { useCommitteeVote } from '@/lib/hooks/useCommitteeVote';
+import { useWaitForTransactionReceipt } from 'wagmi';
+import { Address, Hex } from 'viem';
+import { GRANT_ESCROW_ADDRESS, grantEscrowAbi } from '@/lib/escrow';
 import {
   Check,
   CheckCircle2,
@@ -18,16 +21,10 @@ import {
   ThumbsUp,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 
 const SIMULATED_PEER_INTERVAL_MS = 1500;
 const QUORUM_BANNER_DELAY_MS = 700;
-/**
- * Probability that a simulated peer votes the *same* way as the viewer.
- * Anything > 0.5 gives the demo a visible majority bias toward the viewer's
- * intent, while still letting the occasional counter-vote slip in so it
- * doesn't look fake. Keep < 1 — quorum is never guaranteed in real life.
- */
 const PEER_MATCH_PROBABILITY = 0.7;
 
 type ReviewPanelProps = {
@@ -56,47 +53,54 @@ function formatUsd(amount: number) {
   return amount.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-/**
- * Full-width review panel for a single milestone submission.
- *
- * State substates handled in-component (US-03 / Screen 4):
- *  - `idle`        — both Approve / Reject buttons active.
- *  - `confirming`  — overlay "Confirm in your wallet" pinned over the panel.
- *  - `submitted`   — overlay flips to "Transaction submitted" with Arbiscan link.
- *  - `voted`       — buttons are replaced by a grey `You voted Approve/Reject`
- *                    chip and the approver pills include the current viewer.
- *
- * "Another Member Voting" is simulated locally with `simulatedPeerVotes` while
- * we don't have a deployed `VoteCast` event. Replace with
- * `useWatchContractEvent({ eventName: 'VoteCast' })` when wiring real reads.
- */
 export default function ReviewPanel({
   submission,
   onVoteFinalised,
   actionable = true,
 }: ReviewPanelProps) {
-  // Bootstrap the FSM with `voted` when the data already says the viewer cast a
-  // vote, so the `Voted` tab renders the chip directly without re-playing the
-  // confirm/submitted phases.
-  const initialFlow: VoteFlowState | undefined = submission.currentMemberVoted
-    ? { kind: 'voted', intent: 'approve' }
-    : undefined;
-  const flow = useDemoVoteFlow(initialFlow);
+  const actualEscrowAddress = (GRANT_ESCROW_ADDRESS) as Address;
 
-  // Simulated peer "VoteCast" feed — appends matching peer votes after the
-  // viewer votes so the live counter visibly ticks all the way to quorum.
-  // Disabled when the panel is not actionable.
+  const { state, start, recordBackend, setState } = useCommitteeVote(
+    submission.escrowAddress,
+    submission.milestoneIndex,
+    parseInt(submission.grantId.replace('#', ''), 10)
+  );
+
+  const { data: receipt, isSuccess: receiptConfirmed } = useWaitForTransactionReceipt({
+    hash: state.kind === 'submitted' ? state.txHash as Hex : undefined,
+  });
+
   const [simulatedPeerVotes, setSimulatedPeerVotes] = useState<CommitteeApprover[]>([]);
   const shouldRunLiveFeed = actionable && !submission.finalOutcome;
 
   useEffect(() => {
-    if (!shouldRunLiveFeed) return;
-    if (flow.state.kind !== 'voted') return;
+    if (receiptConfirmed && state.kind === 'submitted' && receipt) {
+      const newApprovalCount = submission.approvers.filter(a => a.status === 'approved').length + (state.intent === 'approve' ? 1 : 0);
+      const newRejectionCount = submission.approvers.filter(a => a.status === 'rejected').length + (state.intent === 'reject' ? 1 : 0);
+      
+      const isApproved = newApprovalCount >= submission.committeeRequired;
+      const rejectThreshold = submission.approvers.length - submission.committeeRequired + 1;
+      const isRejected = newRejectionCount >= rejectThreshold;
 
-    const viewerIntent = flow.state.intent;
+      recordBackend(
+          state.txHash, 
+          state.intent, 
+          newApprovalCount, 
+          newRejectionCount, 
+          isApproved ? 'approved' : isRejected ? 'rejected' : undefined
+      ).finally(() => {
+          setState({ kind: 'voted', intent: state.intent, txHash: state.txHash });
+      });
+    }
+  }, [receiptConfirmed, state, receipt, recordBackend, setState, submission]);
+
+  useEffect(() => {
+    if (!shouldRunLiveFeed) return;
+    if (state.kind !== 'voted') return;
+
+    const viewerIntent = state.intent;
     const totalMembers = submission.approvers.length;
     const quorum = submission.committeeRequired;
-    // Approval becomes mathematically impossible at this many rejections.
     const rejectionThreshold = totalMembers - quorum + 1;
 
     const baseApproved = submission.approvers.filter((a) => a.status === 'approved').length;
@@ -104,8 +108,6 @@ export default function ReviewPanel({
     const pendingSlots = submission.approvers.filter((a) => a.status === 'pending').length;
 
     const intervalId = window.setInterval(() => {
-      // Decide *this* peer's vote up-front so the random draw is stable even
-      // if React re-invokes the setState callback (strict mode).
       const willMatchViewer = Math.random() < PEER_MATCH_PROBABILITY;
       const matchStatus: 'approved' | 'rejected' =
         viewerIntent === 'approve' ? 'approved' : 'rejected';
@@ -125,10 +127,8 @@ export default function ReviewPanel({
           baseRejected +
           (viewerIntent === 'reject' ? 1 : 0) +
           prev.filter((p) => p.status === 'rejected').length;
-        // Viewer occupies one of the pending slots; peers occupy the rest.
         const slotsLeft = pendingSlots - 1 - prev.length;
 
-        // Final-state stop conditions: real contract semantics.
         const reachedApprovalQuorum = approvedNow >= quorum;
         const reachedRejectionThreshold = rejectedNow >= rejectionThreshold;
 
@@ -142,7 +142,7 @@ export default function ReviewPanel({
 
     return () => window.clearInterval(intervalId);
   }, [
-    flow.state,
+    state,
     shouldRunLiveFeed,
     submission.approvers,
     submission.committeeRequired,
@@ -151,16 +151,13 @@ export default function ReviewPanel({
   const approversAfterFlow = useMemo(() => {
     let approvers: CommitteeApprover[] = submission.approvers.slice();
 
-    // If the viewer just voted, promote the *first pending* slot to their
-    // vote. Avoids guessing the viewer's address while keeping the visual
-    // tally accurate.
-    if (flow.state.kind === 'voted') {
+    if (state.kind === 'voted') {
       const pendingIdx = approvers.findIndex((a) => a.status === 'pending');
       if (pendingIdx >= 0) {
         approvers = approvers.slice();
         approvers[pendingIdx] = {
           ...approvers[pendingIdx],
-          status: flow.state.intent === 'approve' ? 'approved' : 'rejected',
+          status: state.intent === 'approve' ? 'approved' : 'rejected',
         };
       }
     }
@@ -177,7 +174,7 @@ export default function ReviewPanel({
     }
 
     return approvers;
-  }, [submission.approvers, flow.state, simulatedPeerVotes]);
+  }, [submission.approvers, state, simulatedPeerVotes]);
 
   const approvedCount = approversAfterFlow.filter((a) => a.status === 'approved').length;
   const rejectedCount = approversAfterFlow.filter((a) => a.status === 'rejected').length;
@@ -188,11 +185,7 @@ export default function ReviewPanel({
   );
 
   const overlayState =
-    flow.state.kind === 'confirming' || flow.state.kind === 'submitted' ? flow.state : null;
-  // Once we hit quorum the buttons should be inert even if FSM is technically
-  // idle (e.g. another member's vote crossed the threshold). Rejection lands
-  // when approval is mathematically impossible — i.e. enough members have
-  // rejected that the remaining slots can no longer reach the approval quorum.
+    state.kind === 'confirming' || state.kind === 'submitted' ? state : null;
   const totalMembers = approversAfterFlow.length;
   const rejectionThreshold = totalMembers - submission.committeeRequired + 1;
   const rawQuorumOutcome: 'approved' | 'rejected' | null =
@@ -202,9 +195,6 @@ export default function ReviewPanel({
         ? 'rejected'
         : null;
 
-  // Give the counter a beat to visibly tick before the banner takes over —
-  // simulates the on-chain `MilestoneApproved` / `MilestoneRejected` event
-  // arriving slightly after the final VoteCast.
   const [quorumOutcome, setQuorumOutcome] = useState<typeof rawQuorumOutcome>(
     submission.finalOutcome ?? null,
   );
@@ -220,16 +210,15 @@ export default function ReviewPanel({
 
   const buttonsDisabled =
     !actionable ||
-    flow.state.kind !== 'idle' ||
+    state.kind !== 'idle' ||
     Boolean(submission.finalOutcome) ||
     submission.currentMemberVoted ||
     Boolean(quorumOutcome);
 
-  // Surface the finalised vote to the page once.
   useEffect(() => {
-    if (flow.state.kind !== 'voted') return;
-    onVoteFinalised?.(submission.id, flow.state.intent, flow.state.txHash);
-  }, [flow.state, submission.id, onVoteFinalised]);
+    if (state.kind !== 'voted') return;
+    onVoteFinalised?.(submission.id, state.intent, state.txHash);
+  }, [state, submission.id, onVoteFinalised]);
 
   const quorumReached = Boolean(rawQuorumOutcome);
 
@@ -247,10 +236,10 @@ export default function ReviewPanel({
           buttonsDisabled={buttonsDisabled}
           quorumReached={quorumReached}
           quorumOutcome={quorumOutcome}
-          flowState={flow.state}
-          onApprove={() => flow.start('approve')}
-          onReject={() => flow.start('reject')}
-          showLiveUpdates={shouldRunLiveFeed && flow.state.kind !== 'idle'}
+          flowState={state as any}
+          onApprove={() => start('approve')}
+          onReject={() => start('reject')}
+          showLiveUpdates={shouldRunLiveFeed && state.kind !== 'idle'}
         />
       </div>
 
@@ -363,15 +352,12 @@ function VotingBlock({
   buttonsDisabled: boolean;
   quorumReached: boolean;
   quorumOutcome: 'approved' | 'rejected' | null;
-  flowState: VoteFlowState;
+  flowState: { kind: string; intent: string; txHash?: string };
   onApprove: () => void;
   onReject: () => void;
   showLiveUpdates: boolean;
 }) {
   const isVoted = flowState.kind === 'voted';
-  // Once an outcome is locked in, the remaining "pending" members didn't get
-  // to vote — their slot is closed. Only render the members who actually cast
-  // a vote and roll the rest into a "+ N did not vote" pill.
   const displayedApprovers = quorumOutcome
     ? approvers.filter((a) => a.status !== 'pending')
     : approvers;
@@ -468,7 +454,7 @@ function VotingBlock({
             reason={submission.rejectionReason}
           />
         ) : isVoted ? (
-          <VotedChip intent={flowState.intent} txHash={flowState.txHash} />
+          <VotedChip intent={flowState.intent as any} txHash={flowState.txHash} />
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -584,13 +570,11 @@ function QuorumRejectedBanner({
   );
 }
 
-/** Approximate a Superfluid flow rate from a lump-sum amount + 30-day window. */
 function deriveDemoFlowRate(usdc: number) {
   const ratePerSec = usdc / (30 * 86_400);
   return `${ratePerSec.toFixed(6)} USDC/sec`;
 }
 
-/** Random 40-char hex address (lowercased, 0x-prefixed). */
 function makeRandomAddress(): `0x${string}` {
   let out = '0x';
   const chars = 'abcdef0123456789';

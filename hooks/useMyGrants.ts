@@ -3,7 +3,7 @@
 import { loadDemoMyGrants } from '@/lib/my-grants/demo-history';
 import type { MyGrantRecord } from '@/lib/my-grants/types';
 import { computeSummary, mapChainGrantToRecord } from '@/lib/my-grants/utils';
-import { GRANT_ESCROW_ADDRESS, grantEscrowReadAbi } from '@/lib/escrow';
+import { GRANT_FACTORY_ADDRESS, grantFactoryAbi, GRANT_ESCROW_ADDRESS, grantEscrowReadAbi } from '@/lib/escrow';
 import { useMemo } from 'react';
 import { type Address } from 'viem';
 import { useAccount, useReadContract, useReadContracts } from 'wagmi';
@@ -27,71 +27,72 @@ export function useMyGrants() {
   const { address } = useAccount();
   const enabled = Boolean(address);
 
-  const builderIdsReadA = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: [{ type: 'function', name: 'getGrantsByBuilder', stateMutability: 'view', inputs: [{ name: 'builder', type: 'address' }], outputs: [{ type: 'uint256[]' }] }] as const,
-    functionName: 'getGrantsByBuilder',
-    args: address ? [address] : undefined,
-    query: { enabled },
-  });
-  const builderIdsReadB = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: [{ type: 'function', name: 'getBuilderGrantIds', stateMutability: 'view', inputs: [{ name: 'builder', type: 'address' }], outputs: [{ type: 'uint256[]' }] }] as const,
-    functionName: 'getBuilderGrantIds',
-    args: address ? [address] : undefined,
-    query: { enabled },
-  });
-  const builderIdsReadC = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: [{ type: 'function', name: 'getGrantsForBuilder', stateMutability: 'view', inputs: [{ name: 'builder', type: 'address' }], outputs: [{ type: 'uint256[]' }] }] as const,
-    functionName: 'getGrantsForBuilder',
-    args: address ? [address] : undefined,
-    query: { enabled },
+  const { data: countData, isLoading: isCountLoading } = useReadContract({
+    address: GRANT_FACTORY_ADDRESS,
+    abi: grantFactoryAbi,
+    functionName: 'grantCount',
   });
 
-  const builderGrantIds = useMemo(() => {
-    const pick = (v: unknown): bigint[] => (Array.isArray(v) ? (v as bigint[]) : []);
-    const a = pick(builderIdsReadA.data);
-    if (a.length > 0) return a;
-    const b = pick(builderIdsReadB.data);
-    if (b.length > 0) return b;
-    return pick(builderIdsReadC.data);
-  }, [builderIdsReadA.data, builderIdsReadB.data, builderIdsReadC.data]);
+  const grantCount = Number(countData || BigInt(0));
 
-  const grantsRead = useReadContracts({
-    contracts: builderGrantIds.map((id) => ({
-      address: GRANT_ESCROW_ADDRESS,
+  const factoryGrantContracts = useMemo(() => {
+    return Array.from({ length: grantCount }, (_, i) => ({
+      address: GRANT_FACTORY_ADDRESS,
+      abi: grantFactoryAbi,
+      functionName: 'grants',
+      args: [BigInt(i)],
+    }));
+  }, [grantCount]);
+
+  const { data: escrowAddressesData, isLoading: isAddressesLoading } = useReadContracts({
+    contracts: factoryGrantContracts,
+    query: { enabled: grantCount > 0 },
+  });
+
+  const escrowAddresses = useMemo(() => {
+    if (!escrowAddressesData) return [];
+    return escrowAddressesData.map((r: any) =>
+      r.status === 'success' && r.result ? r.result : '0x0000000000000000000000000000000000000000',
+    );
+  }, [escrowAddressesData]);
+
+  const grantContracts = useMemo(() => {
+    return escrowAddresses.map((addr) => ({
+      address: addr as Address,
       abi: grantEscrowReadAbi,
       functionName: 'getGrant',
-      args: [id],
-    })),
-    query: { enabled: builderGrantIds.length > 0 },
+    }));
+  }, [escrowAddresses]);
+
+  const grantsRead = useReadContracts({
+    contracts: grantContracts,
+    query: { enabled: grantContracts.length > 0 },
   });
 
   const statusContracts = useMemo(() => {
     if (!grantsRead.data) return [];
     const out: Array<{
-      address: typeof GRANT_ESCROW_ADDRESS;
+      address: Address;
       abi: typeof grantEscrowReadAbi;
       functionName: 'getMilestoneStatus';
-      args: readonly [bigint, bigint];
+      args: readonly [bigint];
     }> = [];
     grantsRead.data.forEach((entry, gi) => {
       const row = entry as { status: string; result?: GrantFromChain };
       if (row.status !== 'success' || !row.result) return;
-      const id = builderGrantIds[gi];
-      if (id === undefined) return;
+      const addr = escrowAddresses[gi];
+      if (!addr || addr === '0x0000000000000000000000000000000000000000') return;
       for (let i = 0; i < row.result.milestones.length; i++) {
         out.push({
-          address: GRANT_ESCROW_ADDRESS,
+          address: addr as Address,
           abi: grantEscrowReadAbi,
           functionName: 'getMilestoneStatus',
-          args: [id, BigInt(i)],
+          args: [BigInt(i)],
         });
       }
     });
     return out;
-  }, [builderGrantIds, grantsRead.data]);
+  }, [escrowAddresses, grantsRead.data]);
 
   const statusRead = useReadContracts({
     contracts: statusContracts,
@@ -99,10 +100,9 @@ export function useMyGrants() {
   });
 
   const loading =
-    builderIdsReadA.isLoading ||
-    builderIdsReadB.isLoading ||
-    builderIdsReadC.isLoading ||
-    (builderGrantIds.length > 0 && grantsRead.isLoading) ||
+    isCountLoading ||
+    isAddressesLoading ||
+    (grantContracts.length > 0 && grantsRead.isLoading) ||
     (statusContracts.length > 0 && statusRead.isLoading);
 
   const grants = useMemo((): MyGrantRecord[] => {
@@ -116,8 +116,7 @@ export function useMyGrants() {
         const row = entry as { status: string; result?: GrantFromChain };
         if (row.status !== 'success' || !row.result) return;
         if (row.result.builder.toLowerCase() !== address.toLowerCase()) return;
-        const id = builderGrantIds[gi];
-        if (id === undefined) return;
+        const id = BigInt(gi);
         const statuses: number[] = [];
         for (let i = 0; i < row.result.milestones.length; i++) {
           const r = statusRead.data?.[statusIdx];
@@ -134,7 +133,7 @@ export function useMyGrants() {
     }
 
     return Array.from(byKey.values());
-  }, [address, builderGrantIds, grantsRead.data, statusRead.data]);
+  }, [address, grantsRead.data, statusRead.data]);
 
   const summary = useMemo(() => computeSummary(grants), [grants]);
   const activeGrantCount = summary.activeGrants;

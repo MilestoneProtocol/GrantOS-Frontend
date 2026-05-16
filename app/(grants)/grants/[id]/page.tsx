@@ -9,6 +9,8 @@ import {
   grantEscrowReadAbi,
   IDENTITY_REGISTRY_ADDRESS,
   identityRegistryAbi,
+  GRANT_FACTORY_ADDRESS,
+  grantFactoryAbi,
 } from '@/lib/escrow';
 import {
   explorerDemoCardToGrantTuple,
@@ -130,13 +132,22 @@ export default function GrantDetailPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('milestones');
   const [streamAccumulated, setStreamAccumulated] = useState(0);
 
-  const { data, isLoading, isError } = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowReadAbi,
-    functionName: 'getGrant',
+  const { data: escrowAddress, isLoading: isEscrowLoading } = useReadContract({
+    address: GRANT_FACTORY_ADDRESS,
+    abi: grantFactoryAbi,
+    functionName: 'grants',
     args: grantId !== null ? [grantId] : undefined,
     query: { enabled: grantId !== null },
   });
+
+  const { data, isLoading: isGrantLoading, isError } = useReadContract({
+    address: escrowAddress as `0x${string}`,
+    abi: grantEscrowReadAbi,
+    functionName: 'getGrant',
+    query: { enabled: Boolean(escrowAddress) },
+  });
+
+  const isLoading = isEscrowLoading || isGrantLoading;
 
   const chainGrant = (data ?? null) as GrantTuple | null;
   const chainGrantExists = useMemo(() => {
@@ -183,7 +194,7 @@ export default function GrantDetailPage() {
   });
 
   const zkVerified =
-    Boolean(identity?.[0]) || (!chainResolved && Boolean(demoCard?.zkVerified));
+    Boolean(identity?.isVerified) || (!chainResolved && Boolean(demoCard?.zkVerified));
 
   const committee = resolvedGrant?.committee ?? [];
   const milestones = resolvedGrant?.milestones ?? [];

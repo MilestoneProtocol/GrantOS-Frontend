@@ -47,7 +47,7 @@ export default function AppShellHeader({
     query: { enabled: Boolean(address) && showZkBadge },
   });
 
-  const zkVerified = Boolean(identityData?.[0]);
+  const zkVerified = Boolean((identityData as any)?.isVerified);
 
   return (
     <header className="sticky top-0 z-30 w-full shrink-0 border-b border-slate-200/80 bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/80">

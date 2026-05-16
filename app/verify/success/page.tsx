@@ -424,6 +424,18 @@ function SuccessContent() {
 
   const isFullyVerified = txConfirmed || alreadyVerified;
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    if (isFullyVerified && requestId) {
+      const timer = setTimeout(() => {
+        router.push('/?select=1&from=%2Fgrants%2Fnew');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isFullyVerified, requestId, router]);
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-slate-200 bg-white">
@@ -455,7 +467,7 @@ function SuccessContent() {
             <aside className="w-full border-b border-slate-100 bg-slate-50/60 p-6 lg:w-[280px] lg:border-b-0 lg:border-r lg:p-8">
               <h2 className="text-sm font-bold tracking-tight text-slate-900">Verification flow</h2>
               <div className="mt-6 flex flex-col">
-                {steps.map((step, idx) => (
+                {mounted && steps.map((step, idx) => (
                   <div key={idx} className="relative pb-7 last:pb-0">
                     {idx !== steps.length - 1 && (
                       <div className={`absolute left-[11px] top-6 h-full w-px ${step.status === 'complete' ? 'bg-blue-500' : 'bg-slate-200'}`} />

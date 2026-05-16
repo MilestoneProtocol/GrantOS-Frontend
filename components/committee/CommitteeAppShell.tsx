@@ -50,7 +50,7 @@ export default function CommitteeAppShell({
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address) },
   });
-  const zkVerified = Boolean(identityData?.[0]);
+  const zkVerified = Boolean((identityData as any)?.isVerified);
   const tasksBadge = useTasksStore((s) => s.queue.badgeCount);
 
   // Close drawer on route change so back / forward navigation never leaves a

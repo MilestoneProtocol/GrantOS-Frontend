@@ -86,9 +86,9 @@ export default function ProfileTab() {
     query: { enabled: Boolean(address) },
   });
 
-  const zkVerified = Boolean(identityData?.[0]);
-  const githubHandle = (identityData?.[1] as string) || '';
-  const reputationScore = Number(identityData?.[4] ?? BigInt(0));
+  const zkVerified = Boolean((identityData as any)?.isVerified);
+  const githubHandle = ((identityData as any)?.githubHandle as string) || '';
+  const reputationScore = 0;
   const grade = letterGrade(reputationScore);
 
   if (!isConnected || !address) {

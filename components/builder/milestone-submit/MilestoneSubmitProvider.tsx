@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  GRANT_FACTORY_ADDRESS,
   GRANT_ESCROW_ADDRESS,
   grantEscrowReadAbi,
   IDENTITY_REGISTRY_ADDRESS,
@@ -39,7 +40,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { formatUnits, type Address } from 'viem';
+import { formatUnits, zeroAddress, type Address } from 'viem';
 import { useAccount, useReadContract } from 'wagmi';
 
 export type GrantTuple = {
@@ -135,6 +136,7 @@ type MilestoneSubmitContextValue = {
   /** Present after onchain tx confirms (hydrated from session). */
   submissionMeta: MilestoneSubmissionSuccessMeta | null;
   submitSessionReady: boolean;
+  resolvedEscrowAddress: Address | undefined;
 };
 
 const MilestoneSubmitContext = createContext<MilestoneSubmitContextValue | null>(null);
@@ -190,17 +192,29 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     [address, isDemoRoute]
   );
 
+  const { data: factoryEscrowAddress } = useReadContract({
+    address: GRANT_FACTORY_ADDRESS,
+    abi: [{ name: 'grants', type: 'function', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'address' }] }],
+    functionName: 'grants',
+    args: grantIdParsed !== undefined ? [grantIdParsed] : undefined,
+    query: { enabled: grantIdParsed !== undefined && !isDemoRoute },
+  });
+
+  const resolvedEscrowAddress =
+    factoryEscrowAddress && factoryEscrowAddress !== zeroAddress
+      ? (factoryEscrowAddress as Address)
+      : undefined;
+
   const {
     data: grantData,
     isLoading: grantLoading,
     isError: grantFetchError,
     isFetched: grantFetched,
   } = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
+    address: resolvedEscrowAddress,
     abi: grantEscrowReadAbi,
     functionName: 'getGrant',
-    args: grantIdParsed !== undefined ? [grantIdParsed] : undefined,
-    query: { enabled: grantIdParsed !== undefined && !isDemoRoute },
+    query: { enabled: resolvedEscrowAddress !== undefined && !isDemoRoute },
   });
 
   const grantTuple = grantData as GrantTuple | undefined;
@@ -228,7 +242,7 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
         milestoneIndex !== null &&
         indexInRange &&
         zkMilestone &&
-        grantIdParsed !== undefined
+        resolvedEscrowAddress !== undefined
     );
 
   const {
@@ -237,12 +251,12 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     isError: statusFetchError,
     isFetched: statusFetched,
   } = useReadContract({
-    address: GRANT_ESCROW_ADDRESS,
+    address: resolvedEscrowAddress,
     abi: grantEscrowReadAbi,
     functionName: 'getMilestoneStatus',
     args:
-      statusQueryEnabled && grantIdParsed !== undefined && milestoneIndex !== null
-        ? [grantIdParsed, BigInt(milestoneIndex)]
+      statusQueryEnabled && milestoneIndex !== null
+        ? [BigInt(milestoneIndex)]
         : undefined,
     query: { enabled: statusQueryEnabled && !isDemoRoute },
   });
@@ -284,7 +298,7 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
   });
 
   const registeredGithubHandle =
-    typeof identityTuple?.[1] === 'string' ? (identityTuple[1] as string) : '';
+    typeof (identityTuple as any)?.githubHandle === 'string' ? ((identityTuple as any).githubHandle as string) : '';
 
   const gate: Gate = useMemo(() => {
     if (isUiDemoPathSegment(routeGrantId) && !isUiDemoMode()) {
@@ -742,6 +756,7 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     regenerateProofAfterInvalidOnchain,
     submissionMeta,
     submitSessionReady,
+    resolvedEscrowAddress,
   };
 
   return <MilestoneSubmitContext.Provider value={value}>{children}</MilestoneSubmitContext.Provider>;
