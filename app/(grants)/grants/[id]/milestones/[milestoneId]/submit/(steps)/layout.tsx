@@ -93,7 +93,7 @@ function SubmitStepsChrome({ children }: { children: ReactNode }) {
                 GrantIdentityRegistry · EAS-ready
               </div>
               <div className="flex items-center gap-1.5">
-                Powered by <span className="font-bold text-slate-700">vlayer Web Prover</span>
+                Powered by <span className="font-bold text-slate-700">Noir ZK Coprocessor</span>
               </div>
             </footer>
           </div>

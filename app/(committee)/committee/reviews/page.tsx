@@ -6,6 +6,7 @@ import CommitteeReviewSkeleton from '@/components/committee/CommitteeReviewSkele
 import ActiveReviewsList from '@/components/committee/reviews/ActiveReviewsList';
 import { getCommitteeDemoActiveReviews } from '@/demo/committee-demo';
 import { useAuthGuard } from '@/lib/authGuard';
+import { useCommitteeReviews } from '@/lib/hooks/useCommitteeReviews';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
@@ -23,6 +24,7 @@ const ACCESS_DENIED_LINGER_MS = 1600;
 
 export default function CommitteeReviewsPage() {
   const guard = useAuthGuard('committee');
+  const { data, loading: dataLoading } = useCommitteeReviews();
 
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
@@ -31,17 +33,11 @@ export default function CommitteeReviewsPage() {
     return () => window.clearTimeout(t);
   }, []);
 
-  const authorized = minTimeElapsed && guard.state === 'allowed';
-
-  const data = useMemo(() => getCommitteeDemoActiveReviews(), []);
+  const authorized = minTimeElapsed && guard.state === 'allowed' && !dataLoading;
 
   const handleVoteFinalised = useCallback(
     (submissionId: string, intent: 'approve' | 'reject', txHash?: string) => {
-      // Wire to a contract write + optimistic tab move when the real flow lands.
-      // For now we just log so the demo flow is observable in the console.
-      if (process.env.NODE_ENV !== 'production') {
-        console.info('[committee] vote finalised', { submissionId, intent, txHash });
-      }
+      console.info('[committee] vote finalised', { submissionId, intent, txHash });
     },
     [],
   );

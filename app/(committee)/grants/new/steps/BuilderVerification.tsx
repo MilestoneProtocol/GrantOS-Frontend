@@ -45,11 +45,11 @@ export default function BuilderVerification({
     () =>
       data
         ? {
-            zkVerified: data[0],
-            githubHandle: data[1],
-            accountCreationYear: Number(data[2]),
-            contributionTier: Number(data[3]),
-            reputationScore: data[4],
+            zkVerified: data.isVerified,
+            githubHandle: data.githubHandle,
+            accountCreationYear: Number(data.createdYear),
+            contributionTier: Number(data.tier),
+            reputationScore: BigInt(0),
           }
         : null,
     [data]

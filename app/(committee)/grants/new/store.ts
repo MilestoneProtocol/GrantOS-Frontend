@@ -196,7 +196,7 @@ export const useGrantCreationStore = create<GrantCreationState>()(
         builderIdentity: state.builderIdentity
           ? {
               ...state.builderIdentity,
-              reputationScore: state.builderIdentity.reputationScore.toString(),
+              reputationScore: state.builderIdentity.reputationScore?.toString() ?? '0',
             }
           : null,
         grantName: state.grantName,

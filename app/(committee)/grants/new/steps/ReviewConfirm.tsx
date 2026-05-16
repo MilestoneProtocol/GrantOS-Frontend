@@ -2,7 +2,7 @@
 
 import { MilestoneInput, PaymentMode } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
-import { GRANT_ESCROW_ADDRESS, grantEscrowAbi, CONTRACTS_READY } from '@/lib/escrow';
+import { GRANT_FACTORY_ADDRESS, grantFactoryAbi, CONTRACTS_READY } from '@/lib/escrow';
 import { USDC_ADDRESS, USDC_DECIMALS, usdcAbi } from '@/lib/usdc';
 import {
   ArrowUpRight,
@@ -16,7 +16,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { parseUnits } from 'viem';
+import { maxUint256, parseUnits } from 'viem';
 import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 type ReviewConfirmProps = {
@@ -87,6 +87,7 @@ export default function ReviewConfirm({
   const {
     isLoading: createIsConfirming,
     isSuccess: createIsConfirmed,
+    data: createReceipt,
   } = useWaitForTransactionReceipt({
     hash: createHash,
     query: {
@@ -94,13 +95,63 @@ export default function ReviewConfirm({
     },
   });
 
-  // propagate success
-  useMemo(() => {
-    if (createIsConfirmed && createHash) {
-      onSuccess(createHash);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createIsConfirmed]);
+  // propagate success + index in backend
+  useEffect(() => {
+    if (!createIsConfirmed || !createHash || !createReceipt) return;
+
+    const indexInBackend = async () => {
+      try {
+        // Find the GrantCreated event in logs
+        const log = createReceipt.logs.find(
+          (l) => l.address.toLowerCase() === GRANT_FACTORY_ADDRESS.toLowerCase()
+        );
+        
+        let onChainId = 0;
+        let escrowAddr = '0x0000000000000000000000000000000000000000';
+
+        if (log) {
+          // GrantCreated(uint256 indexed grantId, address indexed escrow, ...)
+          // Topics: [0] event sig, [1] grantId, [2] escrow
+          onChainId = Number(BigInt(log.topics[1] || '0'));
+          escrowAddr = `0x${log.topics[2]?.slice(26)}`.toLowerCase();
+        }
+
+        const payload = {
+          onChainId,
+          escrowAddress: escrowAddr,
+          grantorAddress: createReceipt.from,
+          granteeAddress: builderAddress,
+          txHash: createHash,
+          totalUsdc: parseUnits(String(totalUsdc), USDC_DECIMALS).toString(),
+          isStreaming: paymentMode === 'streaming',
+          quorum: Number(quorum),
+          committee: committeeMembers,
+          milestones: milestones.map((m) => ({
+            title: m.title,
+            description: m.description,
+            amount: parseUnits(m.amount || '0', USDC_DECIMALS).toString(),
+            deadline: Math.floor(new Date(m.deadline).getTime() / 1000),
+            proofType: m.proofType === 'zk_github' ? 0 : 1,
+          })),
+        };
+
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        await fetch(`${apiBase}/grants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        onSuccess(createHash);
+      } catch (err) {
+        console.error('Failed to index grant in backend:', err);
+        // Still proceed to success screen so user sees their tx
+        onSuccess(createHash);
+      }
+    };
+
+    indexInBackend();
+  }, [createIsConfirmed, createHash, createReceipt, builderAddress, committeeMembers, milestones, paymentMode, quorum, totalUsdc, onSuccess]);
 
   const approveError =
     (approveWriteError as Error | null)?.message ||
@@ -159,30 +210,36 @@ export default function ReviewConfirm({
       address: USDC_ADDRESS,
       abi: usdcAbi,
       functionName: 'approve',
-      args: [GRANT_ESCROW_ADDRESS, parseUnits(String(totalUsdc), USDC_DECIMALS)],
+      args: [GRANT_FACTORY_ADDRESS, maxUint256],
+      // Switch to Legacy gas price for better testnet reliability
+      gasPrice: parseUnits('2', 9), // 2 Gwei
+      gas: BigInt(200000),           // Manual gas limit for approval
     });
   }
 
   function handleCreate() {
-    if (!CONTRACTS_READY || !grantEscrowAbi) return;
+    if (!CONTRACTS_READY || !grantFactoryAbi) return;
     resetCreate();
     writeCreate({
-      address: GRANT_ESCROW_ADDRESS,
-      abi: grantEscrowAbi,
+      address: GRANT_FACTORY_ADDRESS,
+      abi: grantFactoryAbi,
       functionName: 'createGrant',
       args: [
-        builderAddress,
+        builderAddress as `0x${string}`,
         paymentMode === 'streaming',
-        committeeMembers,
-        quorum,
+        committeeMembers as `0x${string}`[],
+        BigInt(quorum),
         milestones.map((m) => ({
           title: m.title,
           description: m.description,
           amount: parseUnits(m.amount || '0', USDC_DECIMALS),
-          deadline: Math.floor(new Date(m.deadline).getTime() / 1000),
+          deadline: BigInt(Math.floor(new Date(m.deadline).getTime() / 1000)),
           proofType: m.proofType === 'zk_github' ? 0 : 1,
         })),
       ],
+      // Switch to Legacy gas price for better testnet reliability
+      gasPrice: parseUnits('2', 9), // 2 Gwei
+      gas: BigInt(3000000),          // Generous gas limit for grant creation
     });
   }
 
@@ -314,11 +371,11 @@ export default function ReviewConfirm({
               Escrow Contract
             </p>
             <p className="mt-1 font-mono text-sm text-slate-700">
-              GrantEscrow.sol (Arbitrum One)
+              GrantEscrow.sol (Arbitrum Sepolia)
             </p>
           </div>
           <a
-            href={`https://arbiscan.io/address/${GRANT_ESCROW_ADDRESS}`}
+            href={`https://sepolia.arbiscan.io/address/${GRANT_FACTORY_ADDRESS}`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 transition hover:text-indigo-800"

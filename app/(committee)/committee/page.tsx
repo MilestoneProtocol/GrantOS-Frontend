@@ -21,8 +21,9 @@ import {
 } from '@/lib/builder-warnings';
 import { buildArbiscanTxUrl } from '@/lib/warning-flow';
 import { useAuthGuard } from '@/lib/authGuard';
-import { AlertTriangle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCommitteeReviews } from '@/lib/hooks/useCommitteeReviews';
+import { AlertTriangle, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 
 /**
@@ -85,16 +86,15 @@ export default function CommitteeDashboardPage() {
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
 
-  /**
-   * Demo source. In production this is replaced by:
-   *   1. A read of `GrantEscrow.getCommitteeGrants(account)`.
-   *   2. For each grant, fetch milestones where `status === Pending`.
-   *   3. Partition into `overdue` (deadline < now) and `pendingReview`.
-   *   4. For each overdue, query EAS for a `MilestoneWarning` attestation
-   *      to determine the substate (`deadline_missed` | `warning_issued`
-   *      | `slash_available`).
-   */
-  const actions = useMemo(() => getCommitteeDemoActions(), []);
+  const { data: realData, loading: reviewsLoading } = useCommitteeReviews();
+
+  const actions = useMemo(() => {
+    return {
+      pendingReview: realData.pending,
+      pendingReviewCount: realData.totalPending,
+      overdue: [], // Overdue logic to be implemented via backend indexing
+    };
+  }, [realData]);
 
   /**
    * When set, the page pivots out of the dashboard and into the Warning
@@ -372,7 +372,17 @@ export default function CommitteeDashboardPage() {
 
                 <section className="flex flex-col gap-3">
                   <SectionHeader label="Pending Review" tone="neutral" />
-                  <PendingReviewTable rows={actions.pendingReview} />
+                  {reviewsLoading ? (
+                    <div className="flex justify-center p-8 text-slate-400">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : actions.pendingReview.length === 0 ? (
+                    <div className="flex justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-sm text-slate-500">
+                      No milestones pending review.
+                    </div>
+                  ) : (
+                    <PendingReviewTable rows={actions.pendingReview} />
+                  )}
                 </section>
               </>
             )}

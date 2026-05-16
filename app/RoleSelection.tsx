@@ -107,7 +107,7 @@ export default function RoleSelection({
         </div>
 
         {/* Cards */}
-        <div className="mt-10 grid gap-5 lg:grid-cols-2">
+        <div className="mt-10 grid gap-5 lg:grid-cols-3">
           <RoleTile
             tone="indigo"
             eyebrow="Builder"
@@ -143,6 +143,21 @@ export default function RoleSelection({
             ctaLabel="Go to Committee"
             href="/committee"
             icon={<Users className="h-5 w-5" strokeWidth={2.2} />}
+          />
+
+          <RoleTile
+            tone="violet"
+            eyebrow="Grantor"
+            title="Create a New Grant"
+            description="Deploy a fully onchain grant via GrantEscrow. Fund builders securely with milestone-based payouts and committee oversight."
+            features={[
+              { icon: <CircleDollarSign className="h-3.5 w-3.5" />, label: 'Fund via USDC' },
+              { icon: <Users className="h-3.5 w-3.5" />, label: 'Assign review committee' },
+              { icon: <ShieldCheck className="h-3.5 w-3.5" />, label: 'Automated escrow' },
+            ]}
+            ctaLabel="Create Grant"
+            href="/grants/new"
+            icon={<Sparkles className="h-5 w-5" strokeWidth={2.2} />}
           />
         </div>
 
@@ -226,7 +241,7 @@ function RoleTile({
   const t = TONE[tone];
   return (
     <article
-      className={`group relative overflow-hidden rounded-[28px] border bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-22px_rgba(15,23,42,0.18)] sm:p-7 ${t.border}`}
+      className={`group relative flex flex-col overflow-hidden rounded-[28px] border bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-22px_rgba(15,23,42,0.18)] sm:p-7 ${t.border}`}
     >
       <div
         aria-hidden
@@ -271,13 +286,15 @@ function RoleTile({
         ))}
       </ul>
 
-      <Link
-        href={href}
-        className={`relative mt-6 inline-flex w-full items-center justify-between gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition ${t.button}`}
-      >
-        <span>{ctaLabel}</span>
-        <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-      </Link>
+      <div className="mt-auto pt-8">
+        <Link
+          href={href}
+          className={`relative inline-flex h-12 w-full items-center justify-between gap-2 rounded-2xl px-5 text-sm font-semibold text-white shadow-sm transition ${t.button}`}
+        >
+          <span>{ctaLabel}</span>
+          <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+        </Link>
+      </div>
     </article>
   );
 }

@@ -51,7 +51,7 @@ function CreateGrantPageContent() {
   const guard = useAuthGuard('committee');
   const searchParams = useSearchParams();
   const [attemptedStep, setAttemptedStep] = useState<number | null>(null);
-  const setGrantCreationSource = useGrantCreationStore((s) => s.setGrantCreationSource);
+
   const {
     currentStep,
     setStep,
@@ -77,7 +77,13 @@ function CreateGrantPageContent() {
     setCreatedTxHash,
     setCreatedGrantId,
     createdGrantId,
+    setGrantCreationSource,
   } = useGrantCreationStore();
+
+  const [hasHydrated, setHasHydrated] = useState(false);
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (searchParams.get('from') === 'dao') {
@@ -117,6 +123,28 @@ function CreateGrantPageContent() {
     return '';
   }, [builderAddress, committeeMembers, currentStep, milestones, quorum]);
 
+  const showStepError = attemptedStep === currentStep && Boolean(stepError);
+
+  useEffect(() => {
+    if (!showStepError) return;
+    const timeoutId = window.setTimeout(() => {
+      setAttemptedStep(null);
+    }, 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [showStepError]);
+
+  const handleIdentityLoaded = useCallback((identity: GrantIdentity | null) => {
+    setBuilderIdentity(identity);
+  }, [setBuilderIdentity]);
+
+  if (!hasHydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Restoring session…
+      </div>
+    );
+  }
+
   const canContinueStep0 = true;
   const canContinueStep1 =
     milestones.length >= 1 &&
@@ -142,32 +170,11 @@ function CreateGrantPageContent() {
   const isPaymentStep = currentStep === 3;
   const isReviewStep = currentStep === 4;
   const isSuccessStep = currentStep === 5;
-  const resolvedGrantId = useMemo(() => {
-    if (createdGrantId) return createdGrantId;
-    return builderAddress ? builderAddress.slice(2, 8).toUpperCase() : '000000';
-  }, [builderAddress, createdGrantId]);
-  const handleIdentityLoaded = useCallback(
-    (identity: GrantIdentity | null) => {
-      setBuilderIdentity(identity);
-    },
-    [setBuilderIdentity]
-  );
+  const resolvedGrantId = createdGrantId || (builderAddress ? builderAddress.slice(2, 8).toUpperCase() : '000000');
 
   function isStepUnlocked(stepIndex: number) {
     return stepIndex >= 0;
   }
-
-  const showStepError = attemptedStep === currentStep && Boolean(stepError);
-
-  useEffect(() => {
-    if (!showStepError) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setAttemptedStep(null);
-    }, 2000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [showStepError]);
 
   function attemptStepChange(stepIndex: number) {
     if (stepIndex === currentStep) return;
@@ -189,7 +196,7 @@ function CreateGrantPageContent() {
   }
 
   return (
-    guard.state === 'blocked' ? null : (
+    guard.state === 'blocked' && hasHydrated ? null : (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <AppShellHeader />
 
@@ -348,7 +355,7 @@ function CreateGrantPageContent() {
               type="button"
               onClick={() => setStep(Math.max(0, currentStep - 1))}
               disabled={currentStep === 0}
-              className="order-2 text-sm font-medium text-slate-400 transition hover:text-slate-600 disabled:pointer-events-none disabled:text-slate-300 sm:order-1"
+              className="order-2 text-sm font-medium text-slate-400 transition hover:text-slate-700 disabled:pointer-events-none disabled:text-slate-300 sm:order-1"
             >
               Back
             </button>

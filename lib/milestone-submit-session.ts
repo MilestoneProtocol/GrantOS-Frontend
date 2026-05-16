@@ -8,6 +8,8 @@ export type ZkProofPreview = {
   mergedAtIso: string;
   proofHash: `0x${string}`;
   identityMatches: boolean;
+  proof?: `0x${string}`;
+  publicInputs?: `0x${string}`[];
 };
 
 export type MilestoneSubmitPersisted = {
@@ -77,21 +79,22 @@ export function normalizeGithubHandle(s: string): string {
 }
 
 /**
- * Mock proof outcome for UI until vlayer is wired.
+ * Mock proof outcome for UI until Noir coprocessor is wired.
  * - Append `zk-fail-demo` to repo owner/repo → generation failure.
  * - Append `mismatch-demo` → PR author ≠ registry (if registry set).
  */
 export function buildMockZkProofResult(
   repo: string,
   pr: string,
-  registeredGithubFromRegistry: string
+  registeredGithubFromRegistry: string,
+  walletAddress: string
 ): { kind: 'success'; preview: ZkProofPreview } | { kind: 'failure'; message: string } {
   const lowerRepo = repo.toLowerCase();
   if (lowerRepo.includes('zk-fail-demo')) {
     return {
       kind: 'failure',
       message:
-        'Repository is private or PR not found. Ensure the vlayer Prover has read access to the target repository.',
+        'Repository is private or PR not found. Ensure the Noir ZK Coprocessor has read access to the target repository.',
     };
   }
 
@@ -106,6 +109,12 @@ export function buildMockZkProofResult(
   const proofSeed = `${repo}:${pr}:${mergedAt.getTime()}`;
   const proofHash = keccak256(stringToBytes(proofSeed)) as `0x${string}`;
 
+  // Coprocessor integration (US-01/US-02 architecture reuse)
+  const walletAddrStr = walletAddress.startsWith('0x') && walletAddress.length > 2 ? walletAddress : '0x1234567890123456789012345678901234567890';
+  const walletAddr = BigInt(walletAddrStr);
+  const addrHi = (walletAddr >> 128n) & 0xffffffffn;
+  const addrLo = walletAddr & ((1n << 128n) - 1n);
+
   return {
     kind: 'success',
     preview: {
@@ -116,6 +125,14 @@ export function buildMockZkProofResult(
       mergedAtIso: mergedAt.toISOString(),
       proofHash,
       identityMatches,
+      proof: '0xabc123' as `0x${string}`, // Mock proof
+      publicInputs: [
+        '0x0000000000000000000000000000000000000000000000000000000000000003' as `0x${string}`, // Tier Gold
+        '0x0000000000000000000000000000000000000000000000000000000000001234' as `0x${string}`, // GitHub ID
+        '0x00000000000000000000000000000000000000000000000000000000000007d8' as `0x${string}`, // 2008
+        `0x${addrHi.toString(16).padStart(64, '0')}` as `0x${string}`,
+        `0x${addrLo.toString(16).padStart(64, '0')}` as `0x${string}`,
+      ] as `0x${string}`[],
     },
   };
 }

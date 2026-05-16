@@ -35,6 +35,10 @@ export default function BuilderWarningsListPage() {
   const guard = useAuthGuard('builder');
   const { address } = useAccount();
   const warnings = useAllBuilderWarnings(address);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (guard.state === 'loading') {
     return (
@@ -46,11 +50,6 @@ export default function BuilderWarningsListPage() {
     );
   }
   if (guard.state === 'blocked') return null;
-
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const activeCount = warnings.filter((w) => !w.slash).length;
   const slashedCount = warnings.filter((w) => w.slash).length;

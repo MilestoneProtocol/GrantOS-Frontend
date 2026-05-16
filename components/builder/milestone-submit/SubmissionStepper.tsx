@@ -18,13 +18,13 @@ export default function SubmissionStepper() {
     uiStep < 2
       ? 'Pending PR & context'
       : uiStep === 2 && zkSubstep === 'loading'
-        ? 'Running vlayer SDK'
+        ? 'Running Noir SDK'
         : uiStep === 2 && zkSubstep === 'result' && zkOutcome === 'failure'
           ? 'Generation failed'
           : uiStep === 2 && zkSubstep === 'result'
             ? 'Proof ready'
             : uiStep === 2
-              ? 'Generate vlayer proof'
+              ? 'Generate ZK proof'
               : 'Proof ready';
 
   const steps: StepDef[] = [

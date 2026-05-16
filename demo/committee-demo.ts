@@ -63,6 +63,7 @@ export type CommitteeReviewSubmission = {
   id: string;
   grantId: string;
   grantTitle: string;
+  escrowAddress: `0x${string}`;
   builder: `0x${string}`;
   milestoneIndex: number;
   milestoneTitle: string;

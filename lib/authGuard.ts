@@ -16,9 +16,15 @@ type GuardState =
 
 function roleFromRoles(requiredRole: RequiredRole, roles: ReturnType<typeof useRoleDetection>) {
   if (requiredRole === 'public') return true;
+  
+  // DAO Admin dashboard is strictly for users with 3+ committee seats
   if (requiredRole === 'dao') return roles.isDaoAdmin;
-  if (requiredRole === 'committee') return roles.isCommittee;
-  if (requiredRole === 'builder') return roles.isBuilder;
+  
+  // Any connected wallet can visit the builder or committee surfaces 
+  // (e.g. to view empty states or to create a new grant)
+  if (requiredRole === 'committee') return true;
+  if (requiredRole === 'builder') return true;
+  
   return false;
 }
 

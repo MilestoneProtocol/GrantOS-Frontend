@@ -159,7 +159,7 @@ function ProofCardMockup() {
             <ProofRow
               icon={<FileCheck2 className="h-3.5 w-3.5" />}
               label="Source attested"
-              detail="vlayer · GitHub PR #315"
+              detail="Noir ZK Coprocessor · GitHub PR #315"
               done
             />
             <ProofRow
@@ -327,7 +327,7 @@ function FeatureSection() {
           eyebrow="ZK Proof Verification"
           title="Submit evidence, not screenshots"
           body="Builders generate zero-knowledge proofs of work — commits, deployments, metrics, web data. Committees verify math, not vibes."
-          tags={['vlayer Web Prover', 'EAS Attestations', 'Arbitrum One']}
+          tags={['Noir ZK Coprocessor', 'EAS Attestations', 'Arbitrum One']}
         />
         <FeatureCard
           accent="emerald"
@@ -498,7 +498,7 @@ function HowItWorksSection() {
 
 const ACTIVITY = [
   { dot: 'bg-emerald-500', text: 'Milestone 2 verified', sub: 'Yield Aggregator · 0x5b4e…a3b' },
-  { dot: 'bg-violet-500', text: 'ZK proof accepted', sub: 'PR #315 · vlayer prover' },
+  { dot: 'bg-violet-500', text: 'ZK proof accepted', sub: 'PR #315 · Noir coprocessor' },
   { dot: 'bg-sky-500', text: 'Stream resumed', sub: '$0.000014/sec · USDC' },
   { dot: 'bg-amber-500', text: 'Warning recorded', sub: 'Cool-off ends in 23h' },
   { dot: 'bg-rose-500', text: 'Slash executed', sub: '$4,000 returned to treasury' },

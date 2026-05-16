@@ -1,13 +1,14 @@
 import { getCommitteeDemoActions } from '@/demo/committee-demo';
 import { getDaoDashboardSnapshot, type DaoGrantCardModel, type DaoMilestoneModel } from '@/demo/dao-dashboard';
 import {
+  GRANT_FACTORY_ADDRESS,
   GRANT_ESCROW_ADDRESS,
   grantEscrowReadAbi,
   IDENTITY_REGISTRY_ADDRESS,
   identityRegistryAbi,
 } from '@/lib/escrow';
 import { USDC_DECIMALS } from '@/lib/usdc';
-import { arbitrum } from 'viem/chains';
+import { arbitrumSepolia } from 'viem/chains';
 import {
   createPublicClient,
   formatUnits,
@@ -77,7 +78,7 @@ export type BuilderProfileData =
     };
 
 const RPC =
-  process.env.NEXT_PUBLIC_RPC_URL?.trim() || 'https://arb1.arbitrum.io/rpc';
+  process.env.NEXT_PUBLIC_RPC_URL?.trim() || 'https://sepolia-rollup.arbitrum.io/rpc';
 
 const builderListAbis = [
   {
@@ -178,18 +179,8 @@ function syntheticBindingTx(address: Address): `0x${string}` {
   return `0x${h.slice(2, 66)}` as `0x${string}`;
 }
 
-function syntheticVerifiedAtUtc(address: Address): string {
-  const n = Number(BigInt(`0x${address.slice(2, 10)}`) % BigInt(86400 * 400));
-  const ms = Date.UTC(2023, 9, 12, 14, 30) + n * 1000;
-  return new Date(ms).toLocaleString('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }) + ' UTC';
+function syntheticVerifiedAtUtc(address: Address): string | null {
+  return null;
 }
 
 function daoMilestoneApproved(m: DaoMilestoneModel): boolean {
@@ -304,10 +295,16 @@ function mergeWarningRows(
   );
 }
 
+function demoCardsForBuilder(address: Address): DaoGrantCardModel[] {
+  const addrLower = address.toLowerCase();
+  const snap = getDaoDashboardSnapshot(0);
+  return snap.grants.filter((g) => g.builder.toLowerCase() === addrLower);
+}
+
 function demoRowsForBuilder(cards: DaoGrantCardModel[]): BuilderProfileGrantRow[] {
   return cards.map((c) => ({
     source: 'demo' as const,
-    href: `/grants/${c.slug}`,
+    href: c.href,
     labelId: c.displayId.replace(/^#/, ''),
     title: c.milestones[0]?.title ?? 'Grant',
     committeeCount: 5,
@@ -318,27 +315,45 @@ function demoRowsForBuilder(cards: DaoGrantCardModel[]): BuilderProfileGrantRow[
   }));
 }
 
-export async function loadBuilderProfile(raw: string): Promise<BuilderProfileData> {
-  const trimmed = decodeURIComponent(raw).trim();
-  if (!trimmed || !isAddress(trimmed)) return { kind: 'invalid' };
+const RPCS = [
+  process.env.NEXT_PUBLIC_RPC_URL?.trim(),
+  'https://sepolia-rollup.arbitrum.io/rpc',
+  'https://arbitrum-sepolia.publicnode.com',
+  'https://arbitrum-sepolia.blockpi.network/v1/rpc/public',
+].filter(Boolean) as string[];
 
-  let address: Address;
-  try {
-    address = getAddress(trimmed);
-  } catch {
-    return { kind: 'invalid' };
+async function getClientWithFallback() {
+  for (const url of RPCS) {
+    try {
+      const client = createPublicClient({
+        chain: arbitrumSepolia,
+        transport: http(url, { timeout: 10_000 }),
+      });
+      // Smoke test
+      await client.getBlockNumber();
+      return client;
+    } catch (e) {
+      console.error(`RPC ${url} failed, trying next...`);
+    }
   }
+  return null;
+}
 
+export async function loadBuilderProfile(raw: string): Promise<BuilderProfileData> {
+  const trimmed = raw.trim();
+  if (!trimmed || !isAddress(trimmed)) {
+    return { kind: 'invalid', address: trimmed };
+  }
+  const address = getAddress(trimmed) as Address;
   const addrLower = address.toLowerCase();
-  const snap = getDaoDashboardSnapshot(0);
-  const demoCards = snap.grants.filter((g) => g.builder.toLowerCase() === addrLower);
+
+  const demoCards = demoCardsForBuilder(address);
   const demoRows = demoRowsForBuilder(demoCards);
   const demoStats = computeDemoStats(demoCards);
   const daoWarnings = mergeWarningsFromDao(demoCards);
   const seedWarnings = committeeSeedWarnings(addrLower);
   const warnings = mergeWarningRows(daoWarnings, seedWarnings);
 
-  let chainReadFailed = false;
   let identity: BuilderIdentityView = {
     zkVerified: false,
     githubHandle: '',
@@ -346,253 +361,16 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
     contributionTier: 0,
     reputationScore: 0,
   };
+  let hasIdentityRecord = false;
   let verifiedAtDisplay: string | null = null;
   let bindingTxHash: `0x${string}` | null = null;
   const chainRows: BuilderProfileGrantRow[] = [];
+  let chainReadFailed = false;
 
-  try {
-    const client = createPublicClient({
-      chain: arbitrum,
-      transport: http(RPC, { timeout: 12_000 }),
-    });
+  const client = await getClientWithFallback();
 
-    const [isVerified, idTuple] = await Promise.all([
-      client.readContract({
-        address: IDENTITY_REGISTRY_ADDRESS,
-        abi: identityRegistryAbi,
-        functionName: 'isVerified',
-        args: [address],
-      }),
-      client.readContract({
-        address: IDENTITY_REGISTRY_ADDRESS,
-        abi: identityRegistryAbi,
-        functionName: 'getIdentity',
-        args: [address],
-      }),
-    ]);
-
-    const zkVerified = Boolean(idTuple[0]) || Boolean(isVerified);
-    const githubHandle = typeof idTuple[1] === 'string' ? idTuple[1] : '';
-    const accountCreationYear = Number(idTuple[2] ?? 0);
-    const contributionTier = Number(idTuple[3] ?? 0);
-    const reputationScore = Number(idTuple[4] ?? 0);
-
-    identity = {
-      zkVerified,
-      githubHandle,
-      accountCreationYear,
-      contributionTier,
-      reputationScore,
-    };
-
-    const hasIdentityRecord =
-      zkVerified ||
-      githubHandle.trim().length > 0 ||
-      accountCreationYear > 0 ||
-      contributionTier > 0 ||
-      reputationScore > 0;
-
-    if (hasIdentityRecord) {
-      verifiedAtDisplay = syntheticVerifiedAtUtc(address);
-      bindingTxHash = syntheticBindingTx(address);
-    }
-
-    const idSet = new Set<string>();
-    for (const fn of builderListAbis) {
-      try {
-        const ids = (await client.readContract({
-          address: GRANT_ESCROW_ADDRESS,
-          abi: [fn],
-          functionName: fn.name,
-          args: [address],
-        })) as bigint[];
-        ids.forEach((id) => idSet.add(id.toString()));
-      } catch {
-        // deployment may not expose this view
-      }
-    }
-
-    const grantIds = Array.from(idSet, (s) => BigInt(s));
-
-    const grantResults =
-      grantIds.length > 0
-        ? await client.multicall({
-            allowFailure: true,
-            contracts: grantIds.map((id) => ({
-              address: GRANT_ESCROW_ADDRESS,
-              abi: grantEscrowReadAbi,
-              functionName: 'getGrant',
-              args: [id],
-            })),
-          })
-        : [];
-
-    const chainGrants: Array<{ id: bigint; tuple: GrantTuple }> = [];
-    grantResults.forEach((row, i) => {
-      if (row.status !== 'success') return;
-      const t = row.result as GrantTuple;
-      if (grantTupleEmpty(t)) return;
-      if (t.builder.toLowerCase() !== addrLower) return;
-      chainGrants.push({ id: grantIds[i]!, tuple: t });
-    });
-
-    const statusContracts = chainGrants.flatMap(({ id, tuple }) =>
-      tuple.milestones.map((_, idx) => ({
-        address: GRANT_ESCROW_ADDRESS,
-        abi: grantEscrowReadAbi,
-        functionName: 'getMilestoneStatus' as const,
-        args: [id, BigInt(idx)] as const,
-      })),
-    );
-
-    const statusResults =
-      statusContracts.length > 0
-        ? await client.multicall({
-            allowFailure: true,
-            contracts: statusContracts,
-          })
-        : [];
-
-    let statusIdx = 0;
-    for (const { id, tuple } of chainGrants) {
-      const statuses: number[] = [];
-      for (let i = 0; i < tuple.milestones.length; i++) {
-        const r = statusResults[statusIdx++];
-        if (r?.status === 'success') statuses.push(Number(r.result));
-        else statuses.push(MILESTONE_PENDING);
-      }
-
-      let approved = 0;
-      let nonPending = 0;
-      let usdcEarned = 0;
-      let zkSubmitted = 0;
-
-      tuple.milestones.forEach((m, i) => {
-        const st = statuses[i] ?? MILESTONE_PENDING;
-        if (st !== MILESTONE_PENDING) {
-          nonPending += 1;
-          if (MILESTONE_APPROVED_LIKE.has(st)) {
-            approved += 1;
-            usdcEarned += usdcFromWei(m.amount);
-          }
-          if (m.proofType === 0) zkSubmitted += 1;
-        }
-      });
-
-      const totalWei = tuple.milestones.reduce((s, m) => s + m.amount, BigInt(0));
-      const completedLike =
-        nonPending > 0 && approved === tuple.milestones.length && !tuple.streaming;
-
-      chainRows.push({
-        source: 'chain',
-        href: `/grants/${id.toString()}`,
-        labelId: `GRT-${id.toString()}`,
-        title: tuple.milestones[0]?.title ?? 'Grant',
-        committeeCount: tuple.committee.length,
-        totalUsdc: Math.round(usdcFromWei(totalWei) * 100) / 100,
-        milestoneApproved: approved,
-        milestoneTotal: tuple.milestones.length,
-        statusLabel: completedLike ? 'Completed' : 'In Progress',
-      });
-    }
-
-    const chainStatsPart = (): BuilderProfileStats => {
-      if (chainGrants.length === 0) {
-        return {
-          reputationScore: 0,
-          letterGrade: '—',
-          deliveryRatePercent: null,
-          deliveryDetail: 'No on-chain grants.',
-          totalUsdcEarned: 0,
-          zkProofsSubmitted: 0,
-          hasZkSubmission: false,
-        };
-      }
-      let approved = 0;
-      let nonPending = 0;
-      let usdcEarned = 0;
-      let zkSubmitted = 0;
-      let si = 0;
-      for (const { tuple } of chainGrants) {
-        for (let i = 0; i < tuple.milestones.length; i++) {
-          const st =
-            statusResults[si]?.status === 'success'
-              ? Number(statusResults[si]!.result)
-              : MILESTONE_PENDING;
-          si++;
-          if (st !== MILESTONE_PENDING) {
-            nonPending += 1;
-            if (MILESTONE_APPROVED_LIKE.has(st)) {
-              approved += 1;
-              usdcEarned += usdcFromWei(tuple.milestones[i]!.amount);
-            }
-            if (tuple.milestones[i]!.proofType === 0) zkSubmitted += 1;
-          }
-        }
-      }
-      const rep = identity.reputationScore || 0;
-      return {
-        reputationScore: rep,
-        letterGrade: rep > 0 ? scoreToLetterGrade(rep) : '—',
-        deliveryRatePercent:
-          nonPending > 0 ? Math.round((approved / nonPending) * 1000) / 10 : null,
-        deliveryDetail:
-          nonPending > 0
-            ? `${approved} of ${nonPending} milestones approved.`
-            : 'Milestone statuses unavailable or all pending.',
-        totalUsdcEarned: Math.round(usdcEarned * 100) / 100,
-        zkProofsSubmitted: zkSubmitted,
-        hasZkSubmission: zkSubmitted > 0,
-      };
-    };
-
-    const chainStats = chainStatsPart();
-    const repScore = hasIdentityRecord
-      ? identity.reputationScore > 0
-        ? identity.reputationScore
-        : chainStats.reputationScore || demoStats.reputationScore
-      : Math.max(chainStats.reputationScore, demoStats.reputationScore);
-
-    const mergedStats: BuilderProfileStats = {
-      reputationScore: repScore,
-      letterGrade: repScore > 0 ? scoreToLetterGrade(repScore) : '—',
-      deliveryRatePercent:
-        chainRows.length > 0
-          ? chainStats.deliveryRatePercent ?? demoStats.deliveryRatePercent
-          : demoStats.deliveryRatePercent,
-      deliveryDetail:
-        chainRows.length > 0 ? chainStats.deliveryDetail : demoStats.deliveryDetail,
-      totalUsdcEarned:
-        chainStats.totalUsdcEarned > 0
-          ? chainStats.totalUsdcEarned
-          : demoStats.totalUsdcEarned,
-      zkProofsSubmitted: Math.max(
-        chainStats.zkProofsSubmitted,
-        demoStats.zkProofsSubmitted,
-      ),
-      hasZkSubmission:
-        chainStats.hasZkSubmission || demoStats.hasZkSubmission,
-    };
-
-    const mergedGrants = mergeGrantRows(chainRows, demoRows);
-
-    const demoContributionTierLabel = demoCards[0]?.contributionTier ?? null;
-
-    return {
-      kind: 'ok',
-      address,
-      identity,
-      hasIdentityRecord,
-      verifiedAtDisplay,
-      bindingTxHash,
-      stats: mergedStats,
-      grants: mergedGrants,
-      warnings,
-      chainReadFailed: false,
-      demoContributionTierLabel,
-    };
-  } catch {
-    chainReadFailed = true;
+  if (!client) {
+    console.error('All RPCs failed for builder profile');
     return {
       kind: 'ok',
       address,
@@ -603,10 +381,214 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
       stats: demoStats,
       grants: demoRows,
       warnings,
-      chainReadFailed,
+      chainReadFailed: true,
       demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
     };
   }
+
+  try {
+    // 1. Fetch identity
+    const [isVerified, idTuple] = await Promise.all([
+      client.readContract({
+        address: IDENTITY_REGISTRY_ADDRESS,
+        abi: identityRegistryAbi,
+        functionName: 'isVerified',
+        args: [address],
+      }).catch(() => false),
+      client.readContract({
+        address: IDENTITY_REGISTRY_ADDRESS,
+        abi: identityRegistryAbi,
+        functionName: 'getIdentity',
+        args: [address],
+      }).catch(() => null),
+    ]);
+
+    if (idTuple || isVerified) {
+      if (idTuple) {
+        const idObj = idTuple as any;
+        const zkVerified = Boolean(idObj.isVerified ?? idObj[0]) || Boolean(isVerified);
+        const githubHandle = (idObj.githubHandle ?? idObj[4] ?? '').toString();
+        const accountCreationYear = Number(idObj.createdYear ?? idObj[3] ?? 0);
+        const contributionTier = Number(idObj.tier ?? idObj[1] ?? 0);
+
+        identity = {
+          zkVerified,
+          githubHandle,
+          accountCreationYear,
+          contributionTier,
+          reputationScore: 0,
+        };
+
+        hasIdentityRecord =
+          zkVerified ||
+          githubHandle.trim().length > 0 ||
+          accountCreationYear > 0 ||
+          contributionTier > 0;
+      } else {
+        identity.zkVerified = true;
+        hasIdentityRecord = true;
+      }
+
+      if (hasIdentityRecord) {
+        bindingTxHash = syntheticBindingTx(address);
+      }
+    }
+
+    // 2. Fetch grants
+    const grantCount = Number(await client.readContract({
+      address: GRANT_FACTORY_ADDRESS,
+      abi: [{ name: 'grantCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+      functionName: 'grantCount',
+    }).catch(() => BigInt(0)));
+
+    const escrowAddresses = grantCount > 0 ? (await client.multicall({
+      contracts: Array.from({ length: grantCount }, (_, i) => ({
+        address: GRANT_FACTORY_ADDRESS,
+        abi: [{ name: 'grants', type: 'function', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'address' }] }],
+        functionName: 'grants',
+        args: [BigInt(i)],
+      })),
+    })).map(r => r.result as Address).filter(a => !!a && a !== zeroAddress) : [];
+
+    if (escrowAddresses.length > 0) {
+      const grantResults = await client.multicall({
+        allowFailure: true,
+        contracts: escrowAddresses.map((addr) => ({
+          address: addr,
+          abi: grantEscrowReadAbi,
+          functionName: 'getGrant',
+        })),
+      });
+
+      const chainGrants: Array<{ addr: Address; tuple: GrantTuple }> = [];
+      grantResults.forEach((row, i) => {
+        if (row.status !== 'success') return;
+        const t = row.result as GrantTuple;
+        if (grantTupleEmpty(t)) return;
+        if (t.builder.toLowerCase() !== addrLower) return;
+        chainGrants.push({ addr: escrowAddresses[i]!, tuple: t });
+      });
+
+      if (chainGrants.length > 0) {
+        const statusContracts = chainGrants.flatMap(({ addr, tuple }) =>
+          tuple.milestones.map((_, idx) => ({
+            address: addr,
+            abi: grantEscrowReadAbi,
+            functionName: 'getMilestoneStatus' as const,
+            args: [BigInt(idx)] as const,
+          })),
+        );
+
+        const statusResults = await client.multicall({
+          allowFailure: true,
+          contracts: statusContracts,
+        });
+
+        let statusIdx = 0;
+        let totalApproved = 0;
+        let totalNonPending = 0;
+        let totalUsdcEarned = 0;
+        let totalZkSubmitted = 0;
+
+        for (const { addr, tuple } of chainGrants) {
+          let grantApproved = 0;
+          let grantNonPending = 0;
+          let grantUsdcEarned = 0;
+          let grantZkSubmitted = 0;
+
+          tuple.milestones.forEach((m, i) => {
+            const r = statusResults[statusIdx++];
+            const st = r?.status === 'success' ? Number(r.result) : MILESTONE_PENDING;
+            
+            if (st !== MILESTONE_PENDING) {
+              grantNonPending += 1;
+              if (MILESTONE_APPROVED_LIKE.has(st)) {
+                grantApproved += 1;
+                grantUsdcEarned += usdcFromWei(m.amount);
+              }
+              if (m.proofType === 0) grantZkSubmitted += 1;
+            }
+          });
+
+          totalApproved += grantApproved;
+          totalNonPending += grantNonPending;
+          totalUsdcEarned += grantUsdcEarned;
+          totalZkSubmitted += grantZkSubmitted;
+
+          const totalWei = tuple.milestones.reduce((s, m) => s + m.amount, BigInt(0));
+          const completedLike = grantNonPending > 0 && grantApproved === tuple.milestones.length && !tuple.streaming;
+
+          chainRows.push({
+            source: 'chain',
+            href: `/grants/${addr}`,
+            labelId: `GRT-${addr.slice(2, 8)}`,
+            title: tuple.milestones[0]?.title ?? 'Grant',
+            committeeCount: tuple.committee.length,
+            totalUsdc: Math.round(usdcFromWei(totalWei) * 100) / 100,
+            milestoneApproved: grantApproved,
+            milestoneTotal: tuple.milestones.length,
+            statusLabel: completedLike ? 'Completed' : 'In Progress',
+          });
+        }
+
+        const mergedStats: BuilderProfileStats = {
+          reputationScore: identity.reputationScore || 0,
+          letterGrade: identity.reputationScore > 0 ? scoreToLetterGrade(identity.reputationScore) : '—',
+          deliveryRatePercent: totalNonPending > 0 ? Math.round((totalApproved / totalNonPending) * 1000) / 10 : null,
+          deliveryDetail: totalNonPending > 0 ? `${totalApproved} of ${totalNonPending} milestones approved.` : 'No milestones reached status.',
+          totalUsdcEarned: Math.round(totalUsdcEarned * 100) / 100,
+          zkProofsSubmitted: totalZkSubmitted,
+          hasZkSubmission: totalZkSubmitted > 0,
+        };
+
+        return {
+          kind: 'ok',
+          address,
+          identity,
+          hasIdentityRecord,
+          verifiedAtDisplay: null,
+          bindingTxHash,
+          stats: mergedStats,
+          grants: mergeGrantRows(chainRows, demoRows),
+          warnings,
+          chainReadFailed: false,
+          demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
+        };
+      }
+    }
+
+    // No chain grants found but identity might be real
+    return {
+      kind: 'ok',
+      address,
+      identity,
+      hasIdentityRecord,
+      verifiedAtDisplay: null,
+      bindingTxHash,
+      stats: demoStats,
+      grants: demoRows,
+      warnings,
+      chainReadFailed: false,
+      demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
+    };
+  } catch (e) {
+    console.error('Chain read error:', e);
+    chainReadFailed = true;
+  }
+
+  return {
+    kind: 'ok',
+    address,
+    identity,
+    hasIdentityRecord,
+    verifiedAtDisplay: null,
+    bindingTxHash: null,
+    stats: demoStats,
+    grants: demoRows,
+    warnings,
+    chainReadFailed: true,
+    demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
+  };
 }
 
 function mergeGrantRows(
