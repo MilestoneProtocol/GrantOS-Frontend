@@ -29,7 +29,7 @@ type ReviewConfirmProps = {
   quorum: number;
   paymentMode: PaymentMode;
   onBack: () => void;
-  onSuccess: (grantTxHash: string) => void;
+  onSuccess: (grantTxHash: string, onChainId: number) => void;
 };
 
 function shortenAddress(addr: string) {
@@ -100,13 +100,13 @@ export default function ReviewConfirm({
     if (!createIsConfirmed || !createHash || !createReceipt) return;
 
     const indexInBackend = async () => {
+      let onChainId = 0;
       try {
         // Find the GrantCreated event in logs
         const log = createReceipt.logs.find(
           (l) => l.address.toLowerCase() === GRANT_FACTORY_ADDRESS.toLowerCase()
         );
         
-        let onChainId = 0;
         let escrowAddr = '0x0000000000000000000000000000000000000000';
 
         if (log) {
@@ -142,11 +142,11 @@ export default function ReviewConfirm({
           body: JSON.stringify(payload),
         });
 
-        onSuccess(createHash);
+        onSuccess(createHash, onChainId);
       } catch (err) {
         console.error('Failed to index grant in backend:', err);
         // Still proceed to success screen so user sees their tx
-        onSuccess(createHash);
+        onSuccess(createHash, onChainId);
       }
     };
 

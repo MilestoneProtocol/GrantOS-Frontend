@@ -40,7 +40,8 @@ export function useCommitteeVote(escrowAddress: Address, milestoneIndex: number,
 
   const recordBackend = useCallback(async (txHash: string, intent: VoteIntent, approvalCount: number, rejectionCount: number, finalStatus?: 'approved' | 'rejected') => {
       try {
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/milestones/vote`, {
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+          await fetch(`${apiBase}/milestones/vote`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

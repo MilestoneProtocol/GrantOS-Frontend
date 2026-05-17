@@ -89,10 +89,18 @@ export default function CommitteeDashboardPage() {
   const { data: realData, loading: reviewsLoading } = useCommitteeReviews();
 
   const actions = useMemo(() => {
+    const mappedPending = realData.pending.map((submission) => ({
+      id: submission.id,
+      grantId: submission.grantId,
+      grantTitle: submission.grantTitle,
+      milestoneTitle: submission.milestoneTitle,
+      submittedLabel: 'recently',
+      deadlineIso: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    }));
     return {
-      pendingReview: realData.pending,
+      pendingReview: mappedPending,
       pendingReviewCount: realData.totalPending,
-      overdue: [], // Overdue logic to be implemented via backend indexing
+      overdue: [] as OverdueMilestone[], // Overdue logic to be implemented via backend indexing
     };
   }, [realData]);
 

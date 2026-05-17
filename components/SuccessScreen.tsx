@@ -50,7 +50,7 @@ export default function SuccessScreen({
       githubHandle: data.githubHandle,
       accountCreationYear: Number(data.createdYear),
       contributionTier: Number(data.tier),
-      reputationScore: 0,
+      reputationScore: BigInt(0),
     };
   }, [data]);
 

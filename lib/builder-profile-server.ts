@@ -107,16 +107,17 @@ const builderListAbis = [
 type GrantTuple = {
   builder: Address;
   streaming: boolean;
-  committee: Address[];
+  committee: readonly Address[];
   quorum: bigint;
   createdAt: bigint;
-  milestones: Array<{
+  milestones: readonly {
     title: string;
     description: string;
     amount: bigint;
     deadline: bigint;
     proofType: number;
-  }>;
+    state: number;
+  }[];
 };
 
 const MILESTONE_PENDING = 0;
@@ -304,7 +305,7 @@ function demoCardsForBuilder(address: Address): DaoGrantCardModel[] {
 function demoRowsForBuilder(cards: DaoGrantCardModel[]): BuilderProfileGrantRow[] {
   return cards.map((c) => ({
     source: 'demo' as const,
-    href: c.href,
+    href: `/grants/${c.slug}`,
     labelId: c.displayId.replace(/^#/, ''),
     title: c.milestones[0]?.title ?? 'Grant',
     committeeCount: 5,
@@ -342,7 +343,7 @@ async function getClientWithFallback() {
 export async function loadBuilderProfile(raw: string): Promise<BuilderProfileData> {
   const trimmed = raw.trim();
   if (!trimmed || !isAddress(trimmed)) {
-    return { kind: 'invalid', address: trimmed };
+    return { kind: 'invalid' };
   }
   const address = getAddress(trimmed) as Address;
   const addrLower = address.toLowerCase();
@@ -411,12 +412,24 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
         const accountCreationYear = Number(idObj.createdYear ?? idObj[3] ?? 0);
         const contributionTier = Number(idObj.tier ?? idObj[1] ?? 0);
 
+        let reputationScore = 0;
+        try {
+          const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+          const repRes = await fetch(`${backendUrl}/api/v1/grants/builder/${address}/reputation`);
+          if (repRes.ok) {
+            const repData = await repRes.json();
+            reputationScore = repData.score || 0;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch reputation from backend in loadBuilderProfile:', e);
+        }
+
         identity = {
           zkVerified,
           githubHandle,
           accountCreationYear,
           contributionTier,
-          reputationScore: 0,
+          reputationScore,
         };
 
         hasIdentityRecord =
@@ -437,14 +450,14 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
     // 2. Fetch grants
     const grantCount = Number(await client.readContract({
       address: GRANT_FACTORY_ADDRESS,
-      abi: [{ name: 'grantCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+      abi: [{ name: 'grantCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }] as const,
       functionName: 'grantCount',
     }).catch(() => BigInt(0)));
 
     const escrowAddresses = grantCount > 0 ? (await client.multicall({
       contracts: Array.from({ length: grantCount }, (_, i) => ({
         address: GRANT_FACTORY_ADDRESS,
-        abi: [{ name: 'grants', type: 'function', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'address' }] }],
+        abi: [{ name: 'grants', type: 'function', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'address' }] }] as const,
         functionName: 'grants',
         args: [BigInt(i)],
       })),

@@ -40,6 +40,7 @@ type GrantSummary = {
     amount: bigint;
     deadline: bigint;
     proofType: number;
+    state: number;
   }>;
 };
 
@@ -143,8 +144,15 @@ export default function BuilderDashboardPage() {
     let pending = 0;
     for (const { grant } of dashboardGrantRows) {
       for (const milestone of grant.milestones) {
-        escrow += milestone.amount;
-        pending += 1;
+        const state = milestone.state ?? 0;
+        const isApproved = state === 2 || state === 5;
+        if (!isApproved) {
+          escrow += milestone.amount;
+        }
+        const requiresAction = state === 0 || state === 3;
+        if (requiresAction) {
+          pending += 1;
+        }
       }
     }
     return {
@@ -247,7 +255,10 @@ export default function BuilderDashboardPage() {
                 const grantKey = grant.id.toString();
                 const expanded = Boolean(expandedGrantKeys[grantKey]);
                 const totalGrantAmount = grant.milestones.reduce((sum, m) => sum + m.amount, BigInt(0));
-                const completed = grant.milestones.length > 0 ? 1 : 0; // Simplified for now
+                const completed = grant.milestones.filter(m => {
+                  const state = m.state ?? 0;
+                  return state === 2 || state === 5;
+                }).length;
                 const progressPct = grant.milestones.length > 0 ? Math.round((completed / grant.milestones.length) * 100) : 0;
 
                 return (
@@ -279,7 +290,19 @@ export default function BuilderDashboardPage() {
                           <tbody>
                             {grant.milestones.map((m, idx) => {
                               const submission = backendSubmissions[`${grant.id}-${idx}`];
-                              const status = submission ? submission.status : 'Pending';
+                              const state = m.state ?? 0;
+                              let status: 'Pending' | 'Submitted' | 'Approved' | 'Rejected' | 'Slashed' = 'Pending';
+                              if (state === 1) status = 'Submitted';
+                              else if (state === 2 || state === 5) status = 'Approved';
+                              else if (state === 3) status = 'Rejected';
+                              else if (state === 4) status = 'Slashed';
+                              else if (submission) {
+                                const dbStatus = submission.status?.toLowerCase();
+                                if (dbStatus === 'approved') status = 'Approved';
+                                else if (dbStatus === 'submitted') status = 'Submitted';
+                                else if (dbStatus === 'rejected') status = 'Rejected';
+                              }
+
                               const overdue = Number(m.deadline) > 0 && Date.now() > Number(m.deadline) * 1000;
                               const submitHref = `/grants/${pathSegment}/milestones/${idx}/submit`;
 
@@ -295,7 +318,7 @@ export default function BuilderDashboardPage() {
                                     </span>
                                   </td>
                                   <td className="px-4 py-3">
-                                    {status === 'Pending' ? (
+                                    {status === 'Pending' || status === 'Rejected' ? (
                                       m.proofType === 0 ? (
                                         <Link href={submitHref} className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700">
                                           Generate Proof
