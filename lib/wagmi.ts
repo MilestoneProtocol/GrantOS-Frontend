@@ -44,7 +44,7 @@ const wallets = [
 export const config = getDefaultConfig({
   appName: 'GrantOS v3',
   projectId,
-  chains: [arbitrum, arbitrumSepolia],
+  chains: [arbitrumSepolia, arbitrum],
   ssr: true,
   wallets,
   storage: createStorage({

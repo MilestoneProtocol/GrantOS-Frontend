@@ -11,6 +11,7 @@ import type { DaoGrantCardModel } from '@/demo/dao-dashboard';
 import { useAuthGuard } from '@/lib/authGuard';
 import { filterDaoGrants } from '@/lib/dao-dashboard-data';
 import { useDaoDashboardStore } from '@/lib/dao-dashboard-store';
+import { useDashboardStats } from '@/hooks/useGrantStats';
 import { Download, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -30,6 +31,9 @@ export default function DaoDashboardPage() {
   const openGrant = useDaoDashboardStore((s) => s.openGrant);
   const setOpenGrant = useDaoDashboardStore((s) => s.setOpenGrant);
   const refresh = useDaoDashboardStore((s) => s.refresh);
+
+  // Fetch real stats from backend
+  const { data: stats } = useDashboardStats(30000);
 
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
@@ -53,6 +57,9 @@ export default function DaoDashboardPage() {
   );
 
   const showSkeleton = !authorized && !showDeniedToast;
+
+  // Use real stats if available, fallback to demo data
+  const heroStats = stats || snapshot.hero;
 
   return (
     <CommitteeAppShell breadcrumb="DAO Governance">
@@ -92,7 +99,7 @@ export default function DaoDashboardPage() {
                 </div>
               </div>
 
-              <DaoHeroStats hero={snapshot.hero} />
+              <DaoHeroStats hero={heroStats} />
 
               <DaoFilterBar
                 search={search}

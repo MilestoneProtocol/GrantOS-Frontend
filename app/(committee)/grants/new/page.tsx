@@ -329,10 +329,10 @@ function CreateGrantPageContent() {
                 quorum={quorum}
                 paymentMode={paymentMode}
                 onBack={() => setStep(3)}
-                onSuccess={(hash) => {
+                onSuccess={(hash, onChainId) => {
                   console.log('Grant created:', hash);
                   setCreatedTxHash(hash as `0x${string}`);
-                  setCreatedGrantId(hash.slice(2, 8).toUpperCase());
+                  setCreatedGrantId(onChainId.toString());
                   setStep(5);
                 }}
               />

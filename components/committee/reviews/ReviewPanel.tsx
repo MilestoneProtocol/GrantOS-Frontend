@@ -189,9 +189,9 @@ export default function ReviewPanel({
   const totalMembers = approversAfterFlow.length;
   const rejectionThreshold = totalMembers - submission.committeeRequired + 1;
   const rawQuorumOutcome: 'approved' | 'rejected' | null =
-    approvedCount >= submission.committeeRequired
+    totalMembers > 0 && approvedCount >= submission.committeeRequired
       ? 'approved'
-      : rejectedCount >= rejectionThreshold
+      : totalMembers > 0 && rejectedCount >= rejectionThreshold
         ? 'rejected'
         : null;
 

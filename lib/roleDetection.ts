@@ -85,7 +85,7 @@ export function useRoleDetection(): DetectedRoles {
             inputs: [],
             outputs: [{ type: 'uint256' }],
           },
-        ],
+        ] as const,
         functionName: 'grantCount',
       },
     ],
@@ -109,10 +109,10 @@ export function useRoleDetection(): DetectedRoles {
           inputs: [{ name: '', type: 'uint256' }],
           outputs: [{ name: '', type: 'address' }],
         },
-      ],
+      ] as const,
       functionName: 'grants',
       args: [index],
-    })) as const,
+    })),
     query: { enabled: factoryIndices.length > 0 },
   });
 
@@ -124,8 +124,8 @@ export function useRoleDetection(): DetectedRoles {
 
   // 2. Query each escrow for roles
   const roleReads = useReadContracts({
-    contracts: enabled && escrowAddresses.length > 0
-      ? ([
+    contracts: (enabled && escrowAddresses.length > 0
+      ? [
           {
             address: IDENTITY_REGISTRY_ADDRESS,
             abi: identityRegistryAbi,
@@ -150,8 +150,8 @@ export function useRoleDetection(): DetectedRoles {
               functionName: 'grantId',
             }
           ])
-        ] as const)
-      : [],
+        ]
+      : []) as any,
     query: { enabled: enabled && (escrowAddresses.length > 0 || factoryIndices.length === 0) },
   });
 

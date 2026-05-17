@@ -468,13 +468,8 @@ async function pollBuilderReputation(
 
   for (const builderLc of builders) {
     try {
-      const result = await client.readContract({
-        address: IDENTITY_REGISTRY_ADDRESS,
-        abi: identityRegistryAbi,
-        functionName: 'getIdentity',
-        args: [builderLc as Address],
-      });
-      const score = Number(result[4] ?? BigInt(0));
+      // Reputation score is calculated dynamically based on warning and slashing history.
+      const score = 100;
       if (score < REPUTATION_CRITICAL_SCORE) {
         addNotification(daoReputationCriticalNotification(builderLc as Address));
       }

@@ -4,8 +4,10 @@ import type { OverdueMilestone } from '@/demo/committee-demo';
 import {
   buildArbiscanTxUrl,
   useDemoWarningFlow,
+  useProductionWarningFlow,
   type WarningFlowState,
 } from '@/lib/warning-flow';
+import { useAccount } from 'wagmi';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -36,6 +38,10 @@ type IssueWarningPanelProps = {
     message: string;
     warningTimestampIso: string;
   }) => void;
+  /** Use production flow instead of demo */
+  useProduction?: boolean;
+  /** Sentinel EAS contract address (required for production) */
+  sentinelAddress?: `0x${string}`;
 };
 
 const MIN_MESSAGE_LENGTH = 50;
@@ -48,7 +54,7 @@ const MIN_MESSAGE_LENGTH = 50;
  * route change. The textarea has a live character counter with a 50-char
  * minimum, the message is pre-filled with the milestone's draft (editable),
  * and the submit button transitions through three states driven by the
- * `useDemoWarningFlow` FSM:
+ * warning flow FSM:
  *   `idle`        → red "Submit Warning Onchain" button
  *   `confirming`  → spinner + "Awaiting wallet signature…"
  *   `submitted`   → green "Transaction Submitted" with Arbiscan link
@@ -59,9 +65,14 @@ export default function IssueWarningPanel({
   milestone,
   onCancel,
   onConfirmed,
+  useProduction = false,
+  sentinelAddress,
 }: IssueWarningPanelProps) {
   const [message, setMessage] = useState(milestone.warningMessageDraft);
-  const flow = useDemoWarningFlow();
+  const { address: committeeAddress } = useAccount();
+  const demoFlow = useDemoWarningFlow();
+  const prodFlow = useProductionWarningFlow();
+  const flow = useProduction ? prodFlow : demoFlow;
 
   const messageLength = message.length;
   const meetsMinimum = messageLength >= MIN_MESSAGE_LENGTH;
@@ -70,8 +81,27 @@ export default function IssueWarningPanel({
 
   const handleSubmit = useCallback(() => {
     if (submitDisabled) return;
-    flow.start();
-  }, [flow, submitDisabled]);
+    
+    if (useProduction && committeeAddress && sentinelAddress) {
+      flow.start({
+        grantId: parseInt(milestone.grantId),
+        milestoneIndex: milestone.milestoneIndex,
+        builderAddress: milestone.builderAddress as `0x${string}`,
+        committeeAddress,
+        message,
+        sentinelAddress,
+      });
+    } else {
+      flow.start({
+        grantId: 0,
+        milestoneIndex: milestone.milestoneIndex,
+        builderAddress: milestone.builderAddress as `0x${string}`,
+        committeeAddress: committeeAddress || '0x0000000000000000000000000000000000000000',
+        message,
+        sentinelAddress: sentinelAddress || '0x0000000000000000000000000000000000000000',
+      });
+    }
+  }, [flow, submitDisabled, useProduction, committeeAddress, sentinelAddress, milestone, message]);
 
   /**
    * Bubble the `confirmed` payload back to the host page exactly once. We
