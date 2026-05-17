@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:webpack": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@coinbase/wallet-sdk": "^4.3.6",
+    "@metamask/connect-evm": "~1.0.0",
+    "@walletconnect/ethereum-provider": "^2.21.1",
     "@aztec/bb.js": "4.2.1",
     "@ethereum-attestation-service/eas-sdk": "^2.9.0",
     "@noir-lang/noir_js": "1.0.0-beta.20",

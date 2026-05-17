@@ -18,19 +18,19 @@ const KIND_STYLES: Record<
   { card: string; badge: string; icon: string }
 > = {
   dao: {
-    card: 'border-blue-200 bg-blue-50/80 dark:border-blue-900/50 dark:bg-blue-950/40',
+    card: 'border-blue-200 bg-blue-50/80',
     badge: 'bg-blue-600 text-white',
-    icon: 'text-blue-600 dark:text-blue-400',
+    icon: 'text-blue-600',
   },
   builder: {
-    card: 'border-violet-200 bg-violet-50/80 dark:border-violet-900/50 dark:bg-violet-950/40',
+    card: 'border-violet-200 bg-violet-50/80',
     badge: 'bg-violet-600 text-white',
-    icon: 'text-violet-600 dark:text-violet-400',
+    icon: 'text-violet-600',
   },
   contract: {
-    card: 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/50 dark:bg-emerald-950/40',
+    card: 'border-emerald-200 bg-emerald-50/80',
     badge: 'bg-emerald-600 text-white',
-    icon: 'text-emerald-600 dark:text-emerald-400',
+    icon: 'text-emerald-600',
   },
 };
 
@@ -61,8 +61,8 @@ function FlowStepCard({
         {step}
       </span>
       <Icon className={`mb-1.5 h-5 w-5 ${styles.icon}`} strokeWidth={2} aria-hidden />
-      <p className="text-sm font-bold leading-tight text-slate-900 dark:text-slate-100">{label}</p>
-      <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{sublabel}</p>
+      <p className="text-sm font-bold leading-tight text-slate-900">{label}</p>
+      <p className="text-xs font-medium text-slate-600">{sublabel}</p>
     </div>
   );
 }
@@ -104,7 +104,7 @@ export default function GuidelinesFlowchart() {
   }));
 
   return (
-    <figure className="guidelines-flowchart rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40 sm:p-5">
+    <figure className="guidelines-flowchart rounded-2xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
       <div className="hidden items-center gap-2 xl:flex">
         {steps.map((step, i) => (
           <div key={step.step} className="flex min-w-0 flex-1 items-center gap-2">
@@ -143,7 +143,7 @@ export default function GuidelinesFlowchart() {
         ))}
       </div>
 
-      <figcaption className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
+      <figcaption className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-blue-600" aria-hidden />
           DAO action

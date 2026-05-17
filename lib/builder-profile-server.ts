@@ -1,12 +1,18 @@
 import { getCommitteeDemoActions } from '@/demo/committee-demo';
 import { getDaoDashboardSnapshot, type DaoGrantCardModel, type DaoMilestoneModel } from '@/demo/dao-dashboard';
 import {
+  CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
   GRANT_ESCROW_ADDRESS,
+  grantFactoryAbi,
   grantEscrowReadAbi,
   IDENTITY_REGISTRY_ADDRESS,
   identityRegistryAbi,
 } from '@/lib/escrow';
+import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
+import { isUiDemoMode } from '@/demo';
+import { parseProfileAddress } from '@/lib/profile-address';
+import { demoPathSegmentForChainIndex } from '@/lib/public-explorer-grant';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import { arbitrumSepolia } from 'viem/chains';
 import {
@@ -14,7 +20,6 @@ import {
   formatUnits,
   getAddress,
   http,
-  isAddress,
   keccak256,
   stringToHex,
   type Address,
@@ -304,7 +309,7 @@ function demoCardsForBuilder(address: Address): DaoGrantCardModel[] {
 function demoRowsForBuilder(cards: DaoGrantCardModel[]): BuilderProfileGrantRow[] {
   return cards.map((c) => ({
     source: 'demo' as const,
-    href: c.href,
+    href: `/grants/${c.slug}`,
     labelId: c.displayId.replace(/^#/, ''),
     title: c.milestones[0]?.title ?? 'Grant',
     committeeCount: 5,
@@ -339,12 +344,13 @@ async function getClientWithFallback() {
   return null;
 }
 
+export { builderProfilePath, parseProfileAddress } from '@/lib/profile-address';
+
 export async function loadBuilderProfile(raw: string): Promise<BuilderProfileData> {
-  const trimmed = raw.trim();
-  if (!trimmed || !isAddress(trimmed)) {
-    return { kind: 'invalid', address: trimmed };
+  const address = parseProfileAddress(raw);
+  if (!address) {
+    return { kind: 'invalid' };
   }
-  const address = getAddress(trimmed) as Address;
   const addrLower = address.toLowerCase();
 
   const demoCards = demoCardsForBuilder(address);
@@ -434,21 +440,35 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
       }
     }
 
-    // 2. Fetch grants
-    const grantCount = Number(await client.readContract({
-      address: GRANT_FACTORY_ADDRESS,
-      abi: [{ name: 'grantCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
-      functionName: 'grantCount',
-    }).catch(() => BigInt(0)));
+    // 2. Fetch grants (skip factory scan when contracts are placeholders)
+    let escrowAddresses: Address[] = [];
+    if (CONTRACTS_READY) {
+      const grantCount = safeFactoryGrantCount(
+        await client
+          .readContract({
+            address: GRANT_FACTORY_ADDRESS,
+            abi: grantFactoryAbi,
+            functionName: 'grantCount',
+          })
+          .catch(() => null),
+      );
 
-    const escrowAddresses = grantCount > 0 ? (await client.multicall({
-      contracts: Array.from({ length: grantCount }, (_, i) => ({
-        address: GRANT_FACTORY_ADDRESS,
-        abi: [{ name: 'grants', type: 'function', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'address' }] }],
-        functionName: 'grants',
-        args: [BigInt(i)],
-      })),
-    })).map(r => r.result as Address).filter(a => !!a && a !== zeroAddress) : [];
+      escrowAddresses =
+        grantCount > 0
+          ? (
+              await client.multicall({
+                contracts: Array.from({ length: grantCount }, (_, i) => ({
+                  address: GRANT_FACTORY_ADDRESS,
+                  abi: grantFactoryAbi,
+                  functionName: 'grants' as const,
+                  args: [BigInt(i)] as const,
+                })),
+              })
+            )
+              .map((r) => r.result as Address)
+              .filter((a) => !!a && a !== zeroAddress)
+          : [];
+    }
 
     if (escrowAddresses.length > 0) {
       const grantResults = await client.multicall({
@@ -463,7 +483,7 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
       const chainGrants: Array<{ addr: Address; tuple: GrantTuple }> = [];
       grantResults.forEach((row, i) => {
         if (row.status !== 'success') return;
-        const t = row.result as GrantTuple;
+        const t = row.result as unknown as GrantTuple;
         if (grantTupleEmpty(t)) return;
         if (t.builder.toLowerCase() !== addrLower) return;
         chainGrants.push({ addr: escrowAddresses[i]!, tuple: t });
@@ -518,9 +538,13 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
           const totalWei = tuple.milestones.reduce((s, m) => s + m.amount, BigInt(0));
           const completedLike = grantNonPending > 0 && grantApproved === tuple.milestones.length && !tuple.streaming;
 
+          const grantPathId = isUiDemoMode()
+            ? demoPathSegmentForChainIndex(BigInt(chainRows.length), tuple.builder)
+            : addr;
+
           chainRows.push({
             source: 'chain',
-            href: `/grants/${addr}`,
+            href: `/grants/${grantPathId}`,
             labelId: `GRT-${addr.slice(2, 8)}`,
             title: tuple.milestones[0]?.title ?? 'Grant',
             committeeCount: tuple.committee.length,

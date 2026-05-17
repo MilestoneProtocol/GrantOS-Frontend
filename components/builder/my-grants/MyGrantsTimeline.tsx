@@ -2,6 +2,7 @@
 
 import type { MyGrantRecord } from '@/lib/my-grants/types';
 import { formatUsdcAmount } from '@/lib/my-grants/utils';
+import { grantDetailPath } from '@/lib/grant-routes';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -76,7 +77,7 @@ export default function MyGrantsTimeline({ grants }: MyGrantsTimelineProps) {
                       onMouseLeave={() => setHovered(null)}
                       onFocus={() => setHovered(g.key)}
                       onBlur={() => setHovered(null)}
-                      onClick={() => router.push(`/grants/${g.pathSegment}`)}
+                      onClick={() => router.push(grantDetailPath(g.pathSegment, 'builder'))}
                       aria-label={`${g.grantId} ${g.finalStatus}`}
                     >
                       {g.milestones.map((m, i) => {

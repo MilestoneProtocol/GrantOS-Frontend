@@ -1,10 +1,10 @@
 'use client';
 
 import {
-  BarChart3,
   CheckCircle2,
   ClipboardList,
   Home,
+  LayoutDashboard,
   LayoutGrid,
   Users,
 } from 'lucide-react';
@@ -19,16 +19,25 @@ export type CommitteeNavItem = {
 };
 
 export const COMMITTEE_NAV_ITEMS: CommitteeNavItem[] = [
-  { label: 'Dashboard', href: '/committee', icon: Home },
-  { label: 'DAO', href: '/dao', icon: BarChart3, matchPrefixes: ['/dao'] },
+  { label: 'Dashboard', href: '/committee', icon: LayoutDashboard },
   {
     label: 'Reviews',
     href: '/committee/reviews',
     icon: ClipboardList,
     matchPrefixes: ['/committee/reviews'],
   },
-  { label: 'All Grants', href: '/committee/grants', icon: LayoutGrid },
-  { label: 'Committee', href: '/committee/members', icon: Users },
+  {
+    label: 'All Grants',
+    href: '/committee/grants',
+    icon: LayoutGrid,
+    matchPrefixes: ['/committee/grants'],
+  },
+  {
+    label: 'Committee',
+    href: '/committee/members',
+    icon: Users,
+    matchPrefixes: ['/committee/members'],
+  },
   {
     label: 'Tasks',
     href: '/tasks',

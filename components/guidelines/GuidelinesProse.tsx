@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export function GuidelinesLead({ children }: { children: ReactNode }) {
   return (
-    <p className="text-base leading-relaxed text-slate-600 dark:text-slate-400 sm:text-[17px]">
+    <p className="text-base leading-relaxed text-slate-600 sm:text-[17px]">
       {children}
     </p>
   );
@@ -10,13 +10,13 @@ export function GuidelinesLead({ children }: { children: ReactNode }) {
 
 export function GuidelinesBody({ children }: { children: ReactNode }) {
   return (
-    <p className="text-base leading-relaxed text-slate-700 dark:text-slate-300">{children}</p>
+    <p className="text-base leading-relaxed text-slate-700">{children}</p>
   );
 }
 
 export function GuidelinesSubheading({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-xl">
+    <h3 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
       {children}
     </h3>
   );
@@ -24,7 +24,7 @@ export function GuidelinesSubheading({ children }: { children: ReactNode }) {
 
 export function GuidelinesList({ children }: { children: ReactNode }) {
   return (
-    <ol className="list-decimal space-y-3 pl-5 text-base leading-relaxed text-slate-700 marker:font-semibold marker:text-slate-500 dark:text-slate-300 dark:marker:text-slate-400">
+    <ol className="list-decimal space-y-3 pl-5 text-base leading-relaxed text-slate-700 marker:font-semibold marker:text-slate-500">
       {children}
     </ol>
   );
@@ -43,8 +43,8 @@ export function GuidelinesStepBlock({
 }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</h4>
-      <p className="text-base leading-relaxed text-slate-700 dark:text-slate-300">{children}</p>
+      <h4 className="text-base font-bold text-slate-900">{title}</h4>
+      <p className="text-base leading-relaxed text-slate-700">{children}</p>
     </div>
   );
 }

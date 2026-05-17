@@ -7,6 +7,7 @@ import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import NotificationProvider from '@/components/notifications/NotificationProvider'
 import SettingsModal from '@/components/SettingsModal'
 import ThemeProvider from '@/components/settings/ThemeProvider'
+import WalletExtensionErrorHandler from '@/components/WalletExtensionErrorHandler'
 import { config } from '@/lib/wagmi'
 import { ReactNode } from 'react'
 
@@ -14,15 +15,17 @@ const queryClient = new QueryClient()
 
 export function Web3Provider({ children }: { children: ReactNode }) {
   return (
-    <WagmiProvider config={config} reconnectOnMount>
+    <WagmiProvider config={config} reconnectOnMount={false}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <ThemeProvider>
-            <NotificationProvider>
-              {children}
-              <SettingsModal />
-            </NotificationProvider>
-          </ThemeProvider>
+          <WalletExtensionErrorHandler>
+            <ThemeProvider>
+              <NotificationProvider>
+                {children}
+                <SettingsModal />
+              </NotificationProvider>
+            </ThemeProvider>
+          </WalletExtensionErrorHandler>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

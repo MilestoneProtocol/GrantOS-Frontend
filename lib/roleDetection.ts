@@ -1,13 +1,14 @@
 'use client';
 
+import { isRoleCheckBypassed } from '@/lib/role-access';
 import {
+  CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
-  GRANT_ESCROW_ADDRESS,
-  IDENTITY_REGISTRY_ADDRESS,
-  committeeMembershipAbis,
-  identityRegistryAbi,
   grantEscrowAbi,
+  IDENTITY_REGISTRY_ADDRESS,
+  identityRegistryAbi,
 } from '@/lib/escrow';
+import { factoryIndexRange, safeFactoryGrantCount } from '@/lib/grant-factory-read';
 import { useMemo } from 'react';
 import { useAccount, useReadContracts } from 'wagmi';
 
@@ -26,139 +27,137 @@ export type DetectedRoles = {
    * should present a role selection UI instead of redirecting.
    */
   hasMultipleRoles: boolean;
+  /** True when role checks are skipped for local / demo development. */
+  bypassActive: boolean;
 };
 
-const builderGrantsAbis = {
-  getGrantsByBuilder: [
-    {
-      type: 'function',
-      name: 'getGrantsByBuilder',
-      stateMutability: 'view',
-      inputs: [{ name: 'builder', type: 'address' }],
-      outputs: [{ type: 'uint256[]' }],
-    },
-  ] as const,
-  getBuilderGrantIds: [
-    {
-      type: 'function',
-      name: 'getBuilderGrantIds',
-      stateMutability: 'view',
-      inputs: [{ name: 'builder', type: 'address' }],
-      outputs: [{ type: 'uint256[]' }],
-    },
-  ] as const,
-  getGrantsForBuilder: [
-    {
-      type: 'function',
-      name: 'getGrantsForBuilder',
-      stateMutability: 'view',
-      inputs: [{ name: 'builder', type: 'address' }],
-      outputs: [{ type: 'uint256[]' }],
-    },
-  ] as const,
-};
+const grantCountAbi = [
+  {
+    type: 'function',
+    name: 'grantCount',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+] as const;
 
-function pickIds(value: unknown): bigint[] {
-  return Array.isArray(value) ? (value as bigint[]) : [];
-}
+const factoryGrantsAbi = [
+  {
+    type: 'function',
+    name: 'grants',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const;
 
-function mergeUniqueBigints(values: bigint[][]): bigint[] {
-  const merged = new Set<string>();
-  for (const arr of values) for (const id of arr) merged.add(id.toString());
-  return Array.from(merged, (s) => BigInt(s));
+function bypassRoles(address: `0x${string}`): DetectedRoles {
+  return {
+    loading: false,
+    address,
+    isVerified: true,
+    builderGrantIds: [],
+    committeeGrantIds: [BigInt(1), BigInt(2), BigInt(3)],
+    isBuilder: true,
+    isCommittee: true,
+    isDaoAdmin: true,
+    isNewWallet: false,
+    hasMultipleRoles: true,
+    bypassActive: true,
+  };
 }
 
 export function useRoleDetection(): DetectedRoles {
   const { address, status } = useAccount();
-  const enabled = Boolean(address);
+  const bypass = isRoleCheckBypassed();
+  const enabled = Boolean(address) && !bypass && CONTRACTS_READY;
 
-  // 1. Get the total number of grants from the factory
   const countRead = useReadContracts({
-    contracts: [
-      {
-        address: GRANT_FACTORY_ADDRESS,
-        abi: [
+    contracts: enabled
+      ? [
           {
-            type: 'function',
-            name: 'grantCount',
-            stateMutability: 'view',
-            inputs: [],
-            outputs: [{ type: 'uint256' }],
+            address: GRANT_FACTORY_ADDRESS,
+            abi: grantCountAbi,
+            functionName: 'grantCount',
           },
-        ],
-        functionName: 'grantCount',
-      },
-    ],
+        ]
+      : [],
+    query: { enabled },
   });
-  const grantCount = (countRead.data?.[0]?.result as bigint) ?? BigInt(0);
 
-  // 1. Get all escrow addresses from the factory
-  const factoryIndices = useMemo(() => {
-    const count = Number(grantCount);
-    return Array.from({ length: count }, (_, i) => BigInt(i));
-  }, [grantCount]);
+  const grantCount = safeFactoryGrantCount(
+    countRead.data?.[0]?.result as bigint | undefined,
+  );
+
+  const factoryIndices = useMemo(
+    () => factoryIndexRange(grantCount),
+    [grantCount],
+  );
 
   const escrowReads = useReadContracts({
     contracts: factoryIndices.map((index) => ({
       address: GRANT_FACTORY_ADDRESS,
-      abi: [
-        {
-          type: 'function',
-          name: 'grants',
-          stateMutability: 'view',
-          inputs: [{ name: '', type: 'uint256' }],
-          outputs: [{ name: '', type: 'address' }],
-        },
-      ],
+      abi: factoryGrantsAbi,
       functionName: 'grants',
       args: [index],
-    })) as const,
-    query: { enabled: factoryIndices.length > 0 },
+    })),
+    query: { enabled: enabled && factoryIndices.length > 0 },
   });
 
   const escrowAddresses = useMemo(() => {
     return (escrowReads.data ?? [])
       .map((r) => r.result as `0x${string}` | undefined)
-      .filter((a): a is `0x${string}` => !!a);
+      .filter((a): a is `0x${string}` => Boolean(a && a !== '0x0000000000000000000000000000000000000000'));
   }, [escrowReads.data]);
 
-  // 2. Query each escrow for roles
-  const roleReads = useReadContracts({
-    contracts: enabled && escrowAddresses.length > 0
-      ? ([
-          {
-            address: IDENTITY_REGISTRY_ADDRESS,
-            abi: identityRegistryAbi,
-            functionName: 'isVerified',
-            args: [address!],
-          },
-          ...escrowAddresses.flatMap(addr => [
-            {
-              address: addr,
-              abi: grantEscrowAbi,
-              functionName: 'builder',
-            },
-            {
-              address: addr,
-              abi: grantEscrowAbi,
-              functionName: 'isCommitteeMember',
-              args: [address!],
-            },
-            {
-              address: addr,
-              abi: grantEscrowAbi,
-              functionName: 'grantId',
-            }
-          ])
-        ] as const)
-      : [],
-    query: { enabled: enabled && (escrowAddresses.length > 0 || factoryIndices.length === 0) },
-  });
+  const roleContracts = useMemo(() => {
+    if (!enabled || !address) return [];
+    const base = [
+      {
+        address: IDENTITY_REGISTRY_ADDRESS,
+        abi: identityRegistryAbi,
+        functionName: 'isVerified' as const,
+        args: [address] as const,
+      },
+    ];
+    const perEscrow = escrowAddresses.flatMap((addr) => [
+      {
+        address: addr,
+        abi: grantEscrowAbi,
+        functionName: 'builder' as const,
+      },
+      {
+        address: addr,
+        abi: grantEscrowAbi,
+        functionName: 'isCommitteeMember' as const,
+        args: [address] as const,
+      },
+      {
+        address: addr,
+        abi: grantEscrowAbi,
+        functionName: 'grantId' as const,
+      },
+    ]);
+    return [...base, ...perEscrow];
+  }, [address, enabled, escrowAddresses]);
 
-  const reads = roleReads; // for backward compatibility with the rest of the hook
+  const factoryReady =
+    !enabled || (!countRead.isLoading && !countRead.isFetching);
+  const escrowReady =
+    !enabled || factoryIndices.length === 0 || (!escrowReads.isLoading && !escrowReads.isFetching);
+
+  const roleReads = useReadContracts({
+    contracts: roleContracts,
+    query: { enabled: enabled && factoryReady && escrowReady && roleContracts.length > 0 },
+  });
 
   return useMemo((): DetectedRoles => {
     const walletResolved = status !== 'connecting' && status !== 'reconnecting';
+
+    if (bypass && address && walletResolved) {
+      return bypassRoles(address as `0x${string}`);
+    }
+
     if (!address || !walletResolved) {
       return {
         loading: false,
@@ -171,22 +170,22 @@ export function useRoleDetection(): DetectedRoles {
         isDaoAdmin: false,
         isNewWallet: false,
         hasMultipleRoles: false,
+        bypassActive: bypass,
       };
     }
 
-    const pending = reads.isLoading || reads.isFetching;
-    const data = reads.data ?? [];
+    const pending =
+      !factoryReady || !escrowReady || roleReads.isLoading || roleReads.isFetching;
 
+    const data = roleReads.data ?? [];
     const verifiedRow = data[0] as { status: string; result?: boolean } | undefined;
     const isVerified =
       verifiedRow?.status === 'success' ? Boolean(verifiedRow.result) : false;
 
     const builderIds: bigint[] = [];
     const committeeIds: bigint[] = [];
-
-    // Skip the first result (isVerified)
     const roleResults = data.slice(1);
-    // results come in triplets: [builder, isCommitteeMember, grantId]
+
     for (let i = 0; i < roleResults.length; i += 3) {
       const builderRes = roleResults[i] as { status: string; result?: string } | undefined;
       const committeeRes = roleResults[i + 1] as { status: string; result?: boolean } | undefined;
@@ -194,11 +193,12 @@ export function useRoleDetection(): DetectedRoles {
 
       if (grantIdRes?.status === 'success' && grantIdRes.result !== undefined) {
         const gid = grantIdRes.result;
-        
-        if (builderRes?.status === 'success' && builderRes.result?.toLowerCase() === address.toLowerCase()) {
+        if (
+          builderRes?.status === 'success' &&
+          builderRes.result?.toLowerCase() === address.toLowerCase()
+        ) {
           builderIds.push(gid);
         }
-        
         if (committeeRes?.status === 'success' && committeeRes.result) {
           committeeIds.push(gid);
         }
@@ -222,7 +222,16 @@ export function useRoleDetection(): DetectedRoles {
       isDaoAdmin,
       isNewWallet,
       hasMultipleRoles,
+      bypassActive: false,
     };
-  }, [address, reads.data, reads.isFetching, reads.isLoading, status]);
+  }, [
+    address,
+    bypass,
+    escrowReady,
+    factoryReady,
+    roleReads.data,
+    roleReads.isFetching,
+    roleReads.isLoading,
+    status,
+  ]);
 }
-

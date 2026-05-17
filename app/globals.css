@@ -178,6 +178,19 @@ body {
 }
 
 /** Subtle upward pop when DAO slash / ZK counters tick up on poll */
+@keyframes dao-alert-panel-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/** Subtle upward pop when DAO slash / ZK counters tick up on poll */
 @keyframes dao-metric-rise {
   0% {
     transform: translateY(0);

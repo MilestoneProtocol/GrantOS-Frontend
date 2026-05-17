@@ -3,6 +3,7 @@
 import { GrantIdentity, useGrantCreationStore } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
+import { grantDetailPath } from '@/lib/grant-routes';
 import { Check, Copy, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -50,7 +51,7 @@ export default function SuccessScreen({
       githubHandle: data.githubHandle,
       accountCreationYear: Number(data.createdYear),
       contributionTier: Number(data.tier),
-      reputationScore: 0,
+      reputationScore: BigInt(0),
     };
   }, [data]);
 
@@ -146,7 +147,7 @@ export default function SuccessScreen({
 
         <div className="mx-auto mt-6 flex w-full max-w-[420px] flex-col gap-2.5 sm:flex-row">
           <Link
-            href={fromDao ? '/dao' : `/grants/${grantId}`}
+            href={fromDao ? '/dao' : grantDetailPath(String(grantId), 'builder')}
             className="inline-flex flex-1 items-center justify-center rounded-md bg-[#ff5b37] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#f04f29]"
           >
             {fromDao ? 'Back to DAO Dashboard' : 'View Grant →'}

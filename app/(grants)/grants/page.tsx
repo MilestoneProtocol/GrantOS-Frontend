@@ -1,13 +1,16 @@
 'use client';
 
 import OnboardingShell from '@/app/(onboarding)/OnboardingShell';
+import { isUiDemoMode } from '@/demo';
 import {
+  getDaoDashboardSnapshot,
   gradeTone,
   hoursUntil,
   letterGradeFromScore,
   type DaoGrantCardModel,
 } from '@/demo/dao-dashboard';
 import {
+  CONTRACTS_READY,
   GRANT_ESCROW_ADDRESS,
   GRANT_FACTORY_ADDRESS,
   IDENTITY_REGISTRY_ADDRESS,
@@ -15,6 +18,7 @@ import {
   grantFactoryAbi,
   identityRegistryAbi,
 } from '@/lib/escrow';
+import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
 import { formatUnits, zeroAddress } from 'viem';
 import { useReadContract, useReadContracts } from 'wagmi';
 import {
@@ -57,11 +61,13 @@ export default function GrantsExplorerPage() {
     address: GRANT_FACTORY_ADDRESS,
     abi: grantFactoryAbi,
     functionName: 'grantCount',
+    query: { enabled: CONTRACTS_READY },
   });
 
-  const grantCount = Number(countData || 0n);
+  const grantCount = safeFactoryGrantCount(countData);
 
   const factoryGrantContracts = useMemo(() => {
+    if (!CONTRACTS_READY || grantCount <= 0) return [];
     return Array.from({ length: grantCount }, (_, i) => ({
       address: GRANT_FACTORY_ADDRESS,
       abi: grantFactoryAbi,
@@ -72,7 +78,7 @@ export default function GrantsExplorerPage() {
 
   const { data: escrowAddressesData, isLoading: isAddressesLoading } = useReadContracts({
     contracts: factoryGrantContracts,
-    query: { enabled: grantCount > 0 },
+    query: { enabled: CONTRACTS_READY && grantCount > 0 },
   });
 
   const escrowAddresses = useMemo(() => {
@@ -117,45 +123,56 @@ export default function GrantsExplorerPage() {
   });
 
   const grants = useMemo((): DaoGrantCardModel[] => {
+    if (isUiDemoMode() || !CONTRACTS_READY) {
+      return getDaoDashboardSnapshot(0).grants;
+    }
     if (!grantsData) return [];
-    return grantsData
-      .map((row: any, i: number) => {
-        if (row.status !== 'success' || !row.result) return null;
-        const g = row.result;
-        const identity = (identitiesData?.[i] as any)?.result as
-          | { isVerified: boolean; tier: bigint; githubHandle: string }
-          | undefined;
+    const rows: DaoGrantCardModel[] = [];
+    grantsData.forEach((row: any, i: number) => {
+      if (row.status !== 'success' || !row.result) return;
+      const g = row.result;
+      const identity = (identitiesData?.[i] as any)?.result as
+        | { isVerified: boolean; tier: bigint; githubHandle: string }
+        | undefined;
 
-        const totalUsdc = Number(
-          g.milestones.reduce((s: bigint, m: any) => s + m.amount, 0n) / 1000000n,
-        );
+      const totalUsdc = Number(
+        g.milestones.reduce((s: bigint, m: any) => s + m.amount, BigInt(0)) / BigInt(1_000_000),
+      );
+      const nextDeadline =
+        g.milestones[0]?.deadline > BigInt(0)
+          ? new Date(Number(g.milestones[0].deadline) * 1000).toISOString()
+          : null;
 
-        return {
-          slug: i.toString(),
-          displayId: `#GRT-${i}`,
-          builder: g.builder,
-          contributionTier: identity ? `Tier ${identity.tier} Contributor` : 'Contributor',
-          reputationScore: identity ? Number(identity.tier) * 25 + 15 : 0,
-          milestoneTotal: g.milestones.length,
-          milestoneCompleted: 0,
-          paymentMode: g.streaming ? 'streaming' : 'lump-sum',
-          zkVerified: identity?.isVerified ?? false,
-          isStreamingActive: g.streaming,
-          streamAccumulatedUsdcAtEpoch: 0,
-          nextDeadlineIso:
-            g.milestones[0]?.deadline > 0n
-              ? new Date(Number(g.milestones[0].deadline) * 1000).toISOString()
-              : undefined,
-          totalGrantUsdc: totalUsdc,
-          hasWarning: false,
-          hasSlashed: false,
-          tags: g.streaming ? ['active', 'streaming'] : ['active'],
-        };
-      })
-      .filter((x): x is DaoGrantCardModel => x !== null);
+      rows.push({
+        slug: i.toString(),
+        displayId: `#GRT-${i}`,
+        builder: g.builder as `0x${string}`,
+        contributionTier: identity ? `Tier ${identity.tier} Contributor` : 'Contributor',
+        reputationScore: identity ? Number(identity.tier) * 25 + 15 : 0,
+        createdAtIso: new Date().toISOString(),
+        milestoneTotal: g.milestones.length,
+        milestoneCompleted: 0,
+        paymentMode: g.streaming ? 'streaming' : 'lump_sum',
+        zkVerified: identity?.isVerified ?? false,
+        isStreamingActive: g.streaming,
+        streamRateUsdcPerSec: 0,
+        streamAccumulatedUsdcAtEpoch: 0,
+        streamEpochMs: Date.now(),
+        nextDeadlineIso: nextDeadline,
+        totalGrantUsdc: totalUsdc,
+        hasWarning: false,
+        hasSlashed: false,
+        tags: g.streaming ? ['active', 'streaming'] : ['active'],
+        milestones: [],
+      });
+    });
+    return rows;
   }, [grantsData, identitiesData]);
 
-  const isLoading = isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading;
+  const isLoading =
+    CONTRACTS_READY &&
+    !isUiDemoMode() &&
+    (isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading);
 
   const [filter, setFilter] = useState<ExplorerFilter>('all');
   const [query, setQuery] = useState('');

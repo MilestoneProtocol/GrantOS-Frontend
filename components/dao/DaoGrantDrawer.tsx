@@ -25,7 +25,7 @@ type DaoGrantDrawerProps = {
 /**
  * Grant Detail Drawer — slides in from the right on desktop, bottom sheet on
  * mobile. Read-only. Mirrors the UXPilot design as closely as possible with
- * our existing CommitteeAppShell header/sidebar.
+ * our existing DaoAppShell header/sidebar.
  *
  * Sections
  * - Header: grant id, builder, ZK verified, totals, payment mode, creation time.

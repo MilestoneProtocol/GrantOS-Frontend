@@ -1,11 +1,11 @@
-import { connectorsForWallets, getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import {
   rainbowWallet,
   metaMaskWallet,
   coinbaseWallet,
   walletConnectWallet,
-  phantomWallet,
   rabbyWallet,
+  phantomWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { createStorage } from 'wagmi';
 import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
@@ -27,16 +27,20 @@ const sessionStorageAdapter = {
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'default';
 
+/**
+ * Register explicit wallets only so the custom modal can target each wallet
+ * reliably instead of hitting a generic injected connector.
+ */
 const wallets = [
   {
     groupName: 'Recommended',
     wallets: [
       metaMaskWallet,
+      phantomWallet,
       rainbowWallet,
+      rabbyWallet,
       coinbaseWallet,
       walletConnectWallet,
-      rabbyWallet,
-      phantomWallet,
     ],
   },
 ];
@@ -47,6 +51,7 @@ export const config = getDefaultConfig({
   chains: [arbitrum, arbitrumSepolia],
   ssr: true,
   wallets,
+  multiInjectedProviderDiscovery: false,
   storage: createStorage({
     storage: sessionStorageAdapter,
   }),

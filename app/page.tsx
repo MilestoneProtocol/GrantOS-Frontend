@@ -5,6 +5,7 @@ import RoleSelection from '@/app/RoleSelection';
 import DetectingRoleSkeleton from '@/app/(onboarding)/DetectingRoleSkeleton';
 import OnboardingShell from '@/app/(onboarding)/OnboardingShell';
 import OnboardingToast from '@/app/(onboarding)/OnboardingToast';
+import { isRoleCheckBypassed } from '@/lib/role-access';
 import { useRoleDetection } from '@/lib/roleDetection';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef } from 'react';
@@ -23,12 +24,16 @@ function EntryPageInner() {
 
   const walletResolved = status !== 'connecting' && status !== 'reconnecting';
   const forceRoleSelect = searchParams.get('select') === '1';
+  const bypassRoles = isRoleCheckBypassed() || roles.bypassActive;
 
   useEffect(() => {
     if (redirectedRef.current) return;
     if (!walletResolved) return;
     if (!isConnected) return;
     if (roles.loading) return;
+
+    // Local / demo: always show role picker — no auto-redirect to a single surface.
+    if (bypassRoles) return;
 
     // PRD decision tree (in order).
     // 1) New wallet → role selection
@@ -71,6 +76,7 @@ function EntryPageInner() {
     roles.loading,
     router,
     walletResolved,
+    bypassRoles,
   ]);
 
   const shouldDetect = walletResolved && isConnected;
@@ -78,7 +84,11 @@ function EntryPageInner() {
   const showRoleSelection =
     shouldDetect &&
     !roles.loading &&
-    (forceRoleSelect || roles.isNewWallet || roles.hasMultipleRoles || (roles.isBuilder && roles.isCommittee));
+    (bypassRoles ||
+      forceRoleSelect ||
+      roles.isNewWallet ||
+      roles.hasMultipleRoles ||
+      (roles.isBuilder && roles.isCommittee));
 
   const builderUnverifiedNudge =
     shouldDetect && !roles.loading && roles.isBuilder && !roles.isVerified;
@@ -90,8 +100,9 @@ function EntryPageInner() {
         <DetectingRoleSkeleton />
       ) : showRoleSelection ? (
         <RoleSelection
-          showDaoCard={roles.isNewWallet || roles.isDaoAdmin}
-          builderUnverifiedNudge={builderUnverifiedNudge}
+          showDaoCard={bypassRoles || roles.isNewWallet || roles.isDaoAdmin}
+          builderUnverifiedNudge={!bypassRoles && builderUnverifiedNudge}
+          devBypassActive={bypassRoles}
         />
       ) : (
         <LandingPage />

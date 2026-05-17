@@ -112,6 +112,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     id: 'sub-defi-ui-m2',
     grantId: '#4092',
     grantTitle: 'DeFi Aggregator UI v2',
+    escrowAddress: '0x0000000000000000000000000000000000000401',
     builder: '0x4F2bA1cE9d3eC1A2bD5cF60d12c5b3e9F87a8B21',
     milestoneIndex: 2,
     milestoneTitle: 'Frontend Integration',
@@ -144,6 +145,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     id: 'sub-pg-m1',
     grantId: '#4087',
     grantTitle: 'Public Goods Explorer',
+    escrowAddress: '0x0000000000000000000000000000000000000402',
     builder: '0x2c4FAa31Be7c0E7c5bBF7CdE2b0C5dF4eFa2A8F1a',
     milestoneIndex: 1,
     milestoneTitle: 'Discovery Page MVP',
@@ -176,6 +178,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     id: 'sub-zk-m1',
     grantId: '#4118',
     grantTitle: 'ZK Identity Solutions',
+    escrowAddress: '0x0000000000000000000000000000000000000411',
     builder: '0x9B1CC8e6F11d99Ee2c3aA4F1Ee72BfA67dD64D2c',
     milestoneIndex: 1,
     milestoneTitle: 'Architecture Design',
@@ -210,6 +213,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     id: 'sub-defi-m1',
     grantId: '#4092',
     grantTitle: 'DeFi Aggregator UI v2',
+    escrowAddress: '0x0000000000000000000000000000000000000401',
     builder: '0x4F2bA1cE9d3eC1A2bD5cF60d12c5b3e9F87a8B21',
     milestoneIndex: 1,
     milestoneTitle: 'Smart Contracts',
@@ -243,6 +247,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     id: 'sub-zk-m0',
     grantId: '#4118',
     grantTitle: 'ZK Identity Solutions',
+    escrowAddress: '0x0000000000000000000000000000000000000411',
     builder: '0x9B1CC8e6F11d99Ee2c3aA4F1Ee72BfA67dD64D2c',
     milestoneIndex: 0,
     milestoneTitle: 'Discovery & Scoping',
@@ -276,6 +281,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     id: 'sub-analytics-m2',
     grantId: '#4071',
     grantTitle: 'On-Chain Analytics Dashboard',
+    escrowAddress: '0x0000000000000000000000000000000000000407',
     builder: '0x8E2dDe9A7c3F1B45e6F9D8c2A1Bc0fE34De71D54',
     milestoneIndex: 2,
     milestoneTitle: 'Backfill Pipeline',
@@ -787,4 +793,53 @@ export function getCommitteeDemoSubmissionById(
  */
 export function getOverdueMilestoneById(id: string): OverdueMilestone | undefined {
   return getCommitteeDemoActions().overdue.find((m) => m.id === id);
+}
+
+/* -------------------------------------------------------------------------- */
+/*                     Committee roster (All Grants / Members)                */
+/* -------------------------------------------------------------------------- */
+
+export type CommitteeGrantRoster = {
+  grantId: string;
+  grantTitle: string;
+  quorum: number;
+  members: `0x${string}`[];
+};
+
+export function getCommitteeDemoRosters(): CommitteeGrantRoster[] {
+  return [
+    {
+      grantId: 'demo-grant-defi',
+      grantTitle: 'DeFi Aggregator Protocol',
+      quorum: 3,
+      members: [
+        '0x4A2bD3aE5C9f00cBEED11d9F0aA8a1B2C5C71E9c',
+        '0x1Ab43e5cF0123Ee9d8C4B2A0bE1FFcD12Aa9F022',
+        '0x9B1CC8e6F11d99Ee2c3aA4F1Ee72BfA67dD64D2c',
+        '0x2c4FAa31Be7c0E7c5bBF7CdE2b0C5dF4eFa2A8F1a',
+      ],
+    },
+    {
+      grantId: 'demo-grant-zk',
+      grantTitle: 'ZK Identity Solutions',
+      quorum: 2,
+      members: [
+        '0x9B1CC8e6F11d99Ee2c3aA4F1Ee72BfA67dD64D2c',
+        '0x4A2bD3aE5C9f00cBEED11d9F0aA8a1B2C5C71E9c',
+        '0x7f3A2b1c9d0e8f6a5b4c3d2e1f0a9b8c7d6e5f4a',
+      ],
+    },
+    {
+      grantId: 'cross-chain-yield',
+      grantTitle: 'Cross-Chain Yield Aggregator',
+      quorum: 3,
+      members: [
+        '0x1Ab43e5cF0123Ee9d8C4B2A0bE1FFcD12Aa9F022',
+        '0x4A2bD3aE5C9f00cBEED11d9F0aA8a1B2C5C71E9c',
+        '0x9B1CC8e6F11d99Ee2c3aA4F1Ee72BfA67dD64D2c',
+        '0x2c4FAa31Be7c0E7c5bBF7CdE2b0C5dF4eFa2A8F1a',
+        '0x8e7D6c5b4a39281706f5e4d3c2b1a0987654321',
+      ],
+    },
+  ];
 }

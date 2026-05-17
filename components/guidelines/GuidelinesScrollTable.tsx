@@ -15,7 +15,7 @@ export default function GuidelinesScrollTable({
 }: GuidelinesScrollTableProps) {
   return (
     <div className="guidelines-table-wrap relative">
-      <div className="guidelines-table-scroll overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="guidelines-table-scroll overflow-x-auto rounded-xl border border-slate-200">
         <table
           className={`guidelines-table w-full min-w-[640px] border-collapse text-left text-sm ${stickyFirstColumn ? 'guidelines-table--sticky-col' : ''}`}
         >

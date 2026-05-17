@@ -19,7 +19,7 @@ function AddressActions({ address }: { address: string }) {
       <button
         type="button"
         onClick={copy}
-        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
       >
         <Copy className="h-3.5 w-3.5" aria-hidden />
         {copied ? 'Copied' : 'Copy'}
@@ -28,7 +28,7 @@ function AddressActions({ address }: { address: string }) {
         href={arbiscanAddressUrl(address)}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
       >
         <ExternalLink className="h-3.5 w-3.5" aria-hidden />
         Explorer
@@ -41,7 +41,7 @@ export default function GuidelinesContractsTable() {
   return (
     <GuidelinesScrollTable caption="Smart contract addresses on Arbitrum One">
       <thead>
-        <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+        <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
           <th className="px-4 py-3">Contract</th>
           <th className="px-4 py-3">Address (Arbitrum One)</th>
           <th className="px-4 py-3">Actions</th>
@@ -51,12 +51,12 @@ export default function GuidelinesContractsTable() {
         {GUIDELINES_CONTRACTS.map((row, i) => (
           <tr
             key={row.name}
-            className={`border-b border-slate-100 dark:border-slate-800 ${i % 2 === 1 ? 'bg-slate-50/60 dark:bg-slate-800/30' : ''}`}
+            className={`border-b border-slate-100 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}
           >
-            <th scope="row" className="px-4 py-3.5 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <th scope="row" className="px-4 py-3.5 text-left text-sm font-semibold text-slate-900">
               {row.name}
             </th>
-            <td className="px-4 py-3.5 font-mono text-xs text-slate-700 dark:text-slate-300 sm:text-sm">
+            <td className="px-4 py-3.5 font-mono text-xs text-slate-700 sm:text-sm">
               {row.address}
             </td>
             <td className="px-4 py-3.5">

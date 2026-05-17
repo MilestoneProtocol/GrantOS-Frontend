@@ -14,7 +14,6 @@ import {
   PaymentMode,
 } from '@/grant-creation/store';
 import AppShellHeader from '@/components/layout/AppShellHeader';
-import { APP_SHELL_PRIMARY_LINKS } from '@/lib/app-shell-nav';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Check, X } from 'lucide-react';
@@ -395,22 +394,6 @@ function CreateGrantPageContent() {
       </main>
       )}
 
-      {!isSuccessStep ? (
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/90 bg-white/95 px-4 py-2 backdrop-blur md:hidden">
-        <div className="grid grid-cols-3 gap-2">
-          {APP_SHELL_PRIMARY_LINKS.map(({ label, href, icon: Icon }) => (
-            <Link
-              key={label}
-              href={href}
-              className="inline-flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
-            >
-              <Icon className="h-4 w-4" strokeWidth={1.9} />
-              <span>{label}</span>
-            </Link>
-          ))}
-        </div>
-      </nav>
-      ) : null}
     </div>
     )
   );

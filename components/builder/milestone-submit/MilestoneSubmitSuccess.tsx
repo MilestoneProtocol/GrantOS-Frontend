@@ -3,6 +3,7 @@
 import { useMilestoneSubmit } from '@/components/builder/milestone-submit/MilestoneSubmitProvider';
 import type { AiVerifierVerdict } from '@/lib/ai-verifier';
 import { easAttestationScanUrl } from '@/lib/eas-scan';
+import { grantDetailPath } from '@/lib/grant-routes';
 import { Bot, Check, ChevronRight, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback } from 'react';
@@ -190,7 +191,7 @@ export default function MilestoneSubmitSuccess() {
           Back to Dashboard
         </Link>
         <Link
-          href={`/grants/${encodeURIComponent(routeGrantId)}`}
+          href={grantDetailPath(routeGrantId, 'builder')}
           className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50 sm:flex-initial sm:min-w-[160px]"
         >
           View Grant

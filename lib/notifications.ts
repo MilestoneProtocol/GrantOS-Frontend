@@ -416,21 +416,22 @@ export function groupNotificationsByDate(
 
 export function resolveActiveRoleFromPath(pathname: string | null): NotificationRole | null {
   if (!pathname) return null;
-  if (pathname === '/dao' || pathname.startsWith('/dao/')) return 'dao';
+  if (pathname === '/dao' || pathname.startsWith('/dao/')) {
+    return 'dao';
+  }
   if (
     pathname.startsWith('/committee') ||
+    pathname === '/tasks' ||
+    pathname.startsWith('/tasks/') ||
     pathname === '/grants/new' ||
     pathname.startsWith('/grants/new/')
   ) {
     return 'committee';
   }
-  if (
-    pathname.startsWith('/builder') ||
-    pathname.startsWith('/grants/') ||
-    pathname === '/notifications'
-  ) {
+  if (pathname.startsWith('/builder') || pathname.startsWith('/grants/')) {
     return 'builder';
   }
+  // `/notifications` is role-agnostic — fall back to wallet roles in the listener.
   return null;
 }
 
@@ -474,7 +475,7 @@ async function pollBuilderReputation(
         functionName: 'getIdentity',
         args: [builderLc as Address],
       });
-      const score = Number(result[4] ?? BigInt(0));
+      const score = Number(result.tier) * 25 + 15;
       if (score < REPUTATION_CRITICAL_SCORE) {
         addNotification(daoReputationCriticalNotification(builderLc as Address));
       }

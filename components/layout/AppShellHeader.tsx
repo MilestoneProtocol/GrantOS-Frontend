@@ -100,21 +100,25 @@ export default function AppShellHeader({
             </span>
           </Link>
 
-          <nav
-            aria-label="Primary"
-            className="mx-auto grid max-w-md grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-1"
-          >
-            {APP_SHELL_PRIMARY_LINKS.map(({ label, href, icon: Icon }) => (
-              <Link
-                key={label}
-                href={href}
-                className="inline-flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900 lg:px-4"
-              >
-                <Icon className="h-4 w-4 shrink-0" strokeWidth={1.9} aria-hidden />
-                <span className="truncate">{label}</span>
-              </Link>
-            ))}
-          </nav>
+          {APP_SHELL_PRIMARY_LINKS.length > 0 ? (
+            <nav
+              aria-label="Primary"
+              className="mx-auto grid max-w-md grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-1"
+            >
+              {APP_SHELL_PRIMARY_LINKS.map(({ label, href, icon: Icon }) => (
+                <Link
+                  key={label}
+                  href={href}
+                  className="inline-flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900 lg:px-4"
+                >
+                  <Icon className="h-4 w-4 shrink-0" strokeWidth={1.9} aria-hidden />
+                  <span className="truncate">{label}</span>
+                </Link>
+              ))}
+            </nav>
+          ) : (
+            <div className="mx-auto flex-1" aria-hidden />
+          )}
 
           <div className="flex shrink-0 items-center gap-2 xl:gap-3">
             {trailingExtras}

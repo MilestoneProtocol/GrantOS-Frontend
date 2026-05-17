@@ -4,13 +4,22 @@ import BuilderAppShell from '@/components/builder/BuilderAppShell';
 import BuilderDashboardToast from '@/components/builder/BuilderDashboardToast';
 import WarningBannerStack from '@/components/builder/dashboard/WarningBannerStack';
 import { useAuthGuard } from '@/lib/authGuard';
-import { GRANT_FACTORY_ADDRESS, grantFactoryAbi, grantEscrowReadAbi, IDENTITY_REGISTRY_ADDRESS, identityRegistryAbi } from '@/lib/escrow';
+import {
+  CONTRACTS_READY,
+  GRANT_FACTORY_ADDRESS,
+  grantFactoryAbi,
+  grantEscrowReadAbi,
+  IDENTITY_REGISTRY_ADDRESS,
+  identityRegistryAbi,
+} from '@/lib/escrow';
+import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import {
   buildUiDemoGrantSummary,
   isUiDemoMode,
   UI_DEMO_GRANT_PATH_ID,
 } from '@/demo';
+import { demoPathSegmentForChainIndex } from '@/lib/public-explorer-grant';
 import {
   AlertTriangle,
   Check,
@@ -72,11 +81,13 @@ export default function BuilderDashboardPage() {
     address: GRANT_FACTORY_ADDRESS,
     abi: grantFactoryAbi,
     functionName: 'grantCount',
+    query: { enabled: CONTRACTS_READY && Boolean(address) },
   });
 
-  const grantCount = Number(countData || BigInt(0));
+  const grantCount = safeFactoryGrantCount(countData);
 
   const factoryGrantContracts = useMemo(() => {
+    if (!CONTRACTS_READY || grantCount <= 0) return [];
     return Array.from({ length: grantCount }, (_, i) => ({
       address: GRANT_FACTORY_ADDRESS,
       abi: grantFactoryAbi,
@@ -87,7 +98,7 @@ export default function BuilderDashboardPage() {
 
   const { data: escrowAddressesData, isLoading: isAddressesLoading } = useReadContracts({
     contracts: factoryGrantContracts,
-    query: { enabled: grantCount > 0 },
+    query: { enabled: CONTRACTS_READY && grantCount > 0 },
   });
 
   const escrowAddresses = useMemo(() => {
@@ -126,7 +137,9 @@ export default function BuilderDashboardPage() {
   const dashboardGrantRows = useMemo(() => {
     const chainRows = grants.map((g) => ({
       grant: g,
-      pathSegment: g.id.toString(),
+      pathSegment: isUiDemoMode()
+        ? demoPathSegmentForChainIndex(g.id, g.builder)
+        : g.id.toString(),
       isUiDemo: false,
     }));
     if (!isUiDemoMode()) return chainRows;
@@ -172,7 +185,15 @@ export default function BuilderDashboardPage() {
     );
   }
 
-  if (guard.state === 'blocked') return null;
+  if (guard.state === 'blocked') {
+    return (
+      <BuilderAppShell>
+        <main className="flex min-h-[50vh] w-full items-center justify-center px-5 py-16 text-sm text-slate-500 md:px-8 lg:px-10">
+          Redirecting…
+        </main>
+      </BuilderAppShell>
+    );
+  }
 
   return (
     <BuilderAppShell>

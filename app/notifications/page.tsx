@@ -2,9 +2,11 @@
 
 import BuilderAppShell from '@/components/builder/BuilderAppShell';
 import CommitteeAppShell from '@/components/committee/CommitteeAppShell';
+import DaoAppShell from '@/components/dao/DaoAppShell';
 import NotificationHistoryCard from '@/components/notifications/NotificationHistoryCard';
-import { groupNotificationsByDate } from '@/lib/notifications';
+import { groupNotificationsByDate, resolveFallbackRole } from '@/lib/notifications';
 import { useAuthGuard } from '@/lib/authGuard';
+import { useRoleDetection } from '@/lib/roleDetection';
 import {
   selectNotificationsForRole,
   selectUnreadForRole,
@@ -12,10 +14,11 @@ import {
   type AppNotification,
   type NotificationCategory,
   type NotificationFilter,
+  type NotificationRole,
 } from '@/store/notificationStore';
 import { Check, ChevronDown, Filter, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAccount } from 'wagmi';
 
 const FILTER_CHIPS: { id: NotificationFilter; label: string; dot?: string }[] = [
@@ -26,9 +29,8 @@ const FILTER_CHIPS: { id: NotificationFilter; label: string; dot?: string }[] = 
   { id: 'approval', label: 'Approvals', dot: 'bg-emerald-500' },
 ];
 
-function NotificationsMain() {
+function NotificationsMain({ viewRole }: { viewRole: NotificationRole }) {
   const router = useRouter();
-  const activeRole = useNotificationStore((s) => s.activeRole);
   const notifications = useNotificationStore((s) => s.notifications);
   const markAsRead = useNotificationStore((s) => s.markAsRead);
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead);
@@ -38,8 +40,8 @@ function NotificationsMain() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [extraCategory, setExtraCategory] = useState<NotificationCategory | null>(null);
 
-  const roleNotifications = selectNotificationsForRole(notifications, activeRole);
-  const unreadCount = selectUnreadForRole(notifications, activeRole);
+  const roleNotifications = selectNotificationsForRole(notifications, viewRole);
+  const unreadCount = selectUnreadForRole(notifications, viewRole);
 
   const filtered = useMemo(() => {
     let list = roleNotifications;
@@ -189,11 +191,22 @@ function NotificationsMain() {
 
 export default function NotificationsPage() {
   const { isConnected } = useAccount();
-  const activeRole = useNotificationStore((s) => s.activeRole);
+  const roles = useRoleDetection();
+  const setActiveRole = useNotificationStore((s) => s.setActiveRole);
+  const storeRole = useNotificationStore((s) => s.activeRole);
 
-  const requiredRole =
-    activeRole === 'dao' ? 'dao' : activeRole === 'committee' ? 'committee' : 'builder';
-  const guard = useAuthGuard(isConnected ? requiredRole : 'public');
+  const viewRole = useMemo<NotificationRole>(() => {
+    if (!roles.loading) return resolveFallbackRole(roles);
+    return storeRole;
+  }, [roles, storeRole]);
+
+  useEffect(() => {
+    if (!roles.loading && isConnected) {
+      setActiveRole(viewRole);
+    }
+  }, [isConnected, roles.loading, setActiveRole, viewRole]);
+
+  const guard = useAuthGuard(isConnected ? viewRole : 'public');
 
   if (!isConnected) {
     return (
@@ -203,31 +216,48 @@ export default function NotificationsPage() {
     );
   }
 
-  if (guard.state === 'loading') {
+  if (guard.state === 'loading' || roles.loading) {
     const loading = (
       <main className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
         Loading…
       </main>
     );
-    if (activeRole === 'builder') {
+    if (viewRole === 'builder') {
       return <BuilderAppShell navActive="none">{loading}</BuilderAppShell>;
+    }
+    if (viewRole === 'dao') {
+      return <DaoAppShell breadcrumb="Notifications">{loading}</DaoAppShell>;
     }
     return <CommitteeAppShell breadcrumb="Notifications">{loading}</CommitteeAppShell>;
   }
 
-  if (guard.state === 'blocked') return null;
+  if (guard.state === 'blocked') {
+    return (
+      <main className="flex min-h-[40vh] items-center justify-center px-4 text-center text-sm text-slate-500">
+        You don&apos;t have access to notifications for this role.
+      </main>
+    );
+  }
 
-  if (activeRole === 'builder') {
+  if (viewRole === 'builder') {
     return (
       <BuilderAppShell navActive="none">
-        <NotificationsMain />
+        <NotificationsMain viewRole={viewRole} />
       </BuilderAppShell>
+    );
+  }
+
+  if (viewRole === 'dao') {
+    return (
+      <DaoAppShell breadcrumb="Notifications">
+        <NotificationsMain viewRole={viewRole} />
+      </DaoAppShell>
     );
   }
 
   return (
     <CommitteeAppShell breadcrumb="Notifications">
-      <NotificationsMain />
+      <NotificationsMain viewRole={viewRole} />
     </CommitteeAppShell>
   );
 }

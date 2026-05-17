@@ -12,5 +12,4 @@ export type GuidelinesTocItem = {
   id: GuidelinesSectionId;
   label: string;
   shortLabel: string;
-  number: string;
 };
