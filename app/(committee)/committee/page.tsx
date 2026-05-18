@@ -14,6 +14,7 @@ import {
   type MilestoneActivityEvent,
   type OverdueMilestone,
   type OverdueMilestoneState,
+  type PendingReviewSummary,
 } from '@/demo/committee-demo';
 import {
   markBuilderWarningSlashed,
@@ -89,10 +90,19 @@ export default function CommitteeDashboardPage() {
   const { data: realData, loading: reviewsLoading } = useCommitteeReviews();
 
   const actions = useMemo(() => {
+    const demoActions = getCommitteeDemoActions();
+    const pendingReview: PendingReviewSummary[] = realData.pending.map((s, i) => ({
+      id: s.id,
+      grantId: s.grantId,
+      grantTitle: s.grantTitle,
+      milestoneTitle: s.milestoneTitle,
+      submittedLabel: demoActions.pendingReview[i]?.submittedLabel ?? 'Recently submitted',
+      deadlineIso: demoActions.pendingReview[i]?.deadlineIso ?? '2026-06-01',
+    }));
     return {
-      pendingReview: realData.pending,
+      pendingReview,
       pendingReviewCount: realData.totalPending,
-      overdue: [], // Overdue logic to be implemented via backend indexing
+      overdue: IS_UI_DEMO ? demoActions.overdue : ([] as OverdueMilestone[]),
     };
   }, [realData]);
 

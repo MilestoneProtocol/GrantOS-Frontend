@@ -6,6 +6,7 @@ import { tierFromReputationPoints } from '@/lib/builder-contribution-tiers';
 import type { BuilderProfileData } from '@/lib/builder-profile-server';
 import { scoreToLetterGrade } from '@/lib/builder-profile-server';
 import {
+  CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
   grantFactoryAbi,
   GRANT_ESCROW_ADDRESS,
@@ -13,6 +14,7 @@ import {
   IDENTITY_REGISTRY_ADDRESS,
   identityRegistryAbi,
 } from '@/lib/escrow';
+import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
 import type { ReputationResult } from '@/lib/reputation';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -157,11 +159,13 @@ export function useBuilderPrivateProfile() {
     address: GRANT_FACTORY_ADDRESS,
     abi: grantFactoryAbi,
     functionName: 'grantCount',
+    query: { enabled: CONTRACTS_READY && Boolean(address) },
   });
 
-  const grantCount = Number(countData || BigInt(0));
+  const grantCount = safeFactoryGrantCount(countData);
 
   const factoryGrantContracts = useMemo(() => {
+    if (!CONTRACTS_READY || grantCount <= 0) return [];
     return Array.from({ length: grantCount }, (_, i) => ({
       address: GRANT_FACTORY_ADDRESS,
       abi: grantFactoryAbi,
@@ -172,7 +176,7 @@ export function useBuilderPrivateProfile() {
 
   const { data: escrowAddressesData, isLoading: isAddressesLoading } = useReadContracts({
     contracts: factoryGrantContracts,
-    query: { enabled: grantCount > 0 },
+    query: { enabled: CONTRACTS_READY && grantCount > 0 },
   });
 
   const escrowAddresses = useMemo(() => {

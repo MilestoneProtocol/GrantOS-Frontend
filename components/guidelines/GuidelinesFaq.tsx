@@ -14,15 +14,15 @@ export default function GuidelinesFaq() {
         return (
           <div
             key={item.question}
-            className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/60"
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white"
           >
             <button
               type="button"
               onClick={() => setOpenIndex(open ? null : index)}
-              className="flex min-h-12 w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/50 sm:min-h-[48px] sm:px-5"
+              className="flex min-h-12 w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-slate-50 sm:min-h-[48px] sm:px-5"
               aria-expanded={open}
             >
-              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 sm:text-base">
+              <span className="text-sm font-semibold text-slate-900 sm:text-base">
                 {item.question}
               </span>
               {open ? (
@@ -35,7 +35,7 @@ export default function GuidelinesFaq() {
               className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
             >
               {/* inner */}
-                <p className="overflow-hidden px-4 pb-4 text-base leading-relaxed text-slate-600 dark:text-slate-400 sm:px-5">
+                <p className="overflow-hidden px-4 pb-4 text-base leading-relaxed text-slate-600 sm:px-5">
                   {item.answer}
                 </p>
             </div>

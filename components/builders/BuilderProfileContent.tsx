@@ -112,13 +112,15 @@ function GrantCard({ row }: { row: import('@/lib/builder-profile-server').Builde
         </div>
       </div>
 
-      <Link
-        href={row.href}
-        className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-violet-700 hover:text-violet-900"
-      >
-        View grant
-        <ArrowUpRight className="h-3.5 w-3.5" />
-      </Link>
+      {row.href ? (
+        <Link
+          href={row.href}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-violet-700 hover:text-violet-900"
+        >
+          View grant
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </Link>
+      ) : null}
     </article>
   );
 }

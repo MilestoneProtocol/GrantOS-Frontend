@@ -1,3 +1,4 @@
+import { isUiDemoMode, UI_DEMO_GRANT_PATH_ID } from '@/demo';
 import { getDaoDashboardSnapshot, type DaoGrantCardModel } from '@/demo/dao-dashboard';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import { getAddress, keccak256, parseUnits, stringToHex, type Address } from 'viem';
@@ -31,12 +32,33 @@ function proofTypeFromDao(t: DaoGrantCardModel['milestones'][0]['proofType']): n
   return 2;
 }
 
+/** Strip demo-only suffixes from borrowed catalogue ids (`8692-b0`). */
+export function normalizeGrantRouteId(routeIdRaw: string): string {
+  return decodeURIComponent(routeIdRaw).trim().replace(/-b\d+$/i, '');
+}
+
+/**
+ * Pick a stable `/grants/[slug]` segment for on-chain index rows in UI demo mode.
+ */
+export function demoPathSegmentForChainIndex(
+  chainIndex: bigint,
+  builder: Address,
+): string {
+  const snap = getDaoDashboardSnapshot(0);
+  const lower = builder.toLowerCase();
+  const own = snap.grants.filter((g) => g.builder.toLowerCase() === lower);
+  const pool = own.length > 0 ? own : snap.grants;
+  if (pool.length === 0) return UI_DEMO_GRANT_PATH_ID;
+  const idx = Number(chainIndex % BigInt(pool.length));
+  return pool[idx]!.slug;
+}
+
 /**
  * Find a grant card from the public explorer demo ledger (`demo/dao-dashboard.ts`)
- * by URL segment: numeric slug, `#GRT-8692`, `GRT-2026-8692`, etc.
+ * by URL segment: numeric slug, `#GRT-8692`, `GRT-2026-8692`, factory index in demo, etc.
  */
 export function findExplorerDemoGrant(routeIdRaw: string): DaoGrantCardModel | null {
-  const s = decodeURIComponent(routeIdRaw).trim();
+  const s = normalizeGrantRouteId(routeIdRaw);
   if (!s) return null;
   const snap = getDaoDashboardSnapshot(0);
 
@@ -53,6 +75,12 @@ export function findExplorerDemoGrant(routeIdRaw: string): DaoGrantCardModel | n
   if (tail?.[1]) {
     const num = tail[1];
     return snap.grants.find((g) => g.slug === num) ?? null;
+  }
+
+  if (isUiDemoMode() && /^\d+$/.test(s)) {
+    const n = Number(s);
+    if (n >= 0 && n < snap.grants.length) return snap.grants[n] ?? null;
+    return snap.grants.find((g) => g.slug === s) ?? null;
   }
 
   return null;

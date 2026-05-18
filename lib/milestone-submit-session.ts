@@ -112,8 +112,8 @@ export function buildMockZkProofResult(
   // Coprocessor integration (US-01/US-02 architecture reuse)
   const walletAddrStr = walletAddress.startsWith('0x') && walletAddress.length > 2 ? walletAddress : '0x1234567890123456789012345678901234567890';
   const walletAddr = BigInt(walletAddrStr);
-  const addrHi = (walletAddr >> 128n) & 0xffffffffn;
-  const addrLo = walletAddr & ((1n << 128n) - 1n);
+  const addrHi = (walletAddr >> BigInt(128)) & BigInt('0xffffffff');
+  const addrLo = walletAddr & ((BigInt(1) << BigInt(128)) - BigInt(1));
 
   return {
     kind: 'success',

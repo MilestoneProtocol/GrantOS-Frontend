@@ -236,7 +236,7 @@ function SectionReputation() {
       <GuidelinesSubheading>Score scale and letter grades:</GuidelinesSubheading>
       <GuidelinesScrollTable caption="Reputation grade scale">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/80">
+          <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             <th className="px-4 py-3">Score</th>
             <th className="px-4 py-3">Grade</th>
             <th className="px-4 py-3">What it means</th>
@@ -244,10 +244,10 @@ function SectionReputation() {
         </thead>
         <tbody>
           {REPUTATION_GRADES.map((row, i) => (
-            <tr key={row.grade} className={`border-b border-slate-100 dark:border-slate-800 ${i % 2 === 1 ? 'bg-slate-50/60 dark:bg-slate-800/30' : ''}`}>
-              <th scope="row" className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">{row.range}</th>
-              <td className="px-4 py-3 text-sm font-bold text-slate-900 dark:text-slate-100">{row.grade}</td>
-              <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{row.meaning}</td>
+            <tr key={row.grade} className={`border-b border-slate-100 ${i % 2 === 1 ? 'bg-slate-50/60' : ''}`}>
+              <th scope="row" className="px-4 py-3 text-sm font-medium text-slate-900">{row.range}</th>
+              <td className="px-4 py-3 text-sm font-bold text-slate-900">{row.grade}</td>
+              <td className="px-4 py-3 text-sm text-slate-600">{row.meaning}</td>
             </tr>
           ))}
         </tbody>

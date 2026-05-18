@@ -3,7 +3,13 @@
 import { loadDemoMyGrants } from '@/lib/my-grants/demo-history';
 import type { MyGrantRecord } from '@/lib/my-grants/types';
 import { computeSummary, mapChainGrantToRecord } from '@/lib/my-grants/utils';
-import { GRANT_FACTORY_ADDRESS, grantFactoryAbi, GRANT_ESCROW_ADDRESS, grantEscrowReadAbi } from '@/lib/escrow';
+import {
+  CONTRACTS_READY,
+  GRANT_FACTORY_ADDRESS,
+  grantFactoryAbi,
+  grantEscrowReadAbi,
+} from '@/lib/escrow';
+import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
 import { useMemo } from 'react';
 import { type Address } from 'viem';
 import { useAccount, useReadContract, useReadContracts } from 'wagmi';
@@ -31,11 +37,13 @@ export function useMyGrants() {
     address: GRANT_FACTORY_ADDRESS,
     abi: grantFactoryAbi,
     functionName: 'grantCount',
+    query: { enabled: CONTRACTS_READY && enabled },
   });
 
-  const grantCount = Number(countData || BigInt(0));
+  const grantCount = safeFactoryGrantCount(countData);
 
   const factoryGrantContracts = useMemo(() => {
+    if (!CONTRACTS_READY || grantCount <= 0) return [];
     return Array.from({ length: grantCount }, (_, i) => ({
       address: GRANT_FACTORY_ADDRESS,
       abi: grantFactoryAbi,
@@ -46,7 +54,7 @@ export function useMyGrants() {
 
   const { data: escrowAddressesData, isLoading: isAddressesLoading } = useReadContracts({
     contracts: factoryGrantContracts,
-    query: { enabled: grantCount > 0 },
+    query: { enabled: CONTRACTS_READY && grantCount > 0 },
   });
 
   const escrowAddresses = useMemo(() => {

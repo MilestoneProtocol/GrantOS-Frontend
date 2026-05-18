@@ -21,9 +21,9 @@ export function loadDemoMyGrants(builderAddress: string): MyGrantRecord[] {
     const mapped = mapDemoGrantToRecord({
       ...card,
       builder: builderAddress as `0x${string}`,
-      slug: `${card.slug}-b${i}`,
-      displayId: card.displayId.replace('GRT', 'GR'),
+      displayId: `${card.displayId}-B${i + 1}`,
     });
+    mapped.key = `demo-borrowed-${card.slug}-${i}`;
     records.push(mapped);
   });
 

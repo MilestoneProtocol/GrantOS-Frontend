@@ -15,6 +15,7 @@ import {
   Shield,
   Zap,
 } from 'lucide-react';
+import { grantDetailPath } from '@/lib/grant-routes';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -142,7 +143,7 @@ export default function MyGrantsGrantCard({ grant, expanded, onToggle }: MyGrant
                 )}
               </button>
               <Link
-                href={`/grants/${grant.pathSegment}`}
+                href={grantDetailPath(grant.pathSegment, 'builder')}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-900"
               >
                 View Grant

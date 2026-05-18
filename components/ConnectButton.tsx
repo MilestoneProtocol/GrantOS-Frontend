@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ConnectButton as RainbowConnectButton } from '@rainbow-me/rainbowkit';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Check, Copy, LogOut, Network, Wallet } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useDisconnect, useAccount } from 'wagmi';
+import { useDisconnect, useAccount, useSwitchChain } from 'wagmi';
+import { config } from '@/lib/wagmi';
 
 /* Lazy-load the heavy modal so it doesn't bloat the initial bundle */
 const WalletModal = dynamic(() => import('./WalletModal'), { ssr: false });
@@ -47,14 +47,13 @@ function WalletControlPlaceholder({ variant }: { variant: ConnectButtonProps['va
 function ConnectedAccountMenu({
   variant,
   displayName,
-  openChainModal,
 }: {
   variant: NonNullable<ConnectButtonProps['variant']>;
   displayName: string;
-  openChainModal: () => void;
 }) {
   const { disconnect } = useDisconnect();
   const { address, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -102,6 +101,13 @@ function ConnectedAccountMenu({
     disconnect();
   }, [disconnect]);
 
+  const onSwitchNetwork = useCallback(() => {
+    const currentChainId = chain?.id;
+    const target = config.chains.find((candidate) => candidate.id !== currentChainId) ?? config.chains[0];
+    if (target) switchChain({ chainId: target.id });
+    setOpen(false);
+  }, [chain?.id, switchChain]);
+
   const triggerClass =
     variant === 'header'
       ? 'inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50'
@@ -114,7 +120,7 @@ function ConnectedAccountMenu({
       {variant !== 'header' ? (
         <button
           type="button"
-          onClick={openChainModal}
+          onClick={onSwitchNetwork}
           className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 md:inline-flex"
         >
         {chain?.name ?? 'Network'}
@@ -185,10 +191,7 @@ function ConnectedAccountMenu({
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              openChainModal();
-            }}
+            onClick={onSwitchNetwork}
             className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-slate-50 ${
               variant === 'header' ? '' : 'md:hidden'
             }`}
@@ -214,41 +217,37 @@ function ConnectedAccountMenu({
 
 export default function ConnectButton({ variant = 'default' }: ConnectButtonProps) {
   const [modalOpen, setModalOpen] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const { address } = useAccount();
   const connectButtonClassName = connectButtonClassNameForVariant(variant);
+
+  const displayName = address
+    ? `${address.slice(0, 6)}…${address.slice(-4)}`
+    : '';
 
   return (
     <>
-      <RainbowConnectButton.Custom>
-        {({ mounted, account, chain, openChainModal }) => {
-          if (!mounted) {
-            return <WalletControlPlaceholder variant={variant} />;
-          }
-
-          if (!account || !chain) {
-            return (
-              <button
-                type="button"
-                onClick={() => setModalOpen(true)}
-                className={connectButtonClassName}
-              >
-                {variant === 'avatar' ? (
-                  <Wallet className="h-4 w-4" strokeWidth={2} />
-                ) : (
-                  'Connect Wallet'
-                )}
-              </button>
-            );
-          }
-
-          return (
-            <ConnectedAccountMenu
-              variant={variant}
-              displayName={account.displayName}
-              openChainModal={openChainModal}
-            />
-          );
-        }}
-      </RainbowConnectButton.Custom>
+      {!mounted ? (
+        <WalletControlPlaceholder variant={variant} />
+      ) : !address ? (
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className={connectButtonClassName}
+        >
+          {variant === 'avatar' ? (
+            <Wallet className="h-4 w-4" strokeWidth={2} />
+          ) : (
+            'Connect Wallet'
+          )}
+        </button>
+      ) : (
+        <ConnectedAccountMenu variant={variant} displayName={displayName} />
+      )}
 
       {modalOpen && <WalletModal onClose={() => setModalOpen(false)} />}
     </>

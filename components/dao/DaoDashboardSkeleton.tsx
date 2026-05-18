@@ -1,5 +1,5 @@
 /**
- * Full-page skeleton for `/dao` while committee membership validates.
+ * Full-page skeleton for `/dao` while DAO admin role validates.
  */
 export default function DaoDashboardSkeleton() {
   return (

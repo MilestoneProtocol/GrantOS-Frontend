@@ -6,6 +6,17 @@ const nextConfig: NextConfig = {
   /** Heavy WASM / ESM packages used by `lib/zk/prover.ts` for client-side proofs. */
   transpilePackages: ['@aztec/bb.js', '@noir-lang/noir_js'],
   allowedDevOrigins: ['192.168.88.159'],
+  webpack(config) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      accounts: false,
+      porto: false,
+      '@base-org/account': false,
+      '@safe-global/safe-apps-provider': false,
+      '@safe-global/safe-apps-sdk': false,
+    };
+    return config;
+  },
   async headers() {
     return [
       {

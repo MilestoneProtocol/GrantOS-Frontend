@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useConnect, useAccount } from 'wagmi';
+import { useConnect, useAccount, type Connector } from 'wagmi';
 import { X, AlertCircle, RefreshCw } from 'lucide-react';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
@@ -94,28 +94,28 @@ const WALLET_DEFS = [
     label: 'MetaMask',
     description: 'Browser extension',
     icon: MetaMaskIcon,
-    connectorMatchers: ['io.metamask', 'metamask', 'metaMask'],
+    connectorMatchers: ['io.metamask', 'io.metamask.mobile', 'metamask', 'metaMask', 'metaMaskSDK'],
   },
   {
     id: 'com.coinbase.wallet',
     label: 'Coinbase Wallet',
     description: 'Smart Wallet & extension',
     icon: CoinbaseIcon,
-    connectorMatchers: ['coinbase', 'coinbase wallet', 'coinbaseWallet'],
+    connectorMatchers: ['com.coinbase.wallet', 'coinbase', 'coinbase wallet', 'coinbaseWallet', 'coinbaseWalletSDK'],
   },
   {
     id: 'me.rainbow',
     label: 'Rainbow',
     description: 'Mobile & extension',
     icon: RainbowIcon,
-    connectorMatchers: ['rainbow', 'rainbow wallet'],
+    connectorMatchers: ['me.rainbow', 'rainbow', 'rainbow wallet'],
   },
   {
     id: 'walletConnect',
     label: 'WalletConnect',
     description: 'Scan with any wallet',
     icon: WalletConnectIcon,
-    connectorMatchers: ['walletconnect', 'wallet connect'],
+    connectorMatchers: ['walletconnect', 'wallet connect', 'walletConnect'],
   },
   {
     id: 'app.phantom',
@@ -125,13 +125,65 @@ const WALLET_DEFS = [
     connectorMatchers: ['app.phantom', 'phantom'],
   },
   {
-    id: 'xyz.rabby',
+    id: 'io.rabby',
     label: 'Rabby Wallet',
     description: 'Browser extension',
     icon: RabbyIcon,
-    connectorMatchers: ['xyz.rabby', 'rabby', 'rabby wallet'],
+    connectorMatchers: ['io.rabby', 'rabby', 'rabby wallet'],
   },
 ] as const;
+
+function getConnectorTokens(connector: Connector): string[] {
+  const rdns = 'rdns' in connector
+    ? Array.isArray(connector.rdns)
+      ? connector.rdns
+      : connector.rdns
+        ? [connector.rdns]
+        : []
+    : [];
+
+  return [
+    connector.id,
+    connector.name,
+    connector.type,
+    ...rdns,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.toLowerCase());
+}
+
+function resolveWalletConnector(
+  connectors: readonly Connector[],
+  walletId: string,
+  matchers: string[],
+): Connector | undefined {
+  const normalizedMatchers = matchers.map((token) => token.toLowerCase());
+
+  const exact = connectors.find((candidate) => {
+    const candidateTokens = getConnectorTokens(candidate);
+    return normalizedMatchers.some((token) => candidateTokens.includes(token));
+  });
+  if (exact) return exact;
+
+  const partial = connectors.find((candidate) => {
+    const candidateTokens = getConnectorTokens(candidate);
+    return normalizedMatchers.some((token) =>
+      candidateTokens.some(
+        (candidateToken) =>
+          candidateToken.includes(token) || token.includes(candidateToken),
+      ),
+    );
+  });
+  if (partial) return partial;
+
+  if (walletId === 'walletConnect') {
+    return connectors.find((candidate) =>
+      getConnectorTokens(candidate).some((token) => token.includes('walletconnect')),
+    );
+  }
+
+  return undefined;
+}
 
 /* ─── Loading dots ────────────────────────────────────────────────────────── */
 
@@ -214,32 +266,10 @@ export default function WalletModal({ onClose }: WalletModalProps) {
       if (state === 'connecting') return;
 
       const walletDef = WALLET_DEFS.find((wallet) => wallet.id === walletId);
-      const requestedTokens = walletDef?.connectorMatchers.map((token) => token.toLowerCase()) ?? [
+      const matchers = walletDef?.connectorMatchers.map((token) => token.toLowerCase()) ?? [
         walletId.toLowerCase(),
       ];
-
-      /* Match the intended connector explicitly so one wallet tile can't
-         accidentally trigger another injected extension. */
-      const connector =
-        connectors.find((candidate) => {
-          const candidateTokens = [
-            candidate.id?.toLowerCase() ?? '',
-            candidate.name?.toLowerCase() ?? '',
-            ...(candidate.type ? [candidate.type.toLowerCase()] : []),
-          ];
-
-          return requestedTokens.some((token) =>
-            candidateTokens.some(
-              (candidateToken) =>
-                candidateToken === token ||
-                candidateToken.includes(token) ||
-                token.includes(candidateToken)
-            )
-          );
-        }) ??
-        (walletId === 'walletConnect'
-          ? connectors.find((candidate) => candidate.id?.toLowerCase().includes('walletconnect'))
-          : undefined);
+      const connector = resolveWalletConnector(connectors, walletId, matchers);
 
       if (!connector) {
         setState('error');

@@ -5,6 +5,7 @@ import { MilestoneSubmitProvider, useMilestoneSubmit } from '@/components/builde
 import SubmissionStepper from '@/components/builder/milestone-submit/SubmissionStepper';
 import SubHeaderBackButton from '@/components/navigation/SubHeaderBackButton';
 import { useAuthGuard } from '@/lib/authGuard';
+import { grantDetailPath } from '@/lib/grant-routes';
 import { Circle } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -66,7 +67,7 @@ function SubmitStepsChrome({ children }: { children: ReactNode }) {
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
               <SubHeaderBackButton
                 label="Back to Milestone"
-                fallbackHref={`/grants/${encodeURIComponent(routeGrantId)}`}
+                fallbackHref={grantDetailPath(routeGrantId, 'builder')}
                 className="shrink-0"
               />
               <span className="text-slate-300">/</span>

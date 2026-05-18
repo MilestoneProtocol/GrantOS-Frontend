@@ -2,6 +2,8 @@
 
 import type { CommitteeDemoGrant, CommitteeMilestoneStatus } from '@/demo/committee-demo';
 import { Check, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 type CommitteeGrantCardProps = {
   grant: CommitteeDemoGrant;
@@ -35,14 +37,23 @@ function formatApprovedAt(iso?: string) {
  * no Approve / Reject controls show because nothing is `submitted`.
  */
 export default function CommitteeGrantCard({ grant }: CommitteeGrantCardProps) {
+  const pathname = usePathname();
   const isCompleted = grant.status === 'completed';
 
+  const grantsBase = pathname?.startsWith('/dao') ? '/dao/grants' : '/committee/grants';
+  const href = `${grantsBase}/${encodeURIComponent(grant.id)}`;
+
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Link
+      href={href}
+      className="group relative block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+    >
       <div className="p-5">
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-base font-bold leading-tight text-slate-900">{grant.title}</h3>
+            <h3 className="text-base font-bold leading-tight text-slate-900 group-hover:text-blue-700">
+              {grant.title}
+            </h3>
             <p className="mt-1 font-mono text-xs text-slate-500">
               Builder: {truncateAddress(grant.builder)}
             </p>
@@ -119,7 +130,7 @@ export default function CommitteeGrantCard({ grant }: CommitteeGrantCardProps) {
         }`}
         aria-hidden
       />
-    </article>
+    </Link>
   );
 }
 

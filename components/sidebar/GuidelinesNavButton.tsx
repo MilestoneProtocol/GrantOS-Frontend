@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowUpRight, BookMarked } from 'lucide-react';
+import { guidelinesPathForPathname } from '@/lib/guidelines-path';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -16,7 +17,11 @@ export default function GuidelinesNavButton({
   className = '',
 }: GuidelinesNavButtonProps) {
   const pathname = usePathname();
-  const active = pathname === '/guidelines' || pathname?.startsWith('/guidelines/');
+  const href = guidelinesPathForPathname(pathname);
+  const active =
+    pathname === href ||
+    (href !== '/guidelines' && pathname?.startsWith(`${href}/`)) ||
+    (href === '/guidelines' && (pathname === '/guidelines' || pathname?.startsWith('/guidelines/')));
   const isRail = variant === 'rail';
 
   if (isRail) {
@@ -37,7 +42,7 @@ export default function GuidelinesNavButton({
 
   return (
     <Link
-      href="/guidelines"
+      href={href}
       onClick={onNavigate}
       className={`group relative block overflow-hidden rounded-xl border border-amber-200/90 bg-linear-to-br from-amber-50 via-white to-orange-50/40 p-3.5 shadow-sm transition hover:border-amber-300 hover:shadow-md dark:border-amber-900/40 dark:from-amber-950/30 dark:via-slate-900 dark:to-slate-900 ${
         active ? 'ring-2 ring-amber-400/30' : ''

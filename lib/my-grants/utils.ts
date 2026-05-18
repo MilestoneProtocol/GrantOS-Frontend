@@ -1,4 +1,6 @@
+import { isUiDemoMode } from '@/demo';
 import type { DaoGrantCardModel, DaoMilestoneModel } from '@/demo/dao-dashboard';
+import { demoPathSegmentForChainIndex } from '@/lib/public-explorer-grant';
 import type {
   MyGrantFilterPill,
   MyGrantFilterTag,
@@ -201,7 +203,9 @@ export function mapChainGrantToRecord(
   return {
     key: `chain-${id.toString()}`,
     grantId: `GRT-${id.toString()}`,
-    pathSegment: id.toString(),
+    pathSegment: isUiDemoMode()
+      ? demoPathSegmentForChainIndex(id, grant.builder)
+      : id.toString(),
     title: grant.milestones[0]?.title ?? `Grant ${id.toString()}`,
     daoName: 'On-chain Committee',
     committeeCount: grant.committee.length,

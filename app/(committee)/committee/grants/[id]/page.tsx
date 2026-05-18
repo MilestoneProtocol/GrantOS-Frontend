@@ -7,8 +7,8 @@ import GrantHeaderCard from '@/components/committee/grant-detail/GrantHeaderCard
 import MilestoneReviewRow from '@/components/committee/grant-detail/MilestoneReviewRow';
 import { getCommitteeDemoGrantDetail } from '@/demo/committee-demo';
 import { useAuthGuard } from '@/lib/authGuard';
-import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 /**
  * Grant detail view (committee role).
@@ -27,6 +27,8 @@ const ACCESS_DENIED_LINGER_MS = 1600;
 
 export default function CommitteeGrantDetailPage() {
   const guard = useAuthGuard('committee');
+  const params = useParams();
+  const grantId = typeof params.id === 'string' ? params.id : '';
 
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
@@ -37,15 +39,18 @@ export default function CommitteeGrantDetailPage() {
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
 
-  // Demo data is keyed by id in the future. For now we always show the
-  // Cross-Chain Yield Aggregator grant regardless of `[id]`.
-  const grant = useMemo(() => getCommitteeDemoGrantDetail(), []);
+  // Demo: full milestone panel for `cross-chain-yield`; other list ids still land here until
+  // per-grant contract reads ship.
+  const grant = useMemo(() => {
+    const detail = getCommitteeDemoGrantDetail();
+    if (!grantId || grantId === detail.id) return detail;
+    return { ...detail, id: grantId };
+  }, [grantId]);
 
   return (
     <CommitteeAppShell
       breadcrumb={[
-        { label: 'Dashboard', href: '/committee' },
-        { label: 'Review Queue', href: '/committee/reviews' },
+        { label: 'All Grants', href: '/committee/grants' },
         { label: grant.title },
       ]}
     >
