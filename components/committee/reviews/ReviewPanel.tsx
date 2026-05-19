@@ -11,6 +11,7 @@ import { useWaitForTransactionReceipt } from 'wagmi';
 import { Address, Hex } from 'viem';
 import { GRANT_ESCROW_ADDRESS, grantEscrowAbi } from '@/lib/escrow';
 import {
+  AlertTriangle,
   Check,
   CheckCircle2,
   Clock,
@@ -189,9 +190,9 @@ export default function ReviewPanel({
   const totalMembers = approversAfterFlow.length;
   const rejectionThreshold = totalMembers - submission.committeeRequired + 1;
   const rawQuorumOutcome: 'approved' | 'rejected' | null =
-    approvedCount >= submission.committeeRequired
+    totalMembers > 0 && approvedCount >= submission.committeeRequired
       ? 'approved'
-      : rejectedCount >= rejectionThreshold
+      : totalMembers > 0 && rejectedCount >= rejectionThreshold
         ? 'rejected'
         : null;
 
@@ -352,7 +353,7 @@ function VotingBlock({
   buttonsDisabled: boolean;
   quorumReached: boolean;
   quorumOutcome: 'approved' | 'rejected' | null;
-  flowState: { kind: string; intent: string; txHash?: string };
+  flowState: { kind: string; intent: string; txHash?: string; message?: string };
   onApprove: () => void;
   onReject: () => void;
   showLiveUpdates: boolean;
@@ -361,6 +362,13 @@ function VotingBlock({
   const displayedApprovers = quorumOutcome
     ? approvers.filter((a) => a.status !== 'pending')
     : approvers;
+
+  const isDeadlinePassed = useMemo(() => {
+    if (submission.payoutMode === 'superfluid' && submission.deadline) {
+      return Date.now() / 1000 >= submission.deadline;
+    }
+    return false;
+  }, [submission]);
 
   return (
     <section className="flex h-full flex-col gap-5 bg-slate-50/40 p-5 sm:p-6 lg:bg-white">
@@ -442,6 +450,28 @@ function VotingBlock({
       </div>
 
       <div className="mt-auto pt-2">
+        {flowState.kind === 'error' && (
+          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+            <p className="font-bold">Transaction failed</p>
+            <p className="mt-1 font-mono break-all leading-relaxed">{flowState.message}</p>
+          </div>
+        )}
+
+        {isDeadlinePassed && !quorumOutcome && !isVoted && (
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <div className="flex gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 animate-pulse" />
+              <div>
+                <p className="font-bold">Milestone Deadline Passed</p>
+                <p className="mt-1 leading-relaxed">
+                  This streaming milestone's deadline ({submission.deadline ? new Date(submission.deadline * 1000).toLocaleDateString() : '—'}) has passed.
+                  Approving this will fail on-chain because Sablier streams cannot be initialized with a past deadline. Please reject this submission or create a new grant with a future deadline.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {quorumOutcome === 'approved' ? (
           <QuorumApprovedBanner
             submission={submission}
@@ -467,9 +497,10 @@ function VotingBlock({
             </button>
             <button
               type="button"
-              disabled={buttonsDisabled}
+              disabled={buttonsDisabled || isDeadlinePassed}
               onClick={onApprove}
               className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              title={isDeadlinePassed ? "Cannot approve stream milestone with past deadline" : undefined}
             >
               <ThumbsUp className="h-4 w-4" strokeWidth={2.2} aria-hidden />
               Approve
@@ -602,7 +633,7 @@ function VotedChip({
       </span>
       {txHash ? (
         <a
-          href={`https://arbiscan.io/tx/${txHash}`}
+          href={`https://sepolia.arbiscan.io/tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-700"

@@ -163,6 +163,10 @@ export const useGrantCreationStore = create<GrantCreationState>()(
       addCommitteeMember: (address) =>
         set((state) => {
           if (state.committeeMembers.length >= 7) return state;
+          const already = state.committeeMembers.some(
+            (m) => m.toLowerCase() === address.toLowerCase()
+          );
+          if (already) return state;
           return { committeeMembers: [...state.committeeMembers, address] };
         }),
       removeCommitteeMember: (address) =>
@@ -218,9 +222,16 @@ export const useGrantCreationStore = create<GrantCreationState>()(
             obj.state && typeof obj.state === 'object' ? obj.state : (raw as PersistedGrantCreationState);
         }
         if (!parsed) return currentState;
+        const uniqueCommittee = parsed.committeeMembers
+          ? parsed.committeeMembers.filter(
+              (item, index, self) =>
+                self.findIndex((m) => m.toLowerCase() === item.toLowerCase()) === index
+            )
+          : [];
         return {
           ...currentState,
           ...parsed,
+          committeeMembers: uniqueCommittee,
           builderIdentity: parsed.builderIdentity
             ? {
                 ...parsed.builderIdentity,

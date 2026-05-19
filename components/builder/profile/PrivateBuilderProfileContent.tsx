@@ -27,7 +27,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 function arbiscanTxUrl(hash: string) {
-  return `https://arbiscan.io/tx/${hash}`;
+  return `https://sepolia.arbiscan.io/tx/${hash}`;
 }
 
 function reputationBarClass(score: number): string {

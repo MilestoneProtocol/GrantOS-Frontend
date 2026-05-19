@@ -2,6 +2,7 @@
 
 import OnboardingShell from '@/app/(onboarding)/OnboardingShell';
 import { isUiDemoMode } from '@/demo';
+import ReputationBadge from '@/components/ReputationBadge';
 import {
   getDaoDashboardSnapshot,
   gradeTone,
@@ -19,6 +20,8 @@ import {
   identityRegistryAbi,
 } from '@/lib/escrow';
 import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
+import { useEnrichedGrants } from '@/hooks/useEnrichedGrants';
+import { useBuilderReputations } from '@/hooks/useBuilderReputations';
 import { formatUnits, zeroAddress } from 'viem';
 import { useReadContract, useReadContracts } from 'wagmi';
 import {
@@ -64,6 +67,7 @@ export default function GrantsExplorerPage() {
     query: { enabled: CONTRACTS_READY },
   });
 
+  const { data: enrichedGrants, isLoading: isEnrichedLoading } = useEnrichedGrants();
   const grantCount = safeFactoryGrantCount(countData);
 
   const factoryGrantContracts = useMemo(() => {
@@ -122,57 +126,77 @@ export default function GrantsExplorerPage() {
     query: { enabled: builderAddresses.length > 0 },
   });
 
+  // Fetch reputation scores for all builders
+  const { reputations } = useBuilderReputations(
+    builderAddresses.filter((addr) => addr !== zeroAddress),
+  );
+
   const grants = useMemo((): DaoGrantCardModel[] => {
     if (isUiDemoMode() || !CONTRACTS_READY) {
       return getDaoDashboardSnapshot(0).grants;
     }
     if (!grantsData) return [];
-    const rows: DaoGrantCardModel[] = [];
-    grantsData.forEach((row: any, i: number) => {
-      if (row.status !== 'success' || !row.result) return;
-      const g = row.result;
-      const identity = (identitiesData?.[i] as any)?.result as
-        | { isVerified: boolean; tier: bigint; githubHandle: string }
-        | undefined;
+    return grantsData
+      .map((row: any, i: number) => {
+        if (row.status !== 'success' || !row.result) return null;
+        const g = row.result;
+        const identity = (identitiesData?.[i] as any)?.result as
+          | { isVerified: boolean; tier: bigint; githubHandle: string }
+          | undefined;
 
-      const totalUsdc = Number(
-        g.milestones.reduce((s: bigint, m: any) => s + m.amount, BigInt(0)) / BigInt(1_000_000),
-      );
-      const nextDeadline =
-        g.milestones[0]?.deadline > BigInt(0)
-          ? new Date(Number(g.milestones[0].deadline) * 1000).toISOString()
-          : null;
+        const totalUsdc = Number(
+          g.milestones.reduce((s: bigint, m: any) => s + m.amount, BigInt(0)) / BigInt(1000000),
+        );
 
-      rows.push({
-        slug: i.toString(),
-        displayId: `#GRT-${i}`,
-        builder: g.builder as `0x${string}`,
-        contributionTier: identity ? `Tier ${identity.tier} Contributor` : 'Contributor',
-        reputationScore: identity ? Number(identity.tier) * 25 + 15 : 0,
-        createdAtIso: new Date().toISOString(),
-        milestoneTotal: g.milestones.length,
-        milestoneCompleted: 0,
-        paymentMode: g.streaming ? 'streaming' : 'lump_sum',
-        zkVerified: identity?.isVerified ?? false,
-        isStreamingActive: g.streaming,
-        streamRateUsdcPerSec: 0,
-        streamAccumulatedUsdcAtEpoch: 0,
-        streamEpochMs: Date.now(),
-        nextDeadlineIso: nextDeadline,
-        totalGrantUsdc: totalUsdc,
-        hasWarning: false,
-        hasSlashed: false,
-        tags: g.streaming ? ['active', 'streaming'] : ['active'],
-        milestones: [],
-      });
-    });
-    return rows;
-  }, [grantsData, identitiesData]);
+        // Find enriched data from backend
+        const enriched = enrichedGrants?.find(eg => eg.onChainId === i);
+
+        const nextDeadline =
+          g.milestones[0]?.deadline > BigInt(0)
+            ? new Date(Number(g.milestones[0].deadline) * 1000).toISOString()
+            : null;
+
+        return {
+          slug: i.toString(),
+          displayId: `#GRT-${i}`,
+          builder: g.builder as `0x${string}`,
+          contributionTier: identity ? `Tier ${identity.tier} Contributor` : 'Contributor',
+          reputationScore: identity ? Number(identity.tier) * 25 + 15 : 0,
+          createdAtIso: new Date().toISOString(),
+          milestoneTotal: g.milestones.length,
+          milestoneCompleted: enriched?.completedMilestones || 0,
+          paymentMode: g.streaming ? 'streaming' : 'lump_sum',
+          zkVerified: identity?.isVerified ?? false,
+          isStreamingActive: g.streaming && !(g.milestones.length > 0 && (enriched?.completedMilestones || 0) === g.milestones.length),
+          streamRateUsdcPerSec: 0,
+          streamAccumulatedUsdcAtEpoch: 0,
+          streamEpochMs: Date.now(),
+          nextDeadlineIso: nextDeadline,
+          totalGrantUsdc: totalUsdc,
+          hasWarning: enriched?.hasWarning || false,
+          hasSlashed: enriched?.hasSlashed || false,
+          tags: (() => {
+            const isCompleted = g.milestones.length > 0 && (enriched?.completedMilestones || 0) === g.milestones.length;
+            const t = [];
+            if (isCompleted) {
+              t.push('completed');
+            } else if (g.streaming) {
+              t.push('streaming');
+            } else {
+              t.push('active');
+            }
+            return t;
+          })(),
+          milestones: [],
+        };
+      })
+      .filter((x) => x !== null) as DaoGrantCardModel[];
+  }, [grantsData, identitiesData, enrichedGrants]);
 
   const isLoading =
     CONTRACTS_READY &&
     !isUiDemoMode() &&
-    (isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading);
+    (isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading || isEnrichedLoading);
 
   const [filter, setFilter] = useState<ExplorerFilter>('all');
   const [query, setQuery] = useState('');
@@ -180,20 +204,8 @@ export default function GrantsExplorerPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return grants.filter((g) => {
-      const matchesFilter =
-        filter === 'all'
-          ? true
-          : filter === 'streaming'
-            ? g.isStreamingActive
-            : filter === 'active'
-              ? g.tags.includes('active')
-              : filter === 'completed'
-                ? g.tags.includes('completed')
-                : filter === 'warning'
-                  ? g.hasWarning && !g.hasSlashed
-                  : filter === 'slashed'
-                    ? g.hasSlashed
-                    : true;
+      const status = computeStatus(g);
+      const matchesFilter = filter === 'all' || status === filter;
       if (!matchesFilter) return false;
       if (!q) return true;
       return (
@@ -328,9 +340,10 @@ export default function GrantsExplorerPage() {
             <EmptyState onClear={() => { setFilter('all'); setQuery(''); }} />
           ) : (
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((g) => (
-                <GrantExplorerCard key={g.slug} grant={g} />
-              ))}
+              {filtered.map((g) => {
+                const reputation = reputations.get(g.builder.toLowerCase());
+                return <GrantExplorerCard key={g.slug} grant={g} reputation={reputation} />;
+              })}
             </div>
           )}
         </div>
@@ -371,13 +384,11 @@ function ExplorerStat({
   );
 }
 
-function GrantExplorerCard({ grant }: { grant: DaoGrantCardModel }) {
+function GrantExplorerCard({ grant, reputation }: { grant: DaoGrantCardModel; reputation?: any }) {
   const progress =
     grant.milestoneTotal > 0
       ? Math.min(100, Math.round((grant.milestoneCompleted / grant.milestoneTotal) * 100))
       : 0;
-  const grade = letterGradeFromScore(grant.reputationScore);
-  const gradeChip = gradeChipClass(gradeTone(grant.reputationScore));
   const status = computeStatus(grant);
 
   return (
@@ -413,12 +424,14 @@ function GrantExplorerCard({ grant }: { grant: DaoGrantCardModel }) {
             <span className="text-xs font-semibold text-slate-500">USDC</span>
           </p>
         </div>
-        <div
-          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ring-inset ${gradeChip}`}
-        >
-          <BadgeCheck className="h-3 w-3" />
-          {grade} · Rep {grant.reputationScore}
-        </div>
+        {reputation && (
+          <ReputationBadge
+            score={reputation.score}
+            letterGrade={reputation.letterGrade}
+            size="sm"
+            zkVerified={grant.zkVerified}
+          />
+        )}
       </div>
 
       <div className="relative mt-5">
@@ -602,7 +615,8 @@ function computeStatus(
 ): 'active' | 'streaming' | 'completed' | 'warning' | 'slashed' {
   if (g.hasSlashed) return 'slashed';
   if (g.hasWarning) return 'warning';
-  if (g.tags.includes('completed')) return 'completed';
+  const isCompleted = g.milestoneTotal > 0 && g.milestoneCompleted === g.milestoneTotal;
+  if (isCompleted) return 'completed';
   if (g.isStreamingActive) return 'streaming';
   return 'active';
 }

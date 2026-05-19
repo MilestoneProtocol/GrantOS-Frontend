@@ -95,7 +95,7 @@ function buildSlashMilestone(task: CommitteeTask): OverdueMilestone {
     state: {
       kind: 'slash_available',
       warningIssuedAtIso: task.warningIssuedAtIso ?? new Date().toISOString(),
-      attestationUrl: 'https://arbitrum.easscan.org/attestation/view/0x0',
+      attestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0x0',
     },
     builderAddress: task.builderAddress,
     escrowBalanceUsdc: 10_000,
@@ -273,7 +273,14 @@ export default function TaskCard({ task, onComplete, removing }: TaskCardProps) 
         amountLabel={amountLabel}
         flowState={slashFlow.state}
         onCancel={() => setSlashOpen(false)}
-        onConfirm={() => slashFlow.start()}
+        onConfirm={() =>
+          slashFlow.start({
+            grantId: parseInt(task.grantId),
+            milestoneIndex: task.milestoneIndex,
+            escrowAddress: '0x0000000000000000000000000000000000000000',
+            amountUsdc: '10000',
+          })
+        }
       />
     </article>
   );

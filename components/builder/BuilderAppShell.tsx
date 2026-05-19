@@ -81,7 +81,7 @@ export default function BuilderAppShell({ children, navActive }: BuilderAppShell
     activeWarningCount,
     reputationScore,
     activeGrantCount,
-    chainName: chain?.name ?? 'Arbitrum One',
+    chainName: mounted && chain?.name ? chain.name : 'Arbitrum Sepolia',
   };
 
   return (

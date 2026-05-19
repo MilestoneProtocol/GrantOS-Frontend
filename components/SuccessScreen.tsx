@@ -88,7 +88,7 @@ export default function SuccessScreen({
             Grant Successfully Created!
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Your grant has been deployed to the GrantEscrow smart contract on Arbitrum One and is now
+            Your grant has been deployed to the GrantEscrow smart contract on Arbitrum Sepolia and is now
             live.
           </p>
         </div>

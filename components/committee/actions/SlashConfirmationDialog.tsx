@@ -1,6 +1,6 @@
 'use client';
 
-import { buildArbiscanTxUrl, type SlashFlowState } from '@/lib/slash-flow';
+import { buildArbiscanTxUrl, type SlashFlowState, type SlashFlowParams } from '@/lib/slash-flow';
 import {
   AlertOctagon,
   Building2,
@@ -20,7 +20,9 @@ type SlashConfirmationDialogProps = {
   amountLabel: string;
   flowState: SlashFlowState;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (params?: SlashFlowParams) => void;
+  /** Production mode parameters */
+  slashParams?: SlashFlowParams;
 };
 
 /**
@@ -46,6 +48,7 @@ export default function SlashConfirmationDialog({
   flowState,
   onCancel,
   onConfirm,
+  slashParams,
 }: SlashConfirmationDialogProps) {
   const txInFlight = flowState.kind === 'confirming' || flowState.kind === 'submitted';
 

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { maxUint256, parseUnits } from 'viem';
-import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 
 type ReviewConfirmProps = {
   builderAddress: string;
@@ -29,7 +29,7 @@ type ReviewConfirmProps = {
   quorum: number;
   paymentMode: PaymentMode;
   onBack: () => void;
-  onSuccess: (grantTxHash: string) => void;
+  onSuccess: (grantTxHash: string, onChainId: number) => void;
 };
 
 function shortenAddress(addr: string) {
@@ -59,6 +59,17 @@ export default function ReviewConfirm({
     () => milestones.reduce((sum, m) => sum + Number(m.amount || 0), 0),
     [milestones]
   );
+  const { address: userAddress } = useAccount();
+
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: USDC_ADDRESS,
+    abi: usdcAbi,
+    functionName: 'allowance',
+    args: userAddress && GRANT_FACTORY_ADDRESS ? [userAddress, GRANT_FACTORY_ADDRESS] : undefined,
+    query: {
+      enabled: Boolean(userAddress && GRANT_FACTORY_ADDRESS),
+    }
+  });
 
   /* ── Approve USDC tx ─────────────────────────────────────────── */
   const {
@@ -74,6 +85,18 @@ export default function ReviewConfirm({
     isSuccess: approveIsConfirmed,
     error: approveReceiptError,
   } = useWaitForTransactionReceipt({ hash: approveHash });
+
+  const isAllowanceSufficient = useMemo(() => {
+    if (allowance === undefined) return false;
+    const required = parseUnits(String(totalUsdc), USDC_DECIMALS);
+    return allowance >= required;
+  }, [allowance, totalUsdc]);
+
+  useEffect(() => {
+    if (approveIsConfirmed) {
+      refetchAllowance();
+    }
+  }, [approveIsConfirmed, refetchAllowance]);
 
   /* ── Create Grant tx ─────────────────────────────────────────── */
   const {
@@ -100,13 +123,13 @@ export default function ReviewConfirm({
     if (!createIsConfirmed || !createHash || !createReceipt) return;
 
     const indexInBackend = async () => {
+      let onChainId = 0;
       try {
         // Find the GrantCreated event in logs
         const log = createReceipt.logs.find(
           (l) => l.address.toLowerCase() === GRANT_FACTORY_ADDRESS.toLowerCase()
         );
         
-        let onChainId = 0;
         let escrowAddr = '0x0000000000000000000000000000000000000000';
 
         if (log) {
@@ -142,11 +165,11 @@ export default function ReviewConfirm({
           body: JSON.stringify(payload),
         });
 
-        onSuccess(createHash);
+        onSuccess(createHash, onChainId);
       } catch (err) {
         console.error('Failed to index grant in backend:', err);
         // Still proceed to success screen so user sees their tx
-        onSuccess(createHash);
+        onSuccess(createHash, onChainId);
       }
     };
 
@@ -176,7 +199,7 @@ export default function ReviewConfirm({
   }, [createErrorKey, showCreateError]);
 
   /* ── Derived states ──────────────────────────────────────────── */
-  const approveStage: 'idle' | 'signing' | 'confirming' | 'done' = approveIsConfirmed
+  const approveStage: 'idle' | 'signing' | 'confirming' | 'done' = isAllowanceSufficient || approveIsConfirmed
     ? 'done'
     : approveIsConfirming
     ? 'confirming'
@@ -528,7 +551,7 @@ export default function ReviewConfirm({
               ) : null}
               {approveHash && (
                 <a
-                  href={`https://arbiscan.io/tx/${approveHash}`}
+                  href={`https://sepolia.arbiscan.io/tx/${approveHash}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-center gap-1 text-xs font-medium text-indigo-600 hover:underline"
@@ -585,7 +608,7 @@ export default function ReviewConfirm({
               ) : null}
               {createHash && (
                 <a
-                  href={`https://arbiscan.io/tx/${createHash}`}
+                  href={`https://sepolia.arbiscan.io/tx/${createHash}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-center gap-1 text-xs font-medium text-indigo-600 hover:underline"

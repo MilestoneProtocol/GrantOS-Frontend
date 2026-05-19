@@ -5,16 +5,16 @@ import { config } from '@/lib/wagmi';
 import { AlertTriangle, Copy, ExternalLink } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type { Address } from 'viem';
-import { arbitrum } from 'viem/chains';
+import { arbitrumSepolia } from 'viem/chains';
 import { useAccount, useSwitchChain } from 'wagmi';
 
 const REPUTATION_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REPUTATION_REGISTRY_ADDRESS ||
   '0x0000000000000000000000000000000000000003') as Address;
 
-const ARBITRUM_ONE_ID = arbitrum.id;
+const TARGET_CHAIN_ID = arbitrumSepolia.id;
 
 function arbiscanAddressUrl(address: string) {
-  return `https://arbiscan.io/address/${address}`;
+  return `https://sepolia.arbiscan.io/address/${address}`;
 }
 
 function ContractRow({
@@ -63,19 +63,19 @@ export default function NetworkTab() {
   const { chain, isConnected } = useAccount();
   const { switchChain, isPending } = useSwitchChain();
 
-  const onArbitrumOne = chain?.id === ARBITRUM_ONE_ID;
-  const targetChain = config.chains.find((c) => c.id === ARBITRUM_ONE_ID) ?? arbitrum;
+  const onTargetChain = chain?.id === TARGET_CHAIN_ID;
+  const targetChain = config.chains.find((c) => c.id === TARGET_CHAIN_ID) ?? arbitrumSepolia;
 
   return (
     <div className="space-y-5">
-      {!onArbitrumOne && isConnected ? (
+      {!onTargetChain && isConnected ? (
         <div
           role="alert"
           className="flex gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
         >
           <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
           <p className="font-medium">
-            GrantOS v3 runs on Arbitrum One — please switch networks.
+            GrantOS v3 runs on Arbitrum Sepolia — please switch networks.
           </p>
         </div>
       ) : null}
@@ -90,7 +90,7 @@ export default function NetworkTab() {
         <p className="mt-0.5 font-mono text-xs text-slate-500">Chain ID: {chain?.id ?? '—'}</p>
         <button
           type="button"
-          disabled={!isConnected || isPending || onArbitrumOne}
+          disabled={!isConnected || isPending || onTargetChain}
           onClick={() => switchChain({ chainId: targetChain.id })}
           className="mt-4 w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-600 dark:hover:bg-blue-500 sm:w-auto sm:min-w-[200px]"
         >

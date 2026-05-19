@@ -195,7 +195,7 @@ function SectionSlashing() {
           <strong>Step 2 — Committee identifies the overdue milestone.</strong> On the /committee page and the /tasks page, overdue milestones display a red OVERDUE badge. The normal Approve and Reject voting buttons are replaced with Warning and Slash controls.
         </GuidelinesListItem>
         <GuidelinesListItem>
-          <strong>Step 3 — Committee issues a warning EAS attestation.</strong> The committee member clicks Issue Warning, writes a warning message, and submits the EAS attestation onchain. The attestation is written to Arbitrum One permanently. The builder sees the warning immediately on their dashboard with a live countdown.
+          <strong>Step 3 — Committee issues a warning EAS attestation.</strong> The committee member clicks Issue Warning, writes a warning message, and submits the EAS attestation onchain. The attestation is written to Arbitrum Sepolia permanently. The builder sees the warning immediately on their dashboard with a live countdown.
         </GuidelinesListItem>
         <GuidelinesListItem>
           <strong>Step 4 — 24-hour window.</strong> From the warning timestamp, the builder has 24 hours. The slash button remains locked during this window. The committee member can see the live countdown on their /tasks and /committee pages.
@@ -280,9 +280,9 @@ function SectionContracts() {
   return (
     <SectionShell
       id="contracts"
-      lead="All contracts are deployed on Arbitrum One, verified on Arbiscan, and open source."
+      lead="All contracts are deployed on Arbitrum Sepolia, verified on Arbiscan, and open source."
     >
-      <GuidelinesSubheading>All contracts are deployed on Arbitrum One, verified on Arbiscan, and open source.</GuidelinesSubheading>
+      <GuidelinesSubheading>All contracts are deployed on Arbitrum Sepolia, verified on Arbiscan, and open source.</GuidelinesSubheading>
       <GuidelinesContractsTable />
       <GuidelinesBody>
         All contracts are open source. You can read every function, every mapping, every event. There are no hidden admin functions. There are no upgrade proxies. What you see is what runs.

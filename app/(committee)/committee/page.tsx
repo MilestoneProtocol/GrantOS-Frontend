@@ -14,7 +14,6 @@ import {
   type MilestoneActivityEvent,
   type OverdueMilestone,
   type OverdueMilestoneState,
-  type PendingReviewSummary,
 } from '@/demo/committee-demo';
 import {
   markBuilderWarningSlashed,
@@ -68,7 +67,7 @@ const PLACEHOLDER_COMMITTEE_ADDRESS: `0x${string}` =
 
 /** Default Arbitrum EAS scan URL builder for a given attestation UID. */
 function buildEasScanUrl(attestationUid: string): string {
-  return `https://arbitrum.easscan.org/attestation/view/${attestationUid}`;
+  return `https://arbitrum-sepolia.easscan.org/attestation/view/${attestationUid}`;
 }
 
 /** True when the UI demo flag is on; chosen at module load. */
@@ -90,19 +89,18 @@ export default function CommitteeDashboardPage() {
   const { data: realData, loading: reviewsLoading } = useCommitteeReviews();
 
   const actions = useMemo(() => {
-    const demoActions = getCommitteeDemoActions();
-    const pendingReview: PendingReviewSummary[] = realData.pending.map((s, i) => ({
-      id: s.id,
-      grantId: s.grantId,
-      grantTitle: s.grantTitle,
-      milestoneTitle: s.milestoneTitle,
-      submittedLabel: demoActions.pendingReview[i]?.submittedLabel ?? 'Recently submitted',
-      deadlineIso: demoActions.pendingReview[i]?.deadlineIso ?? '2026-06-01',
+    const mappedPending = realData.pending.map((submission) => ({
+      id: submission.id,
+      grantId: submission.grantId,
+      grantTitle: submission.grantTitle,
+      milestoneTitle: submission.milestoneTitle,
+      submittedLabel: 'recently',
+      deadlineIso: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     }));
     return {
-      pendingReview,
+      pendingReview: mappedPending,
       pendingReviewCount: realData.totalPending,
-      overdue: IS_UI_DEMO ? demoActions.overdue : ([] as OverdueMilestone[]),
+      overdue: [] as OverdueMilestone[], // Overdue logic to be implemented via backend indexing
     };
   }, [realData]);
 
@@ -294,7 +292,7 @@ export default function CommitteeDashboardPage() {
         const attestationUrl =
           base.state.kind === 'warning_issued' || base.state.kind === 'slash_available'
             ? base.state.attestationUrl
-            : 'https://arbitrum.easscan.org';
+            : 'https://arbitrum-sepolia.easscan.org';
 
         const slashedActivityEvent: MilestoneActivityEvent = {
           id: `evt-slashed-${payload.txHash.slice(2, 10)}`,

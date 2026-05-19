@@ -150,7 +150,7 @@ export default function OnchainSubmitStep() {
       // "Proof not bound to grantee" errors from stale sessionStorage.
       if (finalPublicInputs.length >= 5 && address) {
         const walletAddr = BigInt(address);
-        const addrHi = (walletAddr >> BigInt(128)) & BigInt('0xffffffff');
+        const addrHi = (walletAddr >> BigInt(128)) & BigInt(0xffffffff);
         const addrLo = walletAddr & ((BigInt(1) << BigInt(128)) - BigInt(1));
         
         finalPublicInputs = [...finalPublicInputs];

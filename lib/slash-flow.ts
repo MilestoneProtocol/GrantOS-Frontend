@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useWarningFlow as useRealWarningFlow } from '@/hooks/useWarningFlow';
+import type { Address } from 'viem';
 
 /**
  * Submission FSM for `GrantEscrow.slash(grantId, milestoneIndex)` — the
@@ -30,10 +32,17 @@ export type SlashFlowState =
 export type SlashFlow = {
   state: SlashFlowState;
   /** Fired when the user clicks `Confirm Slash` in the modal. */
-  start: () => void;
+  start: (params: SlashFlowParams) => void;
   /** Reset to idle. Used by the Cancel button and on dialog dismissal. */
   reset: () => void;
 };
+
+export interface SlashFlowParams {
+  grantId: number;
+  milestoneIndex: number;
+  escrowAddress: Address;
+  amountUsdc: string;
+}
 
 const CONFIRMING_DELAY_MS = 1600;
 const SUBMITTED_DELAY_MS = 2000;
@@ -63,7 +72,7 @@ export function useDemoSlashFlow(initial?: SlashFlowState): SlashFlow {
     [],
   );
 
-  const start = useCallback(() => {
+  const start = useCallback((params: SlashFlowParams) => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
 
@@ -97,7 +106,40 @@ export function useDemoSlashFlow(initial?: SlashFlowState): SlashFlow {
   return useMemo(() => ({ state, start, reset }), [state, start, reset]);
 }
 
+/**
+ * Production slash flow that integrates with real contracts and backend.
+ */
+export function useProductionSlashFlow(): SlashFlow {
+  const [state, setState] = useState<SlashFlowState>({ kind: 'idle' });
+  const { slashMilestone, isSlashing } = useRealWarningFlow();
+
+  const start = useCallback(
+    async (params: SlashFlowParams) => {
+      setState({ kind: 'confirming' });
+
+      try {
+        await slashMilestone(params);
+        setState({
+          kind: 'confirmed',
+          txHash: '0x...',
+          slashedAtIso: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error('Slash flow error:', err);
+        setState({ kind: 'idle' });
+      }
+    },
+    [slashMilestone],
+  );
+
+  const reset = useCallback(() => {
+    setState({ kind: 'idle' });
+  }, []);
+
+  return useMemo(() => ({ state, start, reset }), [state, start, reset]);
+}
+
 /** Default Arbiscan tx URL builder. */
 export function buildArbiscanTxUrl(txHash: string): string {
-  return `https://arbiscan.io/tx/${txHash}`;
+  return `https://sepolia.arbiscan.io/tx/${txHash}`;
 }

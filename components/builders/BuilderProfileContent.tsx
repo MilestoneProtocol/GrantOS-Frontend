@@ -17,7 +17,7 @@ function shorten(a: string) {
 }
 
 function arbiscanTxUrl(hash: string) {
-  return `https://arbiscan.io/tx/${hash}`;
+  return `https://sepolia.arbiscan.io/tx/${hash}`;
 }
 
 function reputationBarClass(score: number): string {

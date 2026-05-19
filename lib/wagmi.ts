@@ -2,18 +2,18 @@ import { createConfig, createStorage, http } from 'wagmi';
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors';
 import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
 
-const sessionStorageAdapter = {
+const localStorageAdapter = {
   getItem(key: string) {
     if (typeof window === 'undefined') return null;
-    return window.sessionStorage.getItem(key);
+    return window.localStorage.getItem(key);
   },
   setItem(key: string, value: string) {
     if (typeof window === 'undefined') return;
-    window.sessionStorage.setItem(key, value);
+    window.localStorage.setItem(key, value);
   },
   removeItem(key: string) {
     if (typeof window === 'undefined') return;
-    window.sessionStorage.removeItem(key);
+    window.localStorage.removeItem(key);
   },
 };
 
@@ -46,7 +46,7 @@ const connectors =
           metadata: {
             name: 'GrantOS v3',
             description: 'Onchain grant enforcement protocol',
-            url: 'https://grantos.local',
+            url: typeof window !== 'undefined' ? window.location.origin : 'https://grantos.local',
             icons: [],
           },
         }),
@@ -79,6 +79,6 @@ export const config = createConfig({
   },
   ssr: true,
   storage: createStorage({
-    storage: sessionStorageAdapter,
+    storage: localStorageAdapter,
   }),
 });

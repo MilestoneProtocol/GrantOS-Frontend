@@ -39,11 +39,11 @@ function AddressActions({ address }: { address: string }) {
 
 export default function GuidelinesContractsTable() {
   return (
-    <GuidelinesScrollTable caption="Smart contract addresses on Arbitrum One">
+    <GuidelinesScrollTable caption="Smart contract addresses on Arbitrum Sepolia">
       <thead>
         <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
           <th className="px-4 py-3">Contract</th>
-          <th className="px-4 py-3">Address (Arbitrum One)</th>
+          <th className="px-4 py-3">Address (Arbitrum Sepolia)</th>
           <th className="px-4 py-3">Actions</th>
         </tr>
       </thead>

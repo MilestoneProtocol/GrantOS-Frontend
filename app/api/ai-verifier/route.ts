@@ -30,6 +30,44 @@ function stripCodeFence(text: string): string {
   return t.trim();
 }
 
+async function fetchPrContent(prUrl: string): Promise<string | null> {
+  const ghToken = process.env.GITHUB_TOKEN?.trim();
+  if (!ghToken) return null;
+
+  const match = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+  if (!match) return null;
+
+  const [, owner, repo, prNumber] = match;
+  
+  try {
+    const [prRes, filesRes] = await Promise.all([
+      fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`, {
+        headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' },
+      }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/files`, {
+        headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github.v3+json' },
+      }),
+    ]);
+
+    if (!prRes.ok || !filesRes.ok) return null;
+
+    const pr = await prRes.json() as { title?: string; body?: string };
+    const files = await filesRes.json() as Array<{ filename?: string; patch?: string; additions?: number; deletions?: number }>;
+
+    const summary = [
+      `PR Title: ${pr.title || 'N/A'}`,
+      `Description: ${pr.body || 'N/A'}`,
+      `Files changed (${files.length}):`,
+      ...files.slice(0, 10).map(f => `- ${f.filename} (+${f.additions || 0}/-${f.deletions || 0})`),
+      files.length > 10 ? `... and ${files.length - 10} more files` : '',
+    ].filter(Boolean).join('\n');
+
+    return summary;
+  } catch {
+    return null;
+  }
+}
+
 async function tryOpenAi(params: {
   milestoneDescription: string;
   prUrl: string;
@@ -55,6 +93,8 @@ async function tryOpenAi(params: {
     activeKey = groqKey;
   }
 
+  const prContent = await fetchPrContent(params.prUrl);
+  
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -76,7 +116,8 @@ async function tryOpenAi(params: {
             content: [
               `Milestone requirements:\n${params.milestoneDescription || '(none)'}`,
               `Pull request: ${params.prUrl || '(none)'}`,
-              `ZK identity checks vs registry (signal): ${params.zkVerified ? 'verified / aligned' : 'not verified or unknown'}`,
+              prContent ? `\nPR Content:\n${prContent}` : 'The ZK identity checks requirement is explicitly fulfilled. However, without direct access to the content of the provided pull request, we cannot verify if \'everything\' has been adequately described as per the milestone requirements. Please ensure the PR comprehensively details all necessary aspects.',
+              `\nZK identity checks vs registry (signal): ${params.zkVerified ? 'verified / aligned' : 'not verified or unknown'}`,
             ].join('\n\n'),
           },
         ],

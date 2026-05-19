@@ -112,16 +112,17 @@ const builderListAbis = [
 type GrantTuple = {
   builder: Address;
   streaming: boolean;
-  committee: Address[];
+  committee: readonly Address[];
   quorum: bigint;
   createdAt: bigint;
-  milestones: Array<{
+  milestones: readonly {
     title: string;
     description: string;
     amount: bigint;
     deadline: bigint;
     proofType: number;
-  }>;
+    state: number;
+  }[];
 };
 
 const MILESTONE_PENDING = 0;
@@ -417,12 +418,24 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
         const accountCreationYear = Number(idObj.createdYear ?? idObj[3] ?? 0);
         const contributionTier = Number(idObj.tier ?? idObj[1] ?? 0);
 
+        let reputationScore = 0;
+        try {
+          const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+          const repRes = await fetch(`${backendUrl}/api/v1/grants/builder/${address}/reputation`);
+          if (repRes.ok) {
+            const repData = await repRes.json();
+            reputationScore = repData.score || 0;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch reputation from backend in loadBuilderProfile:', e);
+        }
+
         identity = {
           zkVerified,
           githubHandle,
           accountCreationYear,
           contributionTier,
-          reputationScore: 0,
+          reputationScore,
         };
 
         hasIdentityRecord =

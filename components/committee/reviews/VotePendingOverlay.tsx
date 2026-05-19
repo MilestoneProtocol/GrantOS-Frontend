@@ -17,7 +17,7 @@ export type VotePendingOverlayProps = {
 };
 
 function defaultExplorerUrl(txHash: string) {
-  return `https://arbiscan.io/tx/${txHash}`;
+  return `https://sepolia.arbiscan.io/tx/${txHash}`;
 }
 
 /**

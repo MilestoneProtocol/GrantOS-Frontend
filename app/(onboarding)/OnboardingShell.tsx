@@ -53,12 +53,18 @@ export default function OnboardingShell({
   const bare = variant === 'bare';
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
 
   const closeDrawer = useCallback(() => setMobileNavOpen(false), []);
-  const chainName = chain?.name ?? 'Arbitrum One';
+  const chainName = mounted && chain?.name ? chain.name : 'Arbitrum Sepolia';
 
   return (
     <div className="relative flex min-h-screen w-full bg-white text-slate-900">

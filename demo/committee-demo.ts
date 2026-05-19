@@ -88,6 +88,7 @@ export type CommitteeReviewSubmission = {
   finalOutcome?: 'approved' | 'rejected';
   /** Optional rejection reason copied from the deciding voter's EAS attestation. */
   rejectionReason?: string;
+  deadline?: number;
 };
 
 export type CommitteeReviewsView = {
@@ -127,7 +128,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     ],
     builderSummary:
       'Completed the UI overhaul for the swap interface. Integrated 1inch router for better rates. Live preview is available at the provided link.',
-    easAttestationUrl: 'https://arbitrum.easscan.org/attestation/view/0xabc',
+    easAttestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0xabc',
     githubPrUrl: 'https://github.com/example/defi-aggregator/pull/214',
     committeeRequired: 3,
     approvers: [
@@ -160,7 +161,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     ],
     builderSummary:
       'Shipped the discovery page MVP with a faceted search. Lighthouse scores attached in the PR description.',
-    easAttestationUrl: 'https://arbitrum.easscan.org/attestation/view/0x123',
+    easAttestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0x123',
     githubPrUrl: 'https://github.com/example/public-goods/pull/9',
     committeeRequired: 3,
     approvers: [
@@ -193,7 +194,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     ],
     builderSummary:
       'Drafted the architecture for the identity binding circuits with notarised constraints. Documentation and tests are linked in the PR.',
-    easAttestationUrl: 'https://arbitrum.easscan.org/attestation/view/0xdef',
+    easAttestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0xdef',
     githubPrUrl: 'https://github.com/example/zk-identity/pull/42',
     committeeRequired: 3,
     approvers: [
@@ -228,7 +229,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     ],
     builderSummary:
       'Deployed the swap and router contracts to Arbitrum. Tests and gas reports are attached.',
-    easAttestationUrl: 'https://arbitrum.easscan.org/attestation/view/0x456',
+    easAttestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0x456',
     githubPrUrl: 'https://github.com/example/defi-aggregator/pull/198',
     committeeRequired: 3,
     approvers: [
@@ -262,7 +263,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     ],
     builderSummary:
       'Compiled the scoping doc and risk register with the committee. Linked all artefacts in the PR.',
-    easAttestationUrl: 'https://arbitrum.easscan.org/attestation/view/0x789',
+    easAttestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0x789',
     githubPrUrl: 'https://github.com/example/zk-identity/pull/12',
     committeeRequired: 3,
     approvers: [
@@ -296,7 +297,7 @@ export function getCommitteeDemoActiveReviews(): CommitteeReviewsView {
     ],
     builderSummary:
       'Backfilled the last 90 days of pool events into the warehouse. Reconciliation script attached.',
-    easAttestationUrl: 'https://arbitrum.easscan.org/attestation/view/0xfa1',
+    easAttestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0xfa1',
     githubPrUrl: 'https://github.com/example/analytics-dashboard/pull/57',
     committeeRequired: 3,
     approvers: [
@@ -714,7 +715,7 @@ export function getCommitteeDemoActions(): CommitteeActionsView {
         kind: 'warning_issued',
         warningIssuedAtIso,
         slashUnlocksAtIso,
-        attestationUrl: 'https://arbitrum.easscan.org/attestation/view/0xdeadbeef',
+        attestationUrl: 'https://arbitrum-sepolia.easscan.org/attestation/view/0xdeadbeef',
         committeeMemberAddress: '0x1Ab43e5cF0123Ee9d8C4B2A0bE1FFcD12Aa9F022',
         message:
           'Submit deliverables for the Smart Contract Audit milestone or this grant will be slashed.',
