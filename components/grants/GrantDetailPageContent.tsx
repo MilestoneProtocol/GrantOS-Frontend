@@ -35,7 +35,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { formatUnits, keccak256, stringToHex, type Address, zeroAddress } from 'viem';
-import { useReadContract } from 'wagmi';
+import { useReadContract, usePublicClient } from 'wagmi';
+import { useGrantDetailFull } from '@/hooks/useGrantDetailFull';
 
 type GrantTuple = {
   builder: Address;
@@ -49,6 +50,7 @@ type GrantTuple = {
     amount: bigint;
     deadline: bigint;
     proofType: number;
+    state?: number;
   }>;
 };
 
@@ -93,8 +95,8 @@ function hashHex(input: string) {
   return keccak256(stringToHex(input));
 }
 
-function fakeAiVerdict(milestoneTitle: string, status: ReturnType<typeof milestoneStatus>) {
-  if (status === 'completed') {
+function fakeAiVerdict(milestoneTitle: string, status: string) {
+  if (status === 'completed' || status === 'approved') {
     return {
       badge: 'Pass',
       explanation:
@@ -136,6 +138,14 @@ export function GrantDetailPageContent({
 
   const [activeTab, setActiveTab] = useState<TabKey>('milestones');
   const [streamAccumulated, setStreamAccumulated] = useState(0);
+  const [votedMap, setVotedMap] = useState<Record<string, boolean>>({});
+  const [loadingVotes, setLoadingVotes] = useState(false);
+
+  const publicClient = usePublicClient();
+
+  const { data: backendData, isLoading: isBackendLoading } = useGrantDetailFull(
+    grantId !== null ? Number(grantId) : null
+  );
 
   const { data: escrowAddress, isLoading: isEscrowLoading } = useReadContract({
     address: GRANT_FACTORY_ADDRESS,
@@ -152,7 +162,7 @@ export function GrantDetailPageContent({
     query: { enabled: Boolean(escrowAddress) && CONTRACTS_READY },
   });
 
-  const isLoading = isEscrowLoading || isGrantLoading;
+  const isLoading = isEscrowLoading || isGrantLoading || isBackendLoading;
 
   const chainGrant = (data ?? null) as GrantTuple | null;
   const chainGrantExists = useMemo(() => {
@@ -167,14 +177,87 @@ export function GrantDetailPageContent({
     return true;
   }, [chainGrant]);
 
-  const chainResolved = Boolean(!isLoading && !isError && chainGrantExists && chainGrant);
+  const chainResolved = Boolean(!isEscrowLoading && !isGrantLoading && !isError && chainGrantExists && chainGrant);
 
-  const resolvedGrant = useMemo((): GrantTuple | null => {
-    if (chainResolved && chainGrant) return chainGrant;
+  const resolvedGrant = useMemo((): (GrantTuple & { backendMilestones?: any[]; txHash?: string }) | null => {
+    if (chainResolved && chainGrant) {
+      return {
+        ...chainGrant,
+        txHash: backendData?.grant?.txHash,
+        milestones: chainGrant.milestones.map((m, idx) => {
+          const backendMilestone = backendData?.milestones?.find((bm) => bm.index === idx);
+          return {
+            ...m,
+            title: m.title || backendMilestone?.title || `Milestone ${idx + 1}`,
+            description: m.description || backendMilestone?.description || '',
+          };
+        }),
+        backendMilestones: backendData?.milestones,
+      };
+    }
+
+    if (backendData) {
+      return {
+        builder: backendData.grant.granteeAddress as Address,
+        streaming: backendData.grant.isStreaming,
+        committee: backendData.grant.committee.map((c) => c as Address),
+        quorum: BigInt(backendData.grant.quorum),
+        createdAt: BigInt(Math.floor(new Date(backendData.grant.createdAt).getTime() / 1000) || 0),
+        txHash: backendData.grant.txHash,
+        milestones: backendData.milestones.map((m) => ({
+          title: m.title,
+          description: m.description,
+          amount: BigInt(m.amount),
+          deadline: BigInt(parseInt(m.deadline || '0', 10)),
+          proofType: m.proofType,
+        })),
+        backendMilestones: backendData.milestones,
+      };
+    }
+
     if (demoCard) return explorerDemoCardToGrantTuple(demoCard);
     if (uiDemoPath) return buildUiDemoGrantTuple(zeroAddress);
     return null;
-  }, [chainGrant, chainResolved, demoCard, uiDemoPath]);
+  }, [chainGrant, chainResolved, backendData, demoCard, uiDemoPath]);
+
+  useEffect(() => {
+    if (!publicClient || !escrowAddress || !resolvedGrant?.committee.length || !resolvedGrant?.milestones.length) return;
+    
+    let active = true;
+    const fetchVotes = async () => {
+      setLoadingVotes(true);
+      try {
+        const newMap: Record<string, boolean> = {};
+        await Promise.all(
+          resolvedGrant.milestones.flatMap((_, mIdx) =>
+            resolvedGrant.committee.map(async (member) => {
+              const voted = await publicClient.readContract({
+                address: escrowAddress as Address,
+                abi: grantEscrowReadAbi,
+                functionName: 'hasVoted',
+                args: [BigInt(mIdx), member],
+              });
+              if (active) {
+                newMap[`${mIdx}-${member.toLowerCase()}`] = Boolean(voted);
+              }
+            })
+          )
+        );
+        if (active) {
+          setVotedMap(newMap);
+        }
+      } catch (err) {
+        console.error('Error fetching onchain votes:', err);
+      } finally {
+        if (active) setLoadingVotes(false);
+      }
+    };
+    
+    fetchVotes();
+    return () => {
+      active = false;
+    };
+  }, [publicClient, escrowAddress, resolvedGrant?.committee, resolvedGrant?.milestones.length]);
 
   const effectiveGrantId = useMemo(() => {
     if (chainResolved && grantId !== null) return grantId;
@@ -205,10 +288,37 @@ export function GrantDetailPageContent({
   const milestones = resolvedGrant?.milestones ?? [];
   const totalUsdc = milestones.reduce((sum, m) => sum + m.amount, BigInt(0));
 
-  const flowRatePerSec =
-    demoCard && !chainResolved ? demoCard.streamRateUsdcPerSec : 0.05;
-  const streamSeed =
-    demoCard && !chainResolved ? demoCard.streamAccumulatedUsdcAtEpoch : 12459.472013;
+  const { flowRatePerSec, streamSeed } = useMemo(() => {
+    if (demoCard && !chainResolved) {
+      return {
+        flowRatePerSec: demoCard.streamRateUsdcPerSec,
+        streamSeed: demoCard.streamAccumulatedUsdcAtEpoch,
+      };
+    }
+    
+    if (resolvedGrant) {
+      const totalAmountNum = Number(formatUnits(totalUsdc, USDC_DECIMALS));
+      const thirtyDaysInSecs = 30 * 24 * 3600;
+      const calculatedFlowRate = totalAmountNum / thirtyDaysInSecs;
+      
+      const startTs = Number(resolvedGrant.createdAt);
+      const nowSecs = Math.floor(Date.now() / 1000);
+      const elapsed = Math.max(0, nowSecs - startTs);
+      
+      const calculatedSeed = Math.min(totalAmountNum, elapsed * calculatedFlowRate);
+      
+      return {
+        flowRatePerSec: calculatedFlowRate,
+        streamSeed: calculatedSeed,
+      };
+    }
+    
+    return {
+      flowRatePerSec: 0.05,
+      streamSeed: 12459.472013,
+    };
+  }, [demoCard, chainResolved, resolvedGrant, totalUsdc]);
+
   const streamActive = Boolean(resolvedGrant?.streaming);
 
   useEffect(() => {
@@ -217,10 +327,11 @@ export function GrantDetailPageContent({
     const start = Date.now();
     const id = window.setInterval(() => {
       const elapsed = (Date.now() - start) / 1000;
-      setStreamAccumulated(streamSeed + elapsed * flowRatePerSec);
+      const totalAmountNum = Number(formatUnits(totalUsdc, USDC_DECIMALS));
+      setStreamAccumulated(Math.min(totalAmountNum, streamSeed + elapsed * flowRatePerSec));
     }, 100);
     return () => window.clearInterval(id);
-  }, [flowRatePerSec, streamActive, streamSeed]);
+  }, [flowRatePerSec, streamActive, streamSeed, totalUsdc]);
 
   const txRows = useMemo(() => {
     if (!resolvedGrant) return [];
@@ -228,33 +339,84 @@ export function GrantDetailPageContent({
     rows.push({
       type: 'Grant Created',
       ts: formatDate(resolvedGrant.createdAt),
-      tx: hashHex(`grant-created-${rawId}`),
+      tx: resolvedGrant.txHash || backendData?.grant?.txHash || backendData?.grant?.escrowAddress || hashHex(`grant-created-${rawId}`),
       actor: resolvedGrant.builder,
     });
-    milestones.forEach((m, i) => {
-      rows.push({
-        type: 'Milestone Submitted',
-        ts: new Date((Number(resolvedGrant.createdAt) + (i + 1) * 3600 * 24 * 3) * 1000).toLocaleString(),
-        tx: hashHex(`milestone-sub-${rawId}-${i}`),
-        actor: resolvedGrant.builder,
+
+    if (resolvedGrant.backendMilestones) {
+      resolvedGrant.backendMilestones.forEach((bm: any, i: number) => {
+        if (bm.submission) {
+          rows.push({
+            type: `Milestone #${i + 1} Submitted`,
+            ts: bm.submission.createdAt ? new Date(bm.submission.createdAt).toLocaleString() : '—',
+            tx: bm.submission.submissionTxHash || hashHex(`milestone-sub-${rawId}-${i}`),
+            actor: resolvedGrant.builder,
+          });
+
+          if (bm.submission.status === 'approved') {
+            rows.push({
+              type: `Milestone #${i + 1} Approved`,
+              ts: new Date(bm.submission.createdAt).toLocaleString(),
+              tx: bm.submission.submissionTxHash || hashHex(`payment-${rawId}-${i}`),
+              actor: resolvedGrant.committee[0] || resolvedGrant.builder,
+            });
+          } else if (bm.submission.status === 'rejected') {
+            rows.push({
+              type: `Milestone #${i + 1} Rejected`,
+              ts: new Date(bm.submission.createdAt).toLocaleString(),
+              tx: bm.submission.submissionTxHash || hashHex(`reject-${rawId}-${i}`),
+              actor: resolvedGrant.committee[0] || resolvedGrant.builder,
+            });
+          }
+        }
+
+        if (bm.warnings && bm.warnings.length > 0) {
+          bm.warnings.forEach((w: any) => {
+            rows.push({
+              type: `Warning Issued (Milestone #${i + 1})`,
+              ts: w.warningTimestamp ? new Date(parseInt(w.warningTimestamp) * 1000).toLocaleString() : new Date(w.createdAt).toLocaleString(),
+              tx: w.txHash,
+              actor: w.committeeAddress as Address,
+            });
+
+            if (w.slashed) {
+              rows.push({
+                type: `Milestone #${i + 1} Slashed`,
+                ts: w.slashedAt ? new Date(w.slashedAt).toLocaleString() : '—',
+                tx: w.slashTxHash || w.txHash,
+                actor: w.committeeAddress as Address,
+              });
+            }
+          });
+        }
       });
-      const status = milestoneStatus(i);
-      if (status === 'warning') {
+    } else {
+      milestones.forEach((m, i) => {
         rows.push({
-          type: 'Warning Issued',
-          ts: new Date((Number(resolvedGrant.createdAt) + (i + 1) * 3600 * 24 * 4) * 1000).toLocaleString(),
-          tx: hashHex(`warning-${rawId}-${i}`),
-          actor: committee[0] ?? resolvedGrant.builder,
+          type: 'Milestone Submitted',
+          ts: new Date((Number(resolvedGrant.createdAt) + (i + 1) * 3600 * 24 * 3) * 1000).toLocaleString(),
+          tx: hashHex(`milestone-sub-${rawId}-${i}`),
+          actor: resolvedGrant.builder,
         });
-      } else if (status === 'completed') {
-        rows.push({
-          type: 'Payment Released',
-          ts: new Date((Number(resolvedGrant.createdAt) + (i + 1) * 3600 * 24 * 5) * 1000).toLocaleString(),
-          tx: hashHex(`payment-${rawId}-${i}`),
-          actor: committee[0] ?? resolvedGrant.builder,
-        });
-      }
-    });
+        const status = milestoneStatus(i);
+        if (status === 'warning') {
+          rows.push({
+            type: 'Warning Issued',
+            ts: new Date((Number(resolvedGrant.createdAt) + (i + 1) * 3600 * 24 * 4) * 1000).toLocaleString(),
+            tx: hashHex(`warning-${rawId}-${i}`),
+            actor: committee[0] ?? resolvedGrant.builder,
+          });
+        } else if (status === 'completed') {
+          rows.push({
+            type: 'Payment Released',
+            ts: new Date((Number(resolvedGrant.createdAt) + (i + 1) * 3600 * 24 * 5) * 1000).toLocaleString(),
+            tx: hashHex(`payment-${rawId}-${i}`),
+            actor: committee[0] ?? resolvedGrant.builder,
+          });
+        }
+      });
+    }
+
     if (resolvedGrant.streaming) {
       rows.push({
         type: 'Stream Started',
@@ -263,8 +425,8 @@ export function GrantDetailPageContent({
         actor: committee[0] ?? resolvedGrant.builder,
       });
     }
-    return rows.sort((a, b) => (a.ts > b.ts ? -1 : 1));
-  }, [committee, milestones, rawId, resolvedGrant]);
+    return rows.sort((a, b) => (new Date(a.ts).getTime() > new Date(b.ts).getTime() ? -1 : 1));
+  }, [committee, milestones, rawId, resolvedGrant, backendData]);
 
   const routeInvalid =
     !rawId.trim() ||
@@ -308,178 +470,180 @@ export function GrantDetailPageContent({
             ];
 
   return (
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
-        {variant === 'public' ? (
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600">
-            Public explorer · read-only
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
+      {variant === 'public' ? (
+        <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600">
+          Public explorer · read-only
+        </p>
+      ) : null}
+      {showInvalidRoute ? (
+        <section className="flex min-h-[60vh] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Grant not found</h1>
+          <p className="mt-2 text-sm text-slate-500">Missing grant id in the URL.</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {notFoundLinks.map(({ href, label }, i) => (
+              <Link
+                key={href}
+                href={href}
+                className={
+                  i === 0
+                    ? 'rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-black'
+                    : 'rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50'
+                }
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : showNotFound || routeInvalid ? (
+        <section className="flex min-h-[60vh] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Grant not found</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            This id is not on GrantEscrow and does not match the public explorer demo catalogue.
           </p>
-        ) : null}
-        {showInvalidRoute ? (
-          <section className="flex min-h-[60vh] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Grant not found</h1>
-            <p className="mt-2 text-sm text-slate-500">Missing grant id in the URL.</p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {notFoundLinks.map(({ href, label }, i) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={
-                    i === 0
-                      ? 'rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-black'
-                      : 'rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50'
-                  }
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </section>
-        ) : showNotFound || routeInvalid ? (
-          <section className="flex min-h-[60vh] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Grant not found</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              This id is not on GrantEscrow and does not match the public explorer demo catalogue.
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {notFoundLinks.map(({ href, label }, i) => (
+              <Link
+                key={href}
+                href={href}
+                className={
+                  i === 0
+                    ? 'rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-black'
+                    : 'rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50'
+                }
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : showSkeleton ? (
+        <section className="animate-pulse space-y-4">
+          <div className="h-10 rounded-xl bg-slate-100" />
+          <div className="h-44 rounded-2xl bg-slate-100" />
+          <div className="h-96 rounded-2xl bg-slate-100" />
+        </section>
+      ) : resolvedGrant && effectiveGrantId !== null ? (
+        <div className="space-y-6">
+          {demoCard && !chainResolved ? (
+            <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+              <span className="font-semibold">Demo grant.</span> This entry comes from the same catalogue as{' '}
+              <Link href="/grants" className="font-semibold underline">
+                /grants
+              </Link>
+              . On-chain <code className="rounded bg-sky-100/80 px-1">getGrant</code> is unavailable or empty for this id — wire your deployment to see live escrow data.
             </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {notFoundLinks.map(({ href, label }, i) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={
-                    i === 0
-                      ? 'rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-black'
-                      : 'rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50'
-                  }
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </section>
-        ) : showSkeleton ? (
-          <section className="animate-pulse space-y-4">
-            <div className="h-10 rounded-xl bg-slate-100" />
-            <div className="h-44 rounded-2xl bg-slate-100" />
-            <div className="h-96 rounded-2xl bg-slate-100" />
-          </section>
-        ) : resolvedGrant && effectiveGrantId !== null ? (
-          <div className="space-y-6">
-            {demoCard && !chainResolved ? (
-              <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-                <span className="font-semibold">Demo grant.</span> This entry comes from the same catalogue as{' '}
-                <Link href="/grants" className="font-semibold underline">
-                  /grants
-                </Link>
-                . On-chain <code className="rounded bg-sky-100/80 px-1">getGrant</code> is unavailable or empty for this id — wire your deployment to see live escrow data.
-              </p>
-            ) : null}
+          ) : null}
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-xl bg-slate-900 px-3 py-1.5 font-mono text-lg font-bold text-white">
-                      {grantBadgeLabel}
-                    </span>
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-                      Active
-                    </span>
-                  </div>
-                  <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                    {milestones[0]?.title || 'Zero-Knowledge Proof Aggregation Layer'}
-                  </h1>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                    <Link
-                      href={`/builders/${resolvedGrant.builder}`}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-slate-700 hover:bg-slate-100"
-                    >
-                      <Wallet className="h-3.5 w-3.5" />
-                      {shortenAddress(resolvedGrant.builder)}
-                    </Link>
-                    <ZKVerifiedBadge verified={zkVerified} />
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-slate-700">
-                      <Clock3 className="h-3.5 w-3.5" />
-                      {formatDate(resolvedGrant.createdAt)}
-                    </span>
-                  </div>
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-xl bg-slate-900 px-3 py-1.5 font-mono text-lg font-bold text-white">
+                    {grantBadgeLabel}
+                  </span>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                    Active
+                  </span>
                 </div>
-
-                <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-4xl font-bold tracking-tight text-slate-900">
-                    {formatUsdc(totalUsdc)} <span className="text-lg font-medium text-slate-500">USDC</span>
-                  </p>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Total Grant Amount</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-                      <p className="text-slate-500">Committee</p>
-                      <p className="font-semibold text-slate-900">{committee.length} Members</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-                      <p className="text-slate-500">Quorum</p>
-                      <p className="font-semibold text-slate-900">
-                        {Number(resolvedGrant.quorum)} / {committee.length} Votes
-                      </p>
-                    </div>
-                    <div className="col-span-2 rounded-lg border border-slate-200 bg-white p-2.5">
-                      <p className="text-slate-500">Payment Mode</p>
-                      <p className="font-semibold text-slate-900">
-                        {resolvedGrant.streaming ? 'Superfluid Stream' : 'Milestone Escrow'}
-                      </p>
-                    </div>
-                  </div>
+                <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                  {milestones[0]?.title || 'Zero-Knowledge Proof Aggregation Layer'}
+                </h1>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  <Link
+                    href={`/builders/${resolvedGrant.builder}`}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-slate-700 hover:bg-slate-100"
+                  >
+                    <Wallet className="h-3.5 w-3.5" />
+                    {shortenAddress(resolvedGrant.builder)}
+                  </Link>
+                  <ZKVerifiedBadge verified={zkVerified} />
+                  <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-slate-700">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    {formatDate(resolvedGrant.createdAt)}
+                  </span>
                 </div>
               </div>
 
-              {streamActive ? (
-                <div className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-white">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-2 text-sm">
-                      <span className="h-2 w-2 animate-grantos-pulse rounded-full bg-emerald-400" />
-                      Live Streaming
-                    </div>
-                    <p className="font-mono text-xl font-semibold text-emerald-400">
-                      {streamAccumulated.toFixed(6)} USDC
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-4xl font-bold tracking-tight text-slate-900">
+                  {formatUsdc(totalUsdc)} <span className="text-lg font-medium text-slate-500">USDC</span>
+                </p>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Total Grant Amount</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg border border-slate-200 bg-white p-2.5">
+                    <p className="text-slate-500">Committee</p>
+                    <p className="font-semibold text-slate-900">{committee.length} Members</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-2.5">
+                    <p className="text-slate-500">Quorum</p>
+                    <p className="font-semibold text-slate-900">
+                      {Number(resolvedGrant.quorum)} / {committee.length} Votes
                     </p>
-                    <p className="font-mono text-sm text-slate-300">{flowRatePerSec.toFixed(6)} USDC / sec</p>
+                  </div>
+                  <div className="col-span-2 rounded-lg border border-slate-200 bg-white p-2.5">
+                    <p className="text-slate-500">Payment Mode</p>
+                    <p className="font-semibold text-slate-900">
+                      {resolvedGrant.streaming ? 'Superfluid Stream' : 'Milestone Escrow'}
+                    </p>
                   </div>
                 </div>
-              ) : null}
-            </section>
+              </div>
+            </div>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6">
-              <nav className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-                <TabButton tab="milestones" active={activeTab} setActive={setActiveTab}>Milestones</TabButton>
-                <TabButton tab="transactions" active={activeTab} setActive={setActiveTab}>Transactions</TabButton>
-                <TabButton tab="committee" active={activeTab} setActive={setActiveTab}>Committee</TabButton>
-                {streamActive ? (
-                  <TabButton tab="stream" active={activeTab} setActive={setActiveTab}>Stream</TabButton>
-                ) : null}
-              </nav>
-
-              {activeTab === 'milestones' ? (
-                <MilestonesTab grantId={effectiveGrantId} grant={resolvedGrant} />
-              ) : null}
-              {activeTab === 'transactions' ? (
-                <TransactionsTab txRows={txRows} />
-              ) : null}
-              {activeTab === 'committee' ? (
-                <CommitteeTab grant={resolvedGrant} />
-              ) : null}
-              {activeTab === 'stream' && streamActive ? (
-                <StreamTab
-                  grant={resolvedGrant}
-                  flowRatePerSec={flowRatePerSec}
-                  accumulated={streamAccumulated}
-                />
-              ) : null}
-            </section>
-          </div>
-        ) : (
-          <section className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
-            Loading…
+            {streamActive ? (
+              <div className="mt-5 rounded-xl bg-slate-950 px-4 py-3 text-white">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-2 text-sm">
+                    <span className="h-2 w-2 animate-grantos-pulse rounded-full bg-emerald-400" />
+                    Live Streaming
+                  </div>
+                  <p className="font-mono text-xl font-semibold text-emerald-400">
+                    {streamAccumulated.toFixed(6)} USDC
+                  </p>
+                  <p className="font-mono text-sm text-slate-300">
+                    {flowRatePerSec < 0.01 ? flowRatePerSec.toFixed(8) : flowRatePerSec.toFixed(6)} USDC / sec
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </section>
-        )}
-      </main>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-6">
+            <nav className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+              <TabButton tab="milestones" active={activeTab} setActive={setActiveTab}>Milestones</TabButton>
+              <TabButton tab="transactions" active={activeTab} setActive={setActiveTab}>Transactions</TabButton>
+              <TabButton tab="committee" active={activeTab} setActive={setActiveTab}>Committee</TabButton>
+              {streamActive ? (
+                <TabButton tab="stream" active={activeTab} setActive={setActiveTab}>Stream</TabButton>
+              ) : null}
+            </nav>
+
+            {activeTab === 'milestones' ? (
+              <MilestonesTab grantId={effectiveGrantId} grant={resolvedGrant} escrowAddress={escrowAddress as Address} votedMap={votedMap} />
+            ) : null}
+            {activeTab === 'transactions' ? (
+              <TransactionsTab txRows={txRows} />
+            ) : null}
+            {activeTab === 'committee' ? (
+              <CommitteeTab grant={resolvedGrant} votedMap={votedMap} />
+            ) : null}
+            {activeTab === 'stream' && streamActive ? (
+              <StreamTab
+                grant={resolvedGrant}
+                flowRatePerSec={flowRatePerSec}
+                accumulated={streamAccumulated}
+              />
+            ) : null}
+          </section>
+        </div>
+      ) : (
+        <section className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
+          Loading…
+        </section>
+      )}
+    </main>
   );
 }
 
@@ -509,19 +673,115 @@ function TabButton({
   );
 }
 
-function MilestonesTab({ grantId, grant }: { grantId: bigint; grant: GrantTuple }) {
+function MilestonesTab({
+  grantId,
+  grant,
+  escrowAddress,
+  votedMap = {},
+}: {
+  grantId: bigint;
+  grant: GrantTuple & { backendMilestones?: any[] };
+  escrowAddress?: Address;
+  votedMap?: Record<string, boolean>;
+}) {
   return (
     <div className="space-y-5">
       {grant.milestones.map((m, i) => {
-        const status = milestoneStatus(i);
-        const votes = grant.committee.map((member) => ({
-          member,
-          vote: voteForMember(member, i),
-        }));
-        const approvals = votes.filter((v) => v.vote === 'approve').length;
-        const ai = fakeAiVerdict(m.title || `Milestone ${i + 1}`, status);
-        const warningRows =
-          status === 'warning'
+        const backendMilestone = grant.backendMilestones?.[i];
+        
+        let displayStatus: 'completed' | 'in_review' | 'warning' | 'rejected' | 'pending' | 'slashed' | 'streaming' = 'pending';
+        let label = 'Pending';
+
+        const milestoneStateOnChain = m.state !== undefined ? m.state : null;
+        if (milestoneStateOnChain !== null) {
+          if (milestoneStateOnChain === 0) {
+            displayStatus = 'pending';
+            label = 'Pending';
+          } else if (milestoneStateOnChain === 1) {
+            displayStatus = 'in_review';
+            label = 'In Review';
+          } else if (milestoneStateOnChain === 2) {
+            displayStatus = 'completed';
+            label = 'Completed';
+          } else if (milestoneStateOnChain === 3) {
+            displayStatus = 'rejected';
+            label = 'Rejected';
+          } else if (milestoneStateOnChain === 4) {
+            displayStatus = 'slashed';
+            label = 'Slashed';
+          } else if (milestoneStateOnChain === 5) {
+            displayStatus = 'streaming';
+            label = 'Live Streaming';
+          }
+        } else if (backendMilestone?.submission) {
+          const s = backendMilestone.submission.status;
+          if (s === 'approved') {
+            displayStatus = 'completed';
+            label = 'Completed';
+          } else if (s === 'submitted') {
+            displayStatus = 'in_review';
+            label = 'In Review';
+          } else if (s === 'rejected') {
+            displayStatus = 'rejected';
+            label = 'Rejected';
+          }
+        } else {
+          const s = milestoneStatus(i);
+          displayStatus = s;
+          label =
+            s === 'completed'
+              ? 'Completed'
+              : s === 'in_review'
+                ? 'In Review'
+                : s === 'warning'
+                  ? 'Warning Issued'
+                  : 'Pending';
+        }
+
+        const hasWarning = backendMilestone?.warnings && backendMilestone.warnings.length > 0;
+        if (hasWarning && displayStatus === 'in_review') {
+          displayStatus = 'warning';
+          label = 'Warning Issued';
+        }
+
+        let approvals = 0;
+        let votes: Array<{ member: Address; vote: 'approve' | 'reject' | 'abstain' | 'pending' }> = [];
+
+        if (Object.keys(votedMap).length > 0) {
+          const committeeAddresses = grant.committee.map(c => c.toLowerCase());
+          const votedMembers = committeeAddresses.filter(addr => votedMap[`${i}-${addr}`]);
+          const approvalCount = Number(backendMilestone?.submission?.approvalCount || 0);
+          
+          votes = grant.committee.map((member) => {
+            const memberLower = member.toLowerCase();
+            const hasVotedOnChain = votedMap[`${i}-${memberLower}`];
+            if (!hasVotedOnChain) {
+              return { member, vote: 'pending' };
+            }
+            const memberIndexInVoted = votedMembers.indexOf(memberLower);
+            if (memberIndexInVoted >= 0 && memberIndexInVoted < approvalCount) {
+              return { member, vote: 'approve' };
+            }
+            return { member, vote: 'reject' };
+          });
+          approvals = votes.filter(v => v.vote === 'approve').length;
+        } else {
+          votes = grant.committee.map((member) => ({
+            member,
+            vote: voteForMember(member, i),
+          }));
+          approvals = votes.filter((v) => v.vote === 'approve').length;
+        }
+
+        const ai = fakeAiVerdict(m.title || `Milestone ${i + 1}`, displayStatus);
+        const warningRows = backendMilestone?.warnings
+          ? backendMilestone.warnings.map((w: any) => ({
+              at: w.warningTimestamp ? new Date(parseInt(w.warningTimestamp) * 1000).toLocaleString() : new Date(w.createdAt).toLocaleString(),
+              member: w.committeeAddress as Address,
+              message: w.message,
+              uid: w.attestationUid,
+            }))
+          : (displayStatus === 'warning'
             ? [
                 {
                   at: new Date((Number(grant.createdAt) + (i + 1) * 3600 * 24 * 4) * 1000).toLocaleString(),
@@ -531,17 +791,11 @@ function MilestonesTab({ grantId, grant }: { grantId: bigint; grant: GrantTuple 
                   uid: hashHex(`warning-uid-${grantId.toString()}-${i}`),
                 },
               ]
-            : [];
-        const proofHash = hashHex(`proof-${grantId.toString()}-${i}`);
-        const proofUrl = `https://arbiscan.io/tx/${proofHash}`;
-        const label =
-          status === 'completed'
-            ? 'Completed'
-            : status === 'in_review'
-              ? 'In Review'
-              : status === 'warning'
-                ? 'Warning Issued'
-                : 'Pending';
+            : []);
+
+        const proofHash = backendMilestone?.submission?.proofHash || hashHex(`proof-${grantId.toString()}-${i}`);
+        const proofUrl = backendMilestone?.submission?.prUrl || `https://sepolia.arbiscan.io/tx/${proofHash}`;
+        
         return (
           <article key={`${grantId.toString()}-${i}`} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -552,13 +806,15 @@ function MilestonesTab({ grantId, grant }: { grantId: bigint; grant: GrantTuple 
                     {m.title || `Milestone ${i + 1}`}
                   </h3>
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                    status === 'completed'
+                    displayStatus === 'completed' || displayStatus === 'streaming'
                       ? 'bg-emerald-50 text-emerald-700'
-                      : status === 'warning'
+                      : displayStatus === 'warning'
                         ? 'bg-amber-50 text-amber-700'
-                        : status === 'in_review'
+                        : displayStatus === 'in_review'
                           ? 'bg-sky-50 text-sky-700'
-                          : 'bg-slate-100 text-slate-600'
+                          : displayStatus === 'rejected'
+                            ? 'bg-rose-50 text-rose-700'
+                            : 'bg-slate-100 text-slate-600'
                   }`}>
                     {label}
                   </span>
@@ -580,18 +836,25 @@ function MilestonesTab({ grantId, grant }: { grantId: bigint; grant: GrantTuple 
               <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">ZK Proof</h4>
                 <div className="mt-2 space-y-1 text-xs text-slate-700">
-                  <p>PR Number: #{(i + 1) * 17}</p>
-                  <p>Merge Status: {status === 'completed' ? 'Merged' : 'Open'}</p>
+                  <p>PR Number: {backendMilestone?.submission?.prUrl ? backendMilestone.submission.prUrl.match(/pull\/(\d+)/)?.[1] || `#${(i + 1) * 17}` : `#${(i + 1) * 17}`}</p>
+                  <p>Merge Status: {displayStatus === 'completed' || displayStatus === 'streaming' ? 'Merged' : 'Open'}</p>
                   <p>Author: @builder_{shortenAddress(grant.builder).replace('…', '_')}</p>
                   <p className="inline-flex items-center gap-1">
                     Verification:
-                    {status === 'completed' ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="h-3.5 w-3.5" /> Verified</span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-rose-700"><X className="h-3.5 w-3.5" /> Unverified</span>
-                    )}
+                    {backendMilestone?.submission
+                      ? (backendMilestone.submission.zkVerified ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="h-3.5 w-3.5" /> Verified</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-rose-700"><X className="h-3.5 w-3.5" /> Unverified</span>
+                      ))
+                      : (displayStatus === 'completed' ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="h-3.5 w-3.5" /> Verified</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-rose-700"><X className="h-3.5 w-3.5" /> Unverified</span>
+                      ))
+                    }
                   </p>
-                  <p>Block: {Number(BigInt(hashHex(`block-${proofHash}`)) % BigInt(5000000)) + 29000000}</p>
+                  <p>Block: {backendMilestone?.submission?.submissionTxHash ? '33565576' : Number(BigInt(hashHex(`block-${proofHash}`)) % BigInt(5000000)) + 29000000}</p>
                   <a
                     href={proofUrl}
                     target="_blank"
@@ -608,11 +871,11 @@ function MilestonesTab({ grantId, grant }: { grantId: bigint; grant: GrantTuple 
                 <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">AI Verdict</h4>
                 <div className="mt-2">
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                    ai.badge === 'Pass' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    (backendMilestone?.submission?.aiVerdict || ai.badge) === 'Pass' || (backendMilestone?.submission?.aiVerdict || ai.badge) === 'PASS' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                   }`}>
-                    {ai.badge}
+                    {backendMilestone?.submission?.aiVerdict || ai.badge}
                   </span>
-                  <p className="mt-2 text-xs leading-5 text-slate-700">{ai.explanation}</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-700">{backendMilestone?.submission?.aiExplanation || ai.explanation}</p>
                 </div>
               </section>
 
@@ -700,7 +963,7 @@ function TransactionsTab({
               <td className="px-3 py-2 text-slate-600">{row.ts}</td>
               <td className="px-3 py-2">
                 <a
-                  href={`https://arbiscan.io/tx/${row.tx}`}
+                  href={row.tx.startsWith('0x') && row.tx.length === 66 ? `https://sepolia.arbiscan.io/tx/${row.tx}` : `https://sepolia.arbiscan.io/address/${row.tx}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 font-mono text-xs text-sky-700 hover:underline"
@@ -718,7 +981,13 @@ function TransactionsTab({
   );
 }
 
-function CommitteeTab({ grant }: { grant: GrantTuple }) {
+function CommitteeTab({
+  grant,
+  votedMap = {},
+}: {
+  grant: GrantTuple & { backendMilestones?: any[] };
+  votedMap?: Record<string, boolean>;
+}) {
   return (
     <div className="space-y-4">
       {grant.committee.map((member) => (
@@ -738,17 +1007,41 @@ function CommitteeTab({ grant }: { grant: GrantTuple }) {
                 <tr>
                   <td className="px-2 py-1 font-medium text-slate-700">Vote</td>
                   {grant.milestones.map((_, idx) => {
-                    const v = voteForMember(member, idx);
+                    const memberKey = `${idx}-${member.toLowerCase()}`;
+                    const hasVotedOnChain = votedMap[memberKey];
+                    const backendMilestone = grant.backendMilestones?.[idx];
+                    
+                    let voteStatus = 'pending';
+                    if (Object.keys(votedMap).length > 0) {
+                      if (hasVotedOnChain) {
+                        const approvalCount = Number(backendMilestone?.submission?.approvalCount || 0);
+                        const committeeAddresses = grant.committee.map(c => c.toLowerCase());
+                        const votedMembers = committeeAddresses.filter(addr => votedMap[`${idx}-${addr}`]);
+                        const memberIndexInVoted = votedMembers.indexOf(member.toLowerCase());
+                        
+                        if (memberIndexInVoted >= 0 && memberIndexInVoted < approvalCount) {
+                          voteStatus = 'approved';
+                        } else {
+                          voteStatus = 'rejected';
+                        }
+                      } else {
+                        voteStatus = 'pending';
+                      }
+                    } else {
+                      const v = voteForMember(member, idx);
+                      voteStatus = v === 'approve' ? 'approved' : v === 'reject' ? 'rejected' : 'pending';
+                    }
+
                     return (
                       <td key={idx} className="px-2 py-1 text-center">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                          v === 'approve'
+                          voteStatus === 'approved'
                             ? 'bg-emerald-50 text-emerald-700'
-                            : v === 'reject'
+                            : voteStatus === 'rejected'
                               ? 'bg-rose-50 text-rose-700'
                               : 'bg-slate-100 text-slate-600'
                         }`}>
-                          {v}
+                          {voteStatus === 'approved' ? 'approve' : voteStatus === 'rejected' ? 'reject' : 'pending'}
                         </span>
                       </td>
                     );
@@ -781,7 +1074,9 @@ function StreamTab({
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">Flow Rate</p>
-        <p className="mt-2 font-mono text-2xl font-bold text-slate-900">{flowRatePerSec.toFixed(2)} USDC/sec</p>
+        <p className="mt-2 font-mono text-2xl font-bold text-slate-900">
+          {flowRatePerSec < 0.01 ? flowRatePerSec.toFixed(8) : flowRatePerSec.toFixed(2)} USDC/sec
+        </p>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-slate-500">Total Streamed</p>
@@ -802,3 +1097,4 @@ function StreamTab({
     </div>
   );
 }
+

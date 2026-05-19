@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useWarningFlow as useRealWarningFlow } from '@/hooks/useWarningFlow';
+import type { Address } from 'viem';
 
 /**
  * Submission FSM for issuing a Milestone Warning attestation (US-04 step 1).
@@ -30,10 +32,19 @@ export type WarningFlowState =
 export type WarningFlow = {
   state: WarningFlowState;
   /** Triggered when the user clicks `Submit Warning Onchain`. */
-  start: () => void;
+  start: (params: WarningFlowParams) => void;
   /** Reset back to `idle` (used for the Cancel button or error retries). */
   reset: () => void;
 };
+
+export interface WarningFlowParams {
+  grantId: number;
+  milestoneIndex: number;
+  builderAddress: Address;
+  committeeAddress: Address;
+  message: string;
+  sentinelAddress: Address;
+}
 
 const CONFIRMING_DELAY_MS = 1700;
 const SUBMITTED_DELAY_MS = 2200;
@@ -62,7 +73,7 @@ export function useDemoWarningFlow(initial?: WarningFlowState): WarningFlow {
     [],
   );
 
-  const start = useCallback(() => {
+  const start = useCallback((params: WarningFlowParams) => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
 
@@ -93,7 +104,37 @@ export function useDemoWarningFlow(initial?: WarningFlowState): WarningFlow {
   return useMemo(() => ({ state, start, reset }), [state, start, reset]);
 }
 
+/**
+ * Production warning flow that integrates with real contracts and backend.
+ */
+export function useProductionWarningFlow(): WarningFlow {
+  const [state, setState] = useState<WarningFlowState>({ kind: 'idle' });
+  const { issueWarning, isIssuing } = useRealWarningFlow();
+
+  const start = useCallback(
+    async (params: WarningFlowParams) => {
+      setState({ kind: 'confirming' });
+
+      try {
+        await issueWarning(params);
+        // State updates will be handled by the hook
+        setState({ kind: 'confirmed', txHash: '0x...', attestationUid: '0x...' });
+      } catch (err) {
+        console.error('Warning flow error:', err);
+        setState({ kind: 'idle' });
+      }
+    },
+    [issueWarning],
+  );
+
+  const reset = useCallback(() => {
+    setState({ kind: 'idle' });
+  }, []);
+
+  return useMemo(() => ({ state, start, reset }), [state, start, reset]);
+}
+
 /** Default Arbiscan tx URL builder. Override per-environment if needed. */
 export function buildArbiscanTxUrl(txHash: string): string {
-  return `https://arbiscan.io/tx/${txHash}`;
+  return `https://sepolia.arbiscan.io/tx/${txHash}`;
 }

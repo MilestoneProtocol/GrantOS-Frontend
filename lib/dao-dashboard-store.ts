@@ -1,7 +1,7 @@
 'use client';
 
 import type { DaoDashboardSnapshot, DaoGrantCardModel } from '@/demo/dao-dashboard';
-import { getDaoDashboardSnapshot } from '@/demo/dao-dashboard';
+import { getDaoDashboardSnapshot, isUiDemoMode } from '@/demo';
 import { create } from 'zustand';
 
 /**
@@ -34,7 +34,19 @@ type DaoDashboardState = {
   setSnapshot: (snapshot: DaoDashboardSnapshot) => void;
 };
 
-const initialSnapshot = getDaoDashboardSnapshot(0);
+const initialSnapshot: DaoDashboardSnapshot = isUiDemoMode()
+  ? getDaoDashboardSnapshot(0)
+  : {
+      hero: {
+        totalUsdcLocked: 0,
+        activeGrants: 0,
+        milestonesDueThisWeek: 0,
+        totalReleasedThisMonth: 0,
+        liveSlashCounterUsdc: 0,
+        totalZkProofsVerified: 0,
+      },
+      grants: [],
+    };
 
 export const useDaoDashboardStore = create<DaoDashboardState>((set, get) => ({
   snapshot: initialSnapshot,
@@ -42,11 +54,13 @@ export const useDaoDashboardStore = create<DaoDashboardState>((set, get) => ({
   openGrant: null,
   setOpenGrant: (grant) => set({ openGrant: grant }),
   refresh: () => {
-    const nextTick = get().pollTick + 1;
-    set({
-      pollTick: nextTick,
-      snapshot: getDaoDashboardSnapshot(nextTick),
-    });
+    if (isUiDemoMode()) {
+      const nextTick = get().pollTick + 1;
+      set({
+        pollTick: nextTick,
+        snapshot: getDaoDashboardSnapshot(nextTick),
+      });
+    }
   },
   setSnapshot: (snapshot) => set({ snapshot }),
 }));

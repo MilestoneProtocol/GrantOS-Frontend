@@ -11,7 +11,7 @@ export default function DetectingRoleSkeleton() {
           Detecting your role...
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          We’re checking your onchain history on Arbitrum One. This takes a moment.
+          We’re checking your onchain history on Arbitrum Sepolia. This takes a moment.
         </p>
 
         <div className="mt-6 space-y-3">

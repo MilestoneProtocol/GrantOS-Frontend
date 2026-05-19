@@ -2,9 +2,9 @@ import { EAS_SCHEMA_UID } from '@/lib/eas-config';
 import { easAttestationScanUrl } from '@/lib/eas-scan';
 import { getAddress, isAddress, type Address } from 'viem';
 
-/** Arbitrum One EAS indexer (same host pattern as https://arbitrum.easscan.org ). */
+/** Arbitrum Sepolia EAS indexer (same host pattern as https://arbitrum-sepolia.easscan.org ). */
 export const EAS_GRAPHQL_URL =
-  process.env.NEXT_PUBLIC_EAS_GRAPHQL_URL?.trim() || 'https://arbitrum.easscan.org/graphql';
+  process.env.NEXT_PUBLIC_EAS_GRAPHQL_URL?.trim() || 'https://arbitrum-sepolia.easscan.org/graphql';
 
 const DELTAS = {
   MilestoneApprovedOnTime: 10,

@@ -110,11 +110,11 @@ export type DaoDashboardSnapshot = {
 const NOW = () => Date.now();
 
 function buildArbiscanTxUrl(txHash: `0x${string}`): string {
-  return `https://arbiscan.io/tx/${txHash}`;
+  return `https://sepolia.arbiscan.io/tx/${txHash}`;
 }
 
 function buildEasUrl(uid: `0x${string}`): string {
-  return `https://arbitrum.easscan.org/attestation/view/${uid}`;
+  return `https://arbitrum-sepolia.easscan.org/attestation/view/${uid}`;
 }
 
 /** Base snapshot; `pollTick` bumps slash + ZK to exercise upward animations. */

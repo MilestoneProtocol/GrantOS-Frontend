@@ -144,7 +144,7 @@ export type TreasurySnapshot = {
 const MS_DAY = 24 * 60 * 60 * 1000;
 
 function arbiscanTx(hash: `0x${string}`): string {
-  return `https://arbiscan.io/tx/${hash}`;
+  return `https://sepolia.arbiscan.io/tx/${hash}`;
 }
 
 function buildSpark(seed: number, drift: 'up' | 'down' | 'flat', points = 30): SparkPoint[] {

@@ -5,6 +5,6 @@ export function easAttestationScanUrl(uid: string): string {
   if (!trimmed.startsWith('0x')) return '';
   const template =
     process.env.NEXT_PUBLIC_EAS_ATTESTATION_URL_TEMPLATE?.trim() ||
-    'https://arbitrum.easscan.org/attestation/view/{uid}';
+    'https://arbitrum-sepolia.easscan.org/attestation/view/{uid}';
   return template.replace('{uid}', encodeURIComponent(trimmed));
 }

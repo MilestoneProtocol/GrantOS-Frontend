@@ -32,6 +32,15 @@
     "wagmi": "^3.6.9",
     "zustand": "^5.0.13"
   },
+  "overrides": {
+    "wagmi": {
+      "@wagmi/connectors": {
+        "@coinbase/wallet-sdk": "$@coinbase/wallet-sdk",
+        "@metamask/connect-evm": "$@metamask/connect-evm",
+        "@walletconnect/ethereum-provider": "$@walletconnect/ethereum-provider"
+      }
+    }
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

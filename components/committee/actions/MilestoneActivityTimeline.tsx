@@ -18,7 +18,7 @@ type MilestoneActivityTimelineProps = {
  */
 export default function MilestoneActivityTimeline({
   events,
-  arbiscanUrl = 'https://arbiscan.io',
+  arbiscanUrl = 'https://sepolia.arbiscan.io',
 }: MilestoneActivityTimelineProps) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

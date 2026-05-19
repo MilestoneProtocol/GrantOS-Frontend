@@ -13,7 +13,7 @@ const queryClient = new QueryClient()
 
 export function Web3Provider({ children }: { children: ReactNode }) {
   return (
-    <WagmiProvider config={config} reconnectOnMount={false}>
+    <WagmiProvider config={config} reconnectOnMount={true}>
       <QueryClientProvider client={queryClient}>
         <WalletExtensionErrorHandler>
           <ThemeProvider>

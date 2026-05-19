@@ -171,8 +171,13 @@ function SlashLifecycle({
   }, [flow]);
 
   const handleConfirm = useCallback(() => {
-    flow.start();
-  }, [flow]);
+    flow.start({
+      grantId: parseInt(milestone.grantId),
+      milestoneIndex: milestone.milestoneIndex,
+      escrowAddress: '0x0000000000000000000000000000000000000000',
+      amountUsdc: milestone.escrowBalanceUsdc.toString(),
+    });
+  }, [flow, milestone]);
 
   useSlashConfirmedEffect(flow.state, (state) => {
     onSlashConfirmed?.({

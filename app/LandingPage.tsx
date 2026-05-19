@@ -96,7 +96,7 @@ function LandingHeader() {
           <Sparkles className="h-3.5 w-3.5 text-violet-500" aria-hidden />
           GrantOS v3
           <span className="text-slate-300">·</span>
-          <span className="text-slate-500">Arbitrum One</span>
+          <span className="text-slate-500">Arbitrum Sepolia</span>
         </div>
         <h1 className="mt-5 text-3xl font-bold tracking-tight text-slate-900 sm:text-[2.5rem] sm:leading-[1.05]">
           Milestone-based funding,
@@ -114,7 +114,7 @@ function LandingHeader() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs shadow-sm">
           <div className="flex items-center gap-2 font-semibold text-slate-900">
             <ShieldCheck className="h-4 w-4 text-emerald-600" aria-hidden />
-            Protocol on Arbitrum One
+            Protocol on Arbitrum Sepolia
           </div>
           <p className="mt-1.5 text-slate-500">
             Browse grants without a wallet. Signing is only required to act.
@@ -522,7 +522,7 @@ function ConnectCta() {
         </p>
         <ul className="relative mt-5 space-y-2">
           {[
-            'Funds escrow on Arbitrum One — no off-chain custody.',
+            'Funds escrow on Arbitrum Sepolia — no off-chain custody.',
             '24h on-chain warning before any slash.',
             'Every action attested to EAS.',
             'Committee identities are ZK-verified.',

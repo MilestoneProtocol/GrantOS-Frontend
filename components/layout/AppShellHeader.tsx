@@ -7,6 +7,7 @@ import { APP_SHELL_PRIMARY_LINKS } from '@/lib/app-shell-nav';
 import NotificationBell from '@/components/NotificationBell';
 import { Menu } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 
 type AppShellHeaderProps = {
@@ -38,6 +39,11 @@ export default function AppShellHeader({
   mobileNavOpen = false,
 }: AppShellHeaderProps) {
   const { address, chain, isConnected } = useAccount();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { data: identityData } = useReadContract({
     address: IDENTITY_REGISTRY_ADDRESS,
@@ -130,7 +136,7 @@ export default function AppShellHeader({
                 {showNetworkBadge ? (
                   <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm xl:inline-flex">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
-                    <span className="truncate">{chain?.name ?? 'Arbitrum One'}</span>
+                    <span className="truncate">{mounted && chain?.name ? chain.name : 'Arbitrum Sepolia'}</span>
                   </div>
                 ) : null}
                 {showZkBadge && address ? <ZKVerifiedBadge verified={zkVerified} /> : null}

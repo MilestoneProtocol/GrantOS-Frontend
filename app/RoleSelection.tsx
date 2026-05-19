@@ -107,7 +107,7 @@ export default function RoleSelection({
           <div className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs shadow-sm">
             <div className="flex items-center gap-2 font-semibold text-slate-900">
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              Protocol on Arbitrum One
+              Protocol on Arbitrum Sepolia
             </div>
             <p className="text-slate-500">
               All role decisions are local — no transactions until you act.

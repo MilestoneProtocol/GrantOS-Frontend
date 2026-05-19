@@ -16,6 +16,8 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useGrantDetailFull } from '@/hooks/useGrantDetailFull';
+import { isUiDemoMode } from '@/demo';
 
 type DaoGrantDrawerProps = {
   grant: DaoGrantCardModel | null;
@@ -35,25 +37,117 @@ type DaoGrantDrawerProps = {
  * - Footer (only when streaming active): live stream panel with 100ms ticker.
  */
 export default function DaoGrantDrawer({ grant, onClose }: DaoGrantDrawerProps) {
-  // Escape closes.
-  useEffect(() => {
-    if (!grant) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [grant, onClose]);
+  const isDemo = isUiDemoMode();
+  const grantId = grant ? Number(grant.slug) : null;
+  const { data: fullDetail, isLoading: isFullDetailLoading } = useGrantDetailFull(
+    !isDemo && grant ? grantId : null
+  );
 
-  // Prevent background scroll while open.
-  useEffect(() => {
-    if (!grant) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [grant]);
+  const mappedMilestones = useMemo((): DaoMilestoneModel[] => {
+    if (!grant) return [];
+    if (isDemo || !fullDetail) {
+      return grant.milestones;
+    }
+
+    return fullDetail.milestones.map((m): DaoMilestoneModel => {
+      const isSlashed = m.warnings?.some((w) => w.slashed) ?? false;
+      const hasWarning = (m.warnings?.length ?? 0) > 0 && !isSlashed;
+      const isApproved = m.submission?.status === 'approved';
+      const isOverdue = !m.submission && (Number(m.deadline) * 1000 < Date.now());
+
+      let status: DaoMilestoneModel['status'] = 'pending';
+      if (isSlashed) status = 'slashed';
+      else if (hasWarning) status = 'warning_issued';
+      else if (isApproved) status = 'approved';
+      else if (isOverdue) status = 'overdue';
+
+      let proofType: DaoMilestoneModel['proofType'] = 'Manual';
+      if (m.proofType === 0) proofType = 'ZK';
+      else if (m.proofType === 1) proofType = 'PR';
+
+      const zkProof: DaoMilestoneModel['zkProof'] = m.submission
+        ? {
+            proofHash: (m.submission.proofHash || '0x') as `0x${string}`,
+            prNumber: m.submission.prUrl ? parseInt(m.submission.prUrl.split('/').pop() || '0') : 0,
+            mergeStatus: m.submission.status === 'approved' ? 'Merged' : 'Open',
+            authorHandle: '@builder',
+            verification: m.submission.zkVerified ? 'Verified' : 'Unverified',
+            verifiedBlockNumber: m.submission.zkVerified ? 29384123 : undefined,
+          }
+        : {
+            proofHash: '0x' as `0x${string}`,
+            prNumber: 0,
+            mergeStatus: 'Open',
+            authorHandle: '@builder',
+            verification: 'Unverified',
+          };
+
+      const aiVerdict: DaoMilestoneModel['aiVerdict'] = m.submission
+        ? {
+            badge: (m.submission.aiVerdict || 'Review') as 'Pass' | 'Review' | 'Fail',
+            explanation: m.submission.aiExplanation || 'Awaiting AI analysis.',
+          }
+        : {
+            badge: 'Review',
+            explanation: 'Awaiting submission. No artifacts available yet.',
+          };
+
+      const warningHistory = (m.warnings || []).map((w) => ({
+        issuedAtIso: w.warningTimestamp,
+        committeeMember: w.committeeAddress as `0x${string}`,
+        message: w.message,
+        attestationUrl: `https://arbitrum-sepolia.easscan.org/attestation/view/${w.attestationUid}`,
+      }));
+
+      const transactions: DaoMilestoneModel['transactions'] = [];
+      if (m.submission) {
+        transactions.push({
+          kind: 'submission',
+          txHash: (m.submission.submissionTxHash || '0x') as `0x${string}`,
+          txUrl: `https://sepolia.arbiscan.io/tx/${m.submission.submissionTxHash}`,
+          timestampIso: m.submission.createdAt,
+        });
+        if (m.submission.status === 'approved') {
+          transactions.push({
+            kind: 'payment',
+            txHash: (m.submission.submissionTxHash || '0x') as `0x${string}`,
+            txUrl: `https://sepolia.arbiscan.io/tx/${m.submission.submissionTxHash}`,
+            timestampIso: m.submission.createdAt,
+          });
+        }
+      }
+      (m.warnings || []).forEach((w) => {
+        transactions.push({
+          kind: 'warning',
+          txHash: w.txHash as `0x${string}`,
+          txUrl: `https://sepolia.arbiscan.io/tx/${w.txHash}`,
+          timestampIso: w.warningTimestamp,
+        });
+        if (w.slashed && w.slashTxHash) {
+          transactions.push({
+            kind: 'slash',
+            txHash: w.slashTxHash as `0x${string}`,
+            txUrl: `https://sepolia.arbiscan.io/tx/${w.slashTxHash}`,
+            timestampIso: w.slashedAt || w.warningTimestamp,
+          });
+        }
+      });
+
+      return {
+        index: m.index + 1,
+        title: m.title,
+        description: m.description,
+        amountUsdc: Number(BigInt(m.amount) / BigInt(1000000)),
+        deadlineIso: new Date(Number(m.deadline) * 1000).toISOString(),
+        status,
+        proofType,
+        zkProof,
+        aiVerdict,
+        warningHistory,
+        transactions,
+      };
+    });
+  }, [grant, isDemo, fullDetail]);
 
   if (!grant) return null;
 
@@ -76,12 +170,18 @@ export default function DaoGrantDrawer({ grant, onClose }: DaoGrantDrawerProps) 
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5">
           <div className="space-y-5">
+            {isFullDetailLoading && (
+              <div className="flex items-center justify-center space-x-2 py-4 text-xs font-semibold text-slate-500">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-800" />
+                <span>Loading latest milestone updates...</span>
+              </div>
+            )}
             <section aria-label="Milestone timeline" className="space-y-4">
-              {grant.milestones.map((m, idx) => (
+              {mappedMilestones.map((m, idx) => (
                 <MilestoneTimelineEntry
                   key={m.index}
                   milestone={m}
-                  isLast={idx === grant.milestones.length - 1}
+                  isLast={idx === mappedMilestones.length - 1}
                 />
               ))}
             </section>

@@ -93,7 +93,7 @@ export default function VerifyIdentity() {
               GrantOS v3
             </h1>
             <div className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500 sm:inline-flex">
-              Arbitrum One
+              Arbitrum Sepolia
             </div>
           </div>
           {isConnected ? (

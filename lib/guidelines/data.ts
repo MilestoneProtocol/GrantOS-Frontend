@@ -127,7 +127,7 @@ export const GUIDELINES_FAQ = [
   {
     question: 'What chains does GrantOS v3 support?',
     answer:
-      'GrantOS v3 is deployed exclusively on Arbitrum One. All contracts, all attestations, all Superfluid streams, and all ZK proof verifications happen on Arbitrum One. There are no plans to deploy on other chains at this time.',
+      'GrantOS v3 is deployed exclusively on Arbitrum Sepolia. All contracts, all attestations, all Superfluid streams, and all ZK proof verifications happen on Arbitrum Sepolia. There are no plans to deploy on other chains at this time.',
   },
 ] as const;
 
@@ -139,5 +139,5 @@ export const GUIDELINES_CONTRACTS = [
 ] as const;
 
 export function arbiscanAddressUrl(address: string) {
-  return `https://arbiscan.io/address/${address}`;
+  return `https://sepolia.arbiscan.io/address/${address}`;
 }

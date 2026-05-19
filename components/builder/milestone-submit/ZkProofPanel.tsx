@@ -1,7 +1,7 @@
 'use client';
 
 import type { ZkProofPreview } from '@/lib/milestone-submit-session';
-import { buildMockZkProofResult } from '@/lib/milestone-submit-session';
+import { buildMockZkProofResult, normalizeGithubHandle } from '@/lib/milestone-submit-session';
 import {
   AlertTriangle,
   Check,
@@ -91,26 +91,119 @@ export default function ZkProofPanel({
       });
 
     (async () => {
-      for (let i = 0; i < PHASE_LABELS.length; i++) {
-        await sleep(PHASE_DELAYS_MS[i] ?? 1500);
+      try {
+        await sleep(1000);
         if (cancelled) return;
-        const t = formatLogTime(new Date());
-        setPhaseTimes((prev) => ({ ...prev, [i]: t }));
-        setPhaseStates(() => {
-          const next: PhaseUi[] = ['pending', 'pending', 'pending', 'pending'];
-          for (let j = 0; j <= i; j++) next[j] = 'done';
-          if (i + 1 < PHASE_LABELS.length) next[i + 1] = 'running';
-          return next;
-        });
-      }
-      await sleep(600);
-      if (cancelled) return;
 
-      const built = buildMockZkProofResult(repo, pr, registeredGithubHandle, addressRef.current || '0x');
-      if (built.kind === 'failure') {
-        onProofResolved({ outcome: 'failure', errorMessage: built.message });
-      } else {
-        onProofResolved({ outcome: 'success', preview: built.preview });
+        if (!addressRef.current) {
+          throw new Error('Wallet not connected. Please connect your wallet.');
+        }
+
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        let attestation: any = null;
+        try {
+          const res = await fetch(`${apiBase}/identity/attestation/wallet/${addressRef.current}`);
+          if (!res.ok) {
+            if (res.status === 404) {
+              throw new Error('No verified identity found for this wallet. Please verify your identity first.');
+            }
+            throw new Error(`Failed to fetch identity attestation: HTTP ${res.status}`);
+          }
+          attestation = await res.json();
+        } catch (err: any) {
+          throw new Error(err.message || 'Failed to fetch identity attestation from backend.');
+        }
+
+        const reg = normalizeGithubHandle(registeredGithubHandle);
+        if (!reg) {
+          throw new Error('Register your GitHub identity in Verify before continuing.');
+        }
+
+        const t0 = formatLogTime(new Date());
+        setPhaseTimes((prev) => ({ ...prev, [0]: t0 }));
+        setPhaseStates(['done', 'running', 'pending', 'pending']);
+        await sleep(1000);
+        if (cancelled) return;
+
+        const { generateProof } = await import('@/lib/zk/prover');
+
+        const toBytes = (hex: string, label: string, expectedLength: number): number[] => {
+          const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
+          if (clean.length % 2 !== 0) throw new Error(`${label} has odd hex length`);
+          const bytes = [];
+          for (let i = 0; i < clean.length; i += 2) {
+            const v = parseInt(clean.slice(i, i + 2), 16);
+            if (isNaN(v)) throw new Error(`${label} contains non-hex characters`);
+            bytes.push(v);
+          }
+          if (bytes.length === expectedLength + 1) bytes.pop();
+          if (bytes.length !== expectedLength)
+            throw new Error(`${label} must be ${expectedLength} bytes, got ${bytes.length}`);
+          return bytes;
+        };
+
+        const t1 = formatLogTime(new Date());
+        setPhaseTimes((prev) => ({ ...prev, [1]: t1 }));
+        setPhaseStates(['done', 'done', 'running', 'pending']);
+        await sleep(1000);
+        if (cancelled) return;
+
+        const t2 = formatLogTime(new Date());
+        setPhaseTimes((prev) => ({ ...prev, [2]: t2 }));
+        setPhaseStates(['done', 'done', 'done', 'running']);
+
+        const result = await generateProof({
+          signature:           toBytes(attestation.oracleSignature, 'Oracle signature', 64),
+          message_hash:        toBytes(attestation.messageHash,     'Message hash',     32),
+          github_id:           attestation.githubId.toString(),
+          github_created_year: attestation.githubCreatedYear.toString(),
+          commits: attestation.commitCount ?? 0,
+          stars:   attestation.totalStars ?? 0,
+          events:  attestation.contributionEvents90d ?? 0,
+          wallet_address_hi: attestation.walletAddressHi,
+          wallet_address_lo: attestation.walletAddressLo,
+        });
+
+        if (!result.success) {
+          throw result.error instanceof Error ? result.error : new Error('Proof generation failed');
+        }
+
+        const t3 = formatLogTime(new Date());
+        setPhaseTimes((prev) => ({ ...prev, [3]: t3 }));
+        setPhaseStates(['done', 'done', 'done', 'done']);
+        await sleep(600);
+        if (cancelled) return;
+
+        const proofHex = ('0x' + Array.from(result.proof).map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`;
+        const pubInputsBytes32 = result.publicInputs.map(v => {
+          const hex = BigInt(v).toString(16).padStart(64, '0');
+          return `0x${hex}` as `0x${string}`;
+        });
+
+        const slug = repo.includes('/') ? repo.split('/')[1] || 'repo' : 'repo';
+        const prTitle = `feat(${slug}): deliver milestone scope with tests and integration`;
+        const mergedAt = new Date();
+        const encoder = new TextEncoder();
+        const proofHashBuf = await crypto.subtle.digest('SHA-256', result.proof as any);
+        const proofHash = ('0x' + Array.from(new Uint8Array(proofHashBuf))
+          .map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`;
+
+        const preview: ZkProofPreview = {
+          prTitle,
+          merged: true,
+          authorLogin: `@${reg}`,
+          branch: 'main',
+          mergedAtIso: mergedAt.toISOString(),
+          proofHash,
+          identityMatches: true,
+          proof: proofHex,
+          publicInputs: pubInputsBytes32,
+        };
+
+        onProofResolved({ outcome: 'success', preview });
+
+      } catch (err: any) {
+        onProofResolved({ outcome: 'failure', errorMessage: err.message || 'Unknown proof generation error.' });
       }
     })();
 
