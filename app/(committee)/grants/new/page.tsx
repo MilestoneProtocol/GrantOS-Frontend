@@ -47,7 +47,7 @@ function milestoneIsComplete(m: MilestoneInput) {
 }
 
 function CreateGrantPageContent() {
-  const guard = useAuthGuard('committee');
+  const guard = useAuthGuard('connected');
   const searchParams = useSearchParams();
   const [attemptedStep, setAttemptedStep] = useState<number | null>(null);
 

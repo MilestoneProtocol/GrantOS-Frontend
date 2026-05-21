@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 
-export type RequiredRole = 'builder' | 'committee' | 'dao' | 'public';
+export type RequiredRole = 'builder' | 'committee' | 'dao' | 'connected' | 'public';
 
 type GuardState =
   | { state: 'public' }
@@ -15,7 +15,7 @@ type GuardState =
   | { state: 'blocked' };
 
 function roleFromRoles(requiredRole: RequiredRole, roles: ReturnType<typeof useRoleDetection>) {
-  if (requiredRole === 'public') return true;
+  if (requiredRole === 'public' || requiredRole === 'connected') return true;
   if (requiredRole === 'dao') return roles.isDaoAdmin;
   if (requiredRole === 'committee') return roles.isCommittee;
   if (requiredRole === 'builder') return roles.isBuilder || roles.isVerified;
@@ -28,6 +28,7 @@ function roleFromRoles(requiredRole: RequiredRole, roles: ReturnType<typeof useR
  *
  * Behavior:
  * - If wallet disconnected on a protected route → redirect to `/` with toast.
+ * - `connected`: any connected wallet is allowed (e.g. grant creation).
  * - If wallet connected but role doesn't match → redirect to `/` (onboarding will show Role Selection).
  *
  * Returns a small state machine so pages can choose to render a skeleton while role detection resolves.
@@ -44,6 +45,7 @@ export function useAuthGuard(requiredRole: RequiredRole): GuardState {
     if (requiredRole === 'public') return { state: 'public' };
     if (!walletResolved) return { state: 'loading' };
     if (!isConnected) return { state: 'blocked' };
+    if (requiredRole === 'connected') return { state: 'allowed' };
     if (roles.loading) return { state: 'loading' };
     return roleFromRoles(requiredRole, roles) ? { state: 'allowed' } : { state: 'blocked' };
   }, [isConnected, requiredRole, roles, walletResolved]);
@@ -59,6 +61,8 @@ export function useAuthGuard(requiredRole: RequiredRole): GuardState {
       router.replace(`/?toast=${encodeURIComponent(key)}&m=${encodeURIComponent(message)}&from=${encodeURIComponent(pathname ?? '')}`);
       return;
     }
+
+    if (requiredRole === 'connected') return;
 
     if (!roles.loading && !roleFromRoles(requiredRole, roles)) {
       router.replace(`/?select=1&from=${encodeURIComponent(pathname ?? '')}`);
