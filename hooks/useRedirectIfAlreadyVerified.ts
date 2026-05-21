@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 
 /**
- * Sends already ZK-verified wallets to the builder dashboard.
+ * Sends already ZK-verified wallets back to onboarding so they can pick a role.
  * Never blocks rendering — the verify UI stays visible until redirect runs.
  */
 export function useRedirectIfAlreadyVerified() {
@@ -33,7 +33,7 @@ export function useRedirectIfAlreadyVerified() {
     if (isLoading || isError) return;
     if (verified !== true) return;
     redirected.current = true;
-    router.replace('/builder?toast=already_verified');
+    router.replace('/?select=1&toast=already_verified');
   }, [address, isError, isLoading, router, verified, walletResolved]);
 
   return { checking: Boolean(address) && walletResolved && CONTRACTS_READY && isLoading };

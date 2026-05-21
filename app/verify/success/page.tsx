@@ -489,7 +489,7 @@ function SuccessContent() {
     if (!walletResolved || verifiedLoading) return;
     if (!alreadyVerified || generatingZk || txPending || txConfirming) return;
     if (isFullyVerified) return;
-    router.replace('/builder?toast=already_verified');
+    router.replace('/?select=1&toast=already_verified');
   }, [
     alreadyVerified,
     generatingZk,
@@ -504,7 +504,7 @@ function SuccessContent() {
   useEffect(() => {
     if (isFullyVerified && resolvedRequestId) {
       const timer = setTimeout(() => {
-        router.replace('/builder?toast=identity_verified');
+        router.replace('/?select=1&toast=identity_verified');
       }, 3000);
       return () => clearTimeout(timer);
     }

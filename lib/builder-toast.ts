@@ -9,5 +9,5 @@ export const BUILDER_TOAST_MESSAGES: Record<string, string> = {
   not_committee: 'You are not a committee member.',
   complete_verification: 'Complete identity verification to receive grants.',
   already_verified: 'You are already verified.',
-  identity_verified: 'Identity verified on-chain. Your builder profile is ready.',
+  identity_verified: 'Identity verified on-chain. Choose how you want to continue.',
 };

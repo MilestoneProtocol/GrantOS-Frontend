@@ -19,10 +19,15 @@ function EntryPageInner() {
   const { isConnected, status } = useAccount();
   const roles = useRoleDetection();
   const redirectedRef = useRef(false);
-  const homeEnteredAtRef = useRef(Date.now());
+  const homeEnteredAtRef = useRef(0);
 
   const walletResolved = status !== 'connecting' && status !== 'reconnecting';
   const forceRoleSelect = searchParams.get('select') === '1';
+  useEffect(() => {
+    if (homeEnteredAtRef.current !== 0) return;
+    homeEnteredAtRef.current = Date.now();
+  }, []);
+
   useEffect(() => {
     if (redirectedRef.current) return;
     if (!walletResolved) return;
@@ -43,8 +48,10 @@ function EntryPageInner() {
       target = roles.isDaoAdmin ? '/dao' : '/committee';
     } else if (roles.isBuilder && !roles.isVerified) {
       target = '/verify?toast=complete_verification';
-    } else if (roles.isVerified || roles.isBuilder) {
+    } else if (roles.isBuilder) {
       target = '/builder';
+    } else if (roles.isVerified) {
+      return;
     } else {
       return;
     }
@@ -78,7 +85,8 @@ function EntryPageInner() {
     (forceRoleSelect ||
       roles.isNewWallet ||
       roles.hasMultipleRoles ||
-      (roles.isBuilder && roles.isCommittee));
+      (roles.isBuilder && roles.isCommittee) ||
+      (roles.isVerified && !roles.isBuilder && !roles.isCommittee));
 
   const builderUnverifiedNudge =
     shouldDetect && !roles.loading && roles.isBuilder && !roles.isVerified;
