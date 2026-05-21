@@ -1,6 +1,4 @@
-import { isUiDemoMode } from '@/demo';
 import type { Address } from 'viem';
-import { generateTasksDemo } from './demo';
 import type { TasksQueue } from './types';
 
 export type { CommitteeTask, TaskPriority, TaskType, TasksQueue, TasksSummary } from './types';
@@ -13,16 +11,8 @@ const EMPTY_QUEUE: TasksQueue = {
 };
 
 /**
- * Builds the committee member's personal action queue.
- *
- * Demo mode synthesises from committee fixtures. Production path batches
- * `getCommitteeGrants` → `getGrant` → `getMilestoneStatus` (extend as contracts ship).
+ * Builds the committee member's personal action queue from chain reads.
  */
-export async function generateTasks(address: Address): Promise<TasksQueue> {
-  if (isUiDemoMode()) {
-    return generateTasksDemo(address);
-  }
-
-  // Contract reads land here; return empty until escrow view fns are wired end-to-end.
+export async function generateTasks(_address: Address): Promise<TasksQueue> {
   return EMPTY_QUEUE;
 }

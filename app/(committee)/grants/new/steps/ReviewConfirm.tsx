@@ -1,5 +1,6 @@
 'use client';
 
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { MilestoneInput, PaymentMode } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { GRANT_FACTORY_ADDRESS, grantFactoryAbi, CONTRACTS_READY } from '@/lib/escrow';
@@ -158,7 +159,7 @@ export default function ReviewConfirm({
           })),
         };
 
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        const apiBase = getPublicApiV1Base();
         await fetch(`${apiBase}/grants`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -17,7 +17,6 @@ import { useEffect, useState, useMemo } from 'react';
 import { useWatchContractEvent, useReadContract, useReadContracts } from 'wagmi';
 import { useQueries } from '@tanstack/react-query';
 import { zeroAddress } from 'viem';
-import { isUiDemoMode } from '@/demo';
 import {
   CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
@@ -32,7 +31,6 @@ import { useEnrichedGrants } from '@/hooks/useEnrichedGrants';
 import { useDashboardStats } from '@/hooks/useGrantStats';
 import { grantEscrowEventsAbi } from '@/lib/notifications';
 import {
-  getTreasurySnapshot,
   type TreasurySnapshot,
   type EscrowRow,
   type StreamRow,
@@ -185,10 +183,7 @@ export default function TreasuryPage() {
   }, [grantDetailQueries]);
 
   const mappedSnapshot = useMemo((): TreasurySnapshot => {
-    if (isUiDemoMode() || !CONTRACTS_READY) {
-      return getTreasurySnapshot();
-    }
-    if (!grantsData) return EMPTY_TREASURY_SNAPSHOT;
+    if (!CONTRACTS_READY || !grantsData) return EMPTY_TREASURY_SNAPSHOT;
 
     const escrowList: EscrowRow[] = [];
     const slashList: SlashRow[] = [];
@@ -361,7 +356,6 @@ export default function TreasuryPage() {
     const flowRate = activeStreams.reduce((s, r) => s + r.flowRateUsdcPerSec, 0);
     const avgSize = grantCount > 0 ? escrowList.reduce((s, r) => s + r.totalEscrowedUsdc, 0) / grantCount : 0;
 
-    const baseSnapshot = getTreasurySnapshot();
     const hero = {
       totalUsdcLocked: totalLocked,
       totalReleasedAllTime: totalReleased,
@@ -369,30 +363,17 @@ export default function TreasuryPage() {
       currentlyStreamingFlowRate: flowRate,
       totalGrantsCreated: grantCount,
       averageGrantSizeUsdc: avgSize,
-      sparks: baseSnapshot.hero.sparks,
-      delta: baseSnapshot.hero.delta,
+      sparks: EMPTY_TREASURY_SNAPSHOT.hero.sparks,
+      delta: EMPTY_TREASURY_SNAPSHOT.hero.delta,
     };
 
-    // CashFlow points generator
-    const cashFlow: Record<string, CashFlowPoint[]> = {};
-    const ranges: ('7D' | '30D' | '90D' | '12M' | 'ALL')[] = ['7D', '30D', '90D', '12M', 'ALL'];
-
-    ranges.forEach((rng) => {
-      const basePoints = baseSnapshot.cashFlow[rng];
-      cashFlow[rng] = basePoints.map((pt, index) => {
-        const progress = index / Math.max(1, basePoints.length - 1);
-        const scaleLocked = totalLocked > 0 ? totalLocked / 2450000 : 1;
-        const scaleReleased = totalReleased > 0 ? totalReleased / 8120450 : 1;
-        const scaleRecovered = totalRecovered > 0 ? totalRecovered / 202500 : 1;
-
-        return {
-          ...pt,
-          locked: Math.round(pt.locked * (1 - progress + progress * scaleLocked)),
-          released: Math.round(pt.released * (1 - progress + progress * scaleReleased)),
-          recovered: Math.round(pt.recovered * (1 - progress + progress * scaleRecovered)),
-        };
-      });
-    });
+    const cashFlow: Record<string, CashFlowPoint[]> = {
+      '7D': [],
+      '30D': [],
+      '90D': [],
+      '12M': [],
+      ALL: [],
+    };
 
     activityList.sort((a, b) => b.timestampMs - a.timestampMs);
 
@@ -408,7 +389,6 @@ export default function TreasuryPage() {
   }, [grantsData, identitiesData, enrichedGrants, detailsList, stats, grantCount]);
 
   const isLoadingData =
-    !isUiDemoMode() &&
     CONTRACTS_READY &&
     (isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading || isEnrichedLoading);
 
@@ -429,9 +409,8 @@ export default function TreasuryPage() {
     onLogs: () => refresh(),
   });
 
-  // Keep store's snapshot updated with real grants if we are not in demo mode
   useEffect(() => {
-    if (!isUiDemoMode() && CONTRACTS_READY && mappedSnapshot && !isLoadingData) {
+    if (CONTRACTS_READY && mappedSnapshot && !isLoadingData) {
       const current = useTreasuryStore.getState().snapshot;
       const hashCurrent = JSON.stringify({
         hero: current.hero,

@@ -1,6 +1,5 @@
 'use client';
 
-import { getCommitteeDemoActions, isUiDemoMode } from '@/demo';
 import { useEffect, useMemo, useState } from 'react';
 
 /**
@@ -227,40 +226,7 @@ export function markBuilderWarningSlashed(
  * builder-facing record shape. Recomputed once per call — cheap.
  */
 function getSeedBuilderWarnings(): BuilderWarningRecord[] {
-  const view = getCommitteeDemoActions();
-  return view.overdue
-    .filter(
-      (m): m is typeof m & { state: Extract<typeof m.state, { kind: 'warning_issued' }> } =>
-        m.state.kind === 'warning_issued',
-    )
-    .map((m) => {
-      const warningIssuedAtMs = new Date(m.state.warningIssuedAtIso).getTime();
-      // Derive a plausible "milestone overdue" timestamp from `daysOverdue` —
-      // the seed fixture exposes that count and the warning is typically
-      // issued at the end of the grace period.
-      const overdueAtMs = warningIssuedAtMs - m.daysOverdue * 24 * 60 * 60 * 1000;
-      // Anchor the original approval ~90d before the warning so the timeline
-      // has a sensible "Pending → Overdue → Warning → Slash" cadence.
-      const approvedAtMs = overdueAtMs - 90 * 24 * 60 * 60 * 1000;
-      return {
-        id: m.id,
-        milestoneId: m.id,
-        builderAddress: m.builderAddress,
-        grantId: m.grantId,
-        grantTitle: m.grantTitle,
-        milestoneTitle: m.milestoneTitle,
-        milestoneIndex: m.milestoneIndex,
-        amountAtRiskUsdc: m.amount.value,
-        committeeMemberAddress: m.state.committeeMemberAddress,
-        committeeMemberLabel: 'Committee Lead',
-        message: m.state.message,
-        warningIssuedAtIso: m.state.warningIssuedAtIso,
-        slashUnlocksAtIso: m.state.slashUnlocksAtIso,
-        attestationUrl: m.state.attestationUrl,
-        milestoneApprovedAtIso: new Date(approvedAtMs).toISOString(),
-        milestoneOverdueAtIso: new Date(overdueAtMs).toISOString(),
-      };
-    });
+  return [];
 }
 
 /* --------------------------------- Hook --------------------------------- */
@@ -321,7 +287,6 @@ function useMergedBuilderWarnings(
   }, [seed, active, cleared]);
 
   return useMemo(() => {
-    if (isUiDemoMode()) return merged;
     if (!builderAddress) return [];
     const lc = builderAddress.toLowerCase();
     return merged.filter((w) => w.builderAddress.toLowerCase() === lc);

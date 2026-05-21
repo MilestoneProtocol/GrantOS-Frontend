@@ -1,4 +1,6 @@
-const BASE = '/api/v1';
+import { getPublicApiV1Base } from '@/lib/api-config';
+
+const BASE = getPublicApiV1Base();
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, options);

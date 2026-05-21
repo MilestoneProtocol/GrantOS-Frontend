@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:3001';
+const BACKEND_URL =
+  process.env.BACKEND_URL?.replace(/\/+$/, '') ??
+  'https://grantos-backend-9f5v.onrender.com';
 
 const nextConfig: NextConfig = {
   /** Heavy WASM / ESM packages used by `lib/zk/prover.ts` for client-side proofs. */

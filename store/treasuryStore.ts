@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  getTreasurySnapshot,
-  type TreasuryActivityFilter,
-  type TreasurySnapshot,
-  type TreasuryTimeRange,
-} from '@/lib/treasury';
-import { isUiDemoMode } from '@/demo';
+import type { TreasuryActivityFilter, TreasurySnapshot, TreasuryTimeRange } from '@/lib/treasury';
 import { create } from 'zustand';
 
 /**
@@ -33,9 +27,7 @@ type TreasuryState = {
   refresh: () => void;
 };
 
-const initialSnapshot: TreasurySnapshot = isUiDemoMode()
-  ? getTreasurySnapshot()
-  : {
+const initialSnapshot: TreasurySnapshot = {
       hero: {
         totalUsdcLocked: 0,
         totalReleasedAllTime: 0,
@@ -77,9 +69,9 @@ const initialSnapshot: TreasurySnapshot = isUiDemoMode()
         upcoming: [],
       },
       activity: [],
-    };
+};
 
-export const useTreasuryStore = create<TreasuryState>((set, get) => ({
+export const useTreasuryStore = create<TreasuryState>((set) => ({
   snapshot: initialSnapshot,
   range: '30D',
   chartMode: 'bar',
@@ -90,11 +82,6 @@ export const useTreasuryStore = create<TreasuryState>((set, get) => ({
   setActivityFilter: (activityFilter) => set({ activityFilter }),
   setSnapshot: (snapshot) => set({ snapshot }),
   refresh: () => {
-    if (isUiDemoMode()) {
-      set({
-        pollTick: get().pollTick + 1,
-        snapshot: getTreasurySnapshot(),
-      });
-    }
+    /* Refreshed by treasury page chain/backend fetches calling setSnapshot. */
   },
 }));

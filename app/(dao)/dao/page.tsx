@@ -30,8 +30,7 @@ import { Download, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useWatchContractEvent, useReadContract, useReadContracts } from 'wagmi';
-import { isUiDemoMode } from '@/demo';
-import { getDaoDashboardSnapshot, type DaoGrantCardModel } from '@/demo/dao-dashboard';
+import type { DaoGrantCardModel } from '@/demo/dao-dashboard';
 import { zeroAddress } from 'viem';
 
 const MIN_VALIDATION_MS = 1500;
@@ -127,10 +126,7 @@ export default function DaoDashboardPage() {
   );
 
   const mappedGrants = useMemo((): DaoGrantCardModel[] => {
-    if (isUiDemoMode() || !CONTRACTS_READY) {
-      return getDaoDashboardSnapshot(0).grants;
-    }
-    if (!grantsData) return [];
+    if (!CONTRACTS_READY || !grantsData) return [];
     return grantsData
       .map((row: any, i: number) => {
         if (row.status !== 'success' || !row.result) return null;
@@ -190,14 +186,12 @@ export default function DaoDashboardPage() {
       .filter((x) => x !== null) as DaoGrantCardModel[];
   }, [grantsData, identitiesData, enrichedGrants, reputations]);
 
-  // Keep store's snapshot updated with real grants if we are not in demo mode
   const setSnapshot = useDaoDashboardStore((s) => s.setSnapshot);
 
-  // Use real stats if available, fallback to demo data
   const heroStats = stats || snapshot.hero;
 
   useEffect(() => {
-    if (!isUiDemoMode() && CONTRACTS_READY && mappedGrants !== undefined) {
+    if (CONTRACTS_READY && mappedGrants !== undefined) {
       const current = useDaoDashboardStore.getState().snapshot;
       const grantsChanged = JSON.stringify(current.grants) !== JSON.stringify(mappedGrants);
       const heroChanged = JSON.stringify(current.hero) !== JSON.stringify(heroStats);
@@ -212,7 +206,6 @@ export default function DaoDashboardPage() {
   }, [mappedGrants, heroStats, setSnapshot]);
 
   const isLoadingData =
-    !isUiDemoMode() &&
     CONTRACTS_READY &&
     (isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading || isEnrichedLoading);
 

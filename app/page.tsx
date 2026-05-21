@@ -5,7 +5,6 @@ import RoleSelection from '@/app/RoleSelection';
 import DetectingRoleSkeleton from '@/app/(onboarding)/DetectingRoleSkeleton';
 import OnboardingShell from '@/app/(onboarding)/OnboardingShell';
 import OnboardingToast from '@/app/(onboarding)/OnboardingToast';
-import { isRoleCheckBypassed } from '@/lib/role-access';
 import { useRoleDetection } from '@/lib/roleDetection';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef } from 'react';
@@ -20,11 +19,14 @@ function EntryPageInner() {
   const { isConnected, status } = useAccount();
   const roles = useRoleDetection();
   const redirectedRef = useRef(false);
-  const homeEnteredAtRef = useRef(Date.now());
+  const homeEnteredAtRef = useRef(0);
 
   const walletResolved = status !== 'connecting' && status !== 'reconnecting';
   const forceRoleSelect = searchParams.get('select') === '1';
-  const bypassRoles = isRoleCheckBypassed() || roles.bypassActive;
+  useEffect(() => {
+    if (homeEnteredAtRef.current !== 0) return;
+    homeEnteredAtRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     if (redirectedRef.current) return;
@@ -32,26 +34,23 @@ function EntryPageInner() {
     if (!isConnected) return;
     if (roles.loading) return;
 
-    // Local / demo: always show role picker — no auto-redirect to a single surface.
-    if (bypassRoles) return;
-
     // PRD decision tree (in order).
     // 1) New wallet → role selection
     if (roles.isNewWallet) return;
 
     let target: string | null = null;
 
-    // 2) Builder only, unverified → /verify with toast
-    if (roles.isBuilder && !roles.isVerified && !roles.isCommittee) {
-      target = '/verify?toast=complete_verification';
-    } else if (roles.isBuilder && roles.isVerified && !roles.isCommittee) {
-      // 3) Builder only, verified → /builder
-      target = '/builder';
-    } else if (roles.isCommittee && !roles.isBuilder) {
-      // 4) Committee only (DAO admin check comes first)
+    if (roles.hasMultipleRoles) {
+      return;
+    }
+
+    if (roles.isCommittee && !roles.isBuilder) {
       target = roles.isDaoAdmin ? '/dao' : '/committee';
-    } else if (roles.hasMultipleRoles) {
-      // 5) Both builder + committee → role selection (no redirect)
+    } else if (roles.isBuilder && !roles.isVerified) {
+      target = '/verify?toast=complete_verification';
+    } else if (roles.isBuilder) {
+      target = '/builder';
+    } else if (roles.isVerified) {
       return;
     } else {
       return;
@@ -76,7 +75,6 @@ function EntryPageInner() {
     roles.loading,
     router,
     walletResolved,
-    bypassRoles,
   ]);
 
   const shouldDetect = walletResolved && isConnected;
@@ -84,11 +82,11 @@ function EntryPageInner() {
   const showRoleSelection =
     shouldDetect &&
     !roles.loading &&
-    (bypassRoles ||
-      forceRoleSelect ||
+    (forceRoleSelect ||
       roles.isNewWallet ||
       roles.hasMultipleRoles ||
-      (roles.isBuilder && roles.isCommittee));
+      (roles.isBuilder && roles.isCommittee) ||
+      (roles.isVerified && !roles.isBuilder && !roles.isCommittee));
 
   const builderUnverifiedNudge =
     shouldDetect && !roles.loading && roles.isBuilder && !roles.isVerified;
@@ -100,9 +98,8 @@ function EntryPageInner() {
         <DetectingRoleSkeleton />
       ) : showRoleSelection ? (
         <RoleSelection
-          showDaoCard={bypassRoles || roles.isNewWallet || roles.isDaoAdmin}
-          builderUnverifiedNudge={!bypassRoles && builderUnverifiedNudge}
-          devBypassActive={bypassRoles}
+          showDaoCard={roles.isNewWallet || roles.isDaoAdmin}
+          builderUnverifiedNudge={builderUnverifiedNudge}
         />
       ) : (
         <LandingPage />

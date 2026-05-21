@@ -4,7 +4,6 @@ import CommitteeAccessDeniedToast from '@/components/committee/CommitteeAccessDe
 import CommitteeAppShell from '@/components/committee/CommitteeAppShell';
 import CommitteeReviewSkeleton from '@/components/committee/CommitteeReviewSkeleton';
 import ActiveReviewsList from '@/components/committee/reviews/ActiveReviewsList';
-import { getCommitteeDemoActiveReviews } from '@/demo/committee-demo';
 import { useAuthGuard } from '@/lib/authGuard';
 import { useCommitteeReviews } from '@/lib/hooks/useCommitteeReviews';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,8 +15,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  * skeleton sits for a minimum window, and unauthorized requests redirect to
  * `/` after the inline access-denied toast.
  *
- * Demo data is used while we wait on the contract reads for
- * `submitted`-state milestones across the connected wallet's committee grants.
  */
 const MIN_VALIDATION_MS = 1500;
 const ACCESS_DENIED_LINGER_MS = 1600;

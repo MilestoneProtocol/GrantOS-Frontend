@@ -2,6 +2,7 @@
 
 import BuilderAppShell from '@/components/builder/BuilderAppShell';
 import Link from 'next/link';
+import { isWalletExtensionNoise } from '@/lib/wallet-extension-errors';
 import { useEffect } from 'react';
 
 export default function BuilderDashboardError({
@@ -15,9 +16,7 @@ export default function BuilderDashboardError({
     console.error('[builder dashboard]', error);
   }, [error]);
 
-  const walletNoise =
-    error.message.includes('chrome.runtime.sendMessage') ||
-    error.message.includes('Extension ID');
+  const walletNoise = isWalletExtensionNoise(error);
 
   return (
     <BuilderAppShell navActive="dashboard">

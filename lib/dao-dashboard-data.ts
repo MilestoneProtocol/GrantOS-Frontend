@@ -1,21 +1,21 @@
 'use client';
 
 import type { DaoDashboardSnapshot, DaoGrantCardModel } from '@/demo/dao-dashboard';
-import { getDaoDashboardSnapshot } from '@/demo/dao-dashboard';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDaoDashboardStore } from '@/lib/dao-dashboard-store';
+import { useCallback, useEffect, useState } from 'react';
 
 const POLL_MS = 30_000;
 
 /**
- * DAO dashboard aggregate + grant rows. `pollTick` increments every 30s so
- * hero slash + ZK counters climb (upward tick animation). Production swaps
- * this for GrantEscrow / ReputationRegistry / indexer reads.
+ * DAO dashboard aggregate + grant rows. Prefer `useDaoDashboardStore` on the DAO page;
+ * this hook exposes the same snapshot with a poll tick for legacy callers.
  */
 export function useDaoDashboardData(): {
   snapshot: DaoDashboardSnapshot;
   pollTick: number;
   refetch: () => void;
 } {
+  const snapshot = useDaoDashboardStore((s) => s.snapshot);
   const [pollTick, setPollTick] = useState(0);
 
   const refetch = useCallback(() => {
@@ -26,11 +26,6 @@ export function useDaoDashboardData(): {
     const id = window.setInterval(refetch, POLL_MS);
     return () => window.clearInterval(id);
   }, [refetch]);
-
-  const snapshot = useMemo(
-    () => getDaoDashboardSnapshot(pollTick),
-    [pollTick],
-  );
 
   return { snapshot, pollTick, refetch };
 }

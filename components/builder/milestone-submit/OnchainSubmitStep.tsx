@@ -1,5 +1,6 @@
 'use client';
 
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { useMilestoneSubmit } from '@/components/builder/milestone-submit/MilestoneSubmitProvider';
 import type { AiVerifierVerdict } from '@/lib/ai-verifier';
 import { easConfigured } from '@/lib/eas-config';
@@ -192,7 +193,7 @@ export default function OnchainSubmitStep() {
     // Index the submission in the backend
     const recordBackend = async () => {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        const apiBase = getPublicApiV1Base();
         await fetch(`${apiBase}/milestones/submit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

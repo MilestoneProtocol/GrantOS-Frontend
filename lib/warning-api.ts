@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
+import { getPublicApiV1Base } from '@/lib/api-config';
+
+const API_BASE_URL = getPublicApiV1Base();
 
 export interface MilestoneWarning {
   id: number;

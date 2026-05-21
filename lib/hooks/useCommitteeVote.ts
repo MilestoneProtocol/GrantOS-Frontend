@@ -1,3 +1,4 @@
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { useCallback, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { grantEscrowAbi } from '@/lib/escrow';
@@ -40,7 +41,7 @@ export function useCommitteeVote(escrowAddress: Address, milestoneIndex: number,
 
   const recordBackend = useCallback(async (txHash: string, intent: VoteIntent, approvalCount: number, rejectionCount: number, finalStatus?: 'approved' | 'rejected') => {
       try {
-          const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+          const apiBase = getPublicApiV1Base();
           await fetch(`${apiBase}/milestones/vote`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

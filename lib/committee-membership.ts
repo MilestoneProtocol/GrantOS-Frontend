@@ -1,6 +1,5 @@
 'use client';
 
-import { isUiDemoMode } from '@/demo';
 import { GRANT_ESCROW_ADDRESS, committeeMembershipAbis } from '@/lib/escrow';
 import { useMemo } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
@@ -17,9 +16,7 @@ export type CommitteeMembership =
  * `getGrantsByCommittee`, `getCommitteeGrants`) and unions the results so this
  * works across deployments without coupling the UI to a single ABI shape.
  *
- * Returns `state: 'idle'` until a wallet is connected. In UI demo mode
- * (`NEXT_PUBLIC_GRANTOS_UI_DEMO=true`) we synthesise a single committee grant
- * so the dashboard is reachable without a deployed contract.
+ * Returns `state: 'idle'` until a wallet is connected.
  */
 export function useCommitteeMembership(): CommitteeMembership {
   const { address } = useAccount();
@@ -68,12 +65,6 @@ export function useCommitteeMembership(): CommitteeMembership {
 
     if (stillLoading && grantIds.length === 0) {
       return { state: 'loading', isMember: false, grantIds: [] };
-    }
-
-    // Demo bypass: pretend the connected wallet is on a committee so the dashboard
-    // can be designed without a deployed escrow ABI.
-    if (isUiDemoMode()) {
-      return { state: 'ready', isMember: true, grantIds };
     }
 
     // If every read errored (likely no deployment / wrong ABI), treat as not-a-member

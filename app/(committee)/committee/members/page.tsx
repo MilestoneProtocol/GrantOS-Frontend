@@ -4,7 +4,7 @@ import CommitteeAccessDeniedToast from '@/components/committee/CommitteeAccessDe
 import CommitteeAppShell from '@/components/committee/CommitteeAppShell';
 import CommitteeReviewSkeleton from '@/components/committee/CommitteeReviewSkeleton';
 import CommitteeRosterList from '@/components/committee/members/CommitteeRosterList';
-import { getCommitteeDemoRosters } from '@/demo/committee-demo';
+import type { CommitteeGrantRoster } from '@/demo/committee-demo';
 import { useAuthGuard } from '@/lib/authGuard';
 import { useCommitteeReviews } from '@/lib/hooks/useCommitteeReviews';
 import { useEffect, useMemo, useState } from 'react';
@@ -27,7 +27,7 @@ export default function CommitteeMembersPage() {
   }, []);
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
-  const rosters = useMemo(() => getCommitteeDemoRosters(), []);
+  const rosters = useMemo((): CommitteeGrantRoster[] => [], []);
 
   return (
     <CommitteeAppShell breadcrumb="Committee" reviewsBadge={reviews.tabCounts.pending}>

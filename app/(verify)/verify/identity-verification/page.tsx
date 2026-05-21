@@ -1,7 +1,11 @@
 'use client';
 
 import ConnectButton from '@/components/ConnectButton';
+import VerifyBackButton from '@/components/verify/VerifyBackButton';
+import VerifyWalletReconnect from '@/components/verify/VerifyWalletReconnect';
 import { api } from '@/lib/api';
+import { useRedirectIfAlreadyVerified } from '@/hooks/useRedirectIfAlreadyVerified';
+import { persistVerifyRequestId, persistVerifyWallet } from '@/lib/identity-verify-session';
 import { Check, Circle, Shield } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
@@ -21,6 +25,7 @@ const steps = [
 
 export default function IdentityVerificationPage() {
   const { isConnected, address } = useAccount();
+  useRedirectIfAlreadyVerified();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +48,8 @@ export default function IdentityVerificationPage() {
         '/identity/init',
         { walletAddress: address },
       );
-      console.log('Verification initiated, requestId:', requestId);
+      persistVerifyRequestId(requestId);
+      persistVerifyWallet(requestId, address);
 
       console.log('Fetching OAuth URL...');
       const { oauthUrl } = await api.get<{ oauthUrl: string; requestId: string }>(
@@ -74,13 +80,15 @@ export default function IdentityVerificationPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <VerifyWalletReconnect />
       <header className="border-b border-slate-200 bg-white">
         <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
+            <VerifyBackButton />
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500">
               <GithubIcon className="h-4 w-4 text-white" />
             </div>
-            <h1 className="text-[15px] font-semibold text-slate-900">GrantOS v3</h1>
+            <h1 className="text-[15px] font-semibold text-slate-900">GrantOS</h1>
           </div>
           {isConnected ? <ConnectButton variant="header" /> : <ConnectButton variant="green" />}
         </div>

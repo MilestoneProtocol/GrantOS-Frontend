@@ -1,6 +1,5 @@
 'use client';
 
-import DisplayTab from '@/app/settings/tabs/DisplayTab';
 import NetworkTab from '@/app/settings/tabs/NetworkTab';
 import NotificationsTab from '@/app/settings/tabs/NotificationsTab';
 import ProfileTab from '@/app/settings/tabs/ProfileTab';
@@ -12,7 +11,6 @@ import { createPortal } from 'react-dom';
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'profile', label: 'Profile' },
   { id: 'notifications', label: 'Notifications' },
-  { id: 'display', label: 'Display' },
   { id: 'network', label: 'Network' },
 ];
 
@@ -22,8 +20,6 @@ function TabPanel({ tab }: { tab: SettingsTab }) {
       return <ProfileTab />;
     case 'notifications':
       return <NotificationsTab />;
-    case 'display':
-      return <DisplayTab />;
     case 'network':
       return <NetworkTab />;
     default:
@@ -43,6 +39,10 @@ export default function SettingsModal() {
     },
     [closeSettings],
   );
+
+  useEffect(() => {
+    if (settingsTab === 'display') setSettingsTab('profile');
+  }, [settingsTab, setSettingsTab]);
 
   useEffect(() => {
     if (!settingsOpen) return;
