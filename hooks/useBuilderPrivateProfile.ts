@@ -1,7 +1,5 @@
 'use client';
 
-import { getDaoDashboardSnapshot, type DaoGrantCardModel } from '@/demo/dao-dashboard';
-import { isUiDemoMode } from '@/demo';
 import { tierFromReputationPoints } from '@/lib/builder-contribution-tiers';
 import type { BuilderProfileData } from '@/lib/builder-profile-server';
 import { scoreToLetterGrade } from '@/lib/builder-profile-server';
@@ -57,81 +55,6 @@ export type BuilderEarningsStats = {
 function usdcFromWei(w: bigint): number {
   return Number(formatUnits(w, USDC_DECIMALS));
 }
-
-
-
-function demoCardsForBuilder(address: string): DaoGrantCardModel[] {
-  if (!isUiDemoMode()) return [];
-  const snap = getDaoDashboardSnapshot(0);
-  return snap.grants.filter((g) => g.builder.toLowerCase() === address.toLowerCase());
-}
-
-function computeStreamingFromDemo(cards: DaoGrantCardModel[]) {
-  let rate = 0;
-  let accumulated = 0;
-  let epochMs = Date.now();
-  let active = false;
-  for (const c of cards) {
-    if (!c.isStreamingActive) continue;
-    active = true;
-    rate += c.streamRateUsdcPerSec;
-    const elapsed = (Date.now() - c.streamEpochMs) / 1000;
-    accumulated += c.streamAccumulatedUsdcAtEpoch + elapsed * c.streamRateUsdcPerSec;
-    epochMs = Math.min(epochMs, c.streamEpochMs);
-  }
-  return { active, accumulatedUsdc: accumulated, rateUsdcPerSec: rate, epochMs };
-}
-
-function computeEarningsFromDemo(cards: DaoGrantCardModel[]) {
-  let totalEarned = 0;
-  let approvedCount = 0;
-  let pendingEscrow = 0;
-  let largest = 0;
-  let largestTitle = '—';
-  let completedGrants = 0;
-  let activeGrantEscrowLocks = 0;
-
-  for (const c of cards) {
-    let grantEarned = 0;
-    let allApproved = c.milestoneTotal > 0 && c.milestoneCompleted === c.milestoneTotal;
-    for (const m of c.milestones) {
-      if (m.status === 'approved') {
-        totalEarned += m.amountUsdc;
-        grantEarned += m.amountUsdc;
-        approvedCount += 1;
-      } else if (m.status === 'pending' || m.status === 'overdue') {
-        pendingEscrow += m.amountUsdc;
-        activeGrantEscrowLocks += 1;
-      }
-    }
-    if (c.totalGrantUsdc > largest) {
-      largest = c.totalGrantUsdc;
-      largestTitle = c.milestones[0]?.title ?? c.displayId;
-    }
-    if (allApproved && c.tags.includes('completed')) completedGrants += 1;
-  }
-
-  const activeGrants = new Set(
-    cards.filter((c) => c.tags.includes('active')).map((c) => c.slug),
-  ).size;
-
-  return {
-    totalUsdcEarned: Math.round(totalEarned * 100) / 100,
-    pendingInEscrow: Math.round(pendingEscrow * 100) / 100,
-    largestSingleGrant: { amount: largest, title: largestTitle },
-    averageMilestoneValue:
-      approvedCount > 0 ? Math.round((totalEarned / approvedCount) * 100) / 100 : 0,
-    totalGrantsCompleted: {
-      count: completedGrants,
-      completionRate:
-        cards.length > 0 ? Math.round((completedGrants / cards.length) * 1000) / 10 : null,
-    },
-    activeGrants: activeGrants || activeGrantEscrowLocks,
-    approvedMilestones: approvedCount,
-    streaming: computeStreamingFromDemo(cards),
-  };
-}
-
 export function useBuilderPrivateProfile() {
   const { address } = useAccount();
   const [profileData, setProfileData] = useState<BuilderProfileData | null>(null);
@@ -313,7 +236,7 @@ export function useBuilderPrivateProfile() {
     };
   }, [address, identityRead.data, verifiedRead.data]);
 
-  const hasBuilderHistory = escrowAddresses.length > 0 || demoCardsForBuilder(address ?? '').length > 0;
+  const hasBuilderHistory = escrowAddresses.length > 0;
 
   const hasProfileContent =
     Boolean(identity?.hasIdentityRecord) ||
@@ -407,13 +330,6 @@ export function useBuilderPrivateProfile() {
       },
     };
   }, [address, escrowAddresses, grantsRead.data, statusRead.data]);
-
-  const demoEarnings = useMemo(() => {
-    if (!address) return null;
-    const cards = demoCardsForBuilder(address);
-    if (cards.length === 0) return null;
-    return computeEarningsFromDemo(cards);
-  }, [address]);
 
   const mergedStats = useMemo(() => {
     const api = profileData?.kind === 'ok' ? profileData.stats : null;

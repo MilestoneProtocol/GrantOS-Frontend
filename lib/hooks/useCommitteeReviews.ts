@@ -1,3 +1,4 @@
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, usePublicClient } from 'wagmi';
 import { grantEscrowAbi } from '@/lib/escrow';
@@ -27,7 +28,7 @@ export function useCommitteeReviews() {
         // In a real factory, we'd have a mapping. For the hackathon, we assume 
         // the backend or a specific contract view helps us.
         // We'll use the backend to find grants for the committee member.
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        const apiBase = getPublicApiV1Base();
         
         // 1. Get all grants where caller is a committee member
         const grantsRes = await fetch(`${apiBase}/grants/committee?address=${address}`);

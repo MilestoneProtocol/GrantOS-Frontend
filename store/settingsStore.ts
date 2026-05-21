@@ -98,7 +98,7 @@ export const useSettingsStore = create<SettingsState>()(
       timestampFormat: 'relative',
       notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
       settingsOpen: false,
-      settingsTab: 'display',
+      settingsTab: 'profile',
 
       setTheme: (theme) => set({ theme }),
       setUsdcDisplay: (usdcDisplay) => set({ usdcDisplay }),

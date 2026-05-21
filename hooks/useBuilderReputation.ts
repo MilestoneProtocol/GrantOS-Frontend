@@ -1,3 +1,4 @@
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { useQuery } from '@tanstack/react-query';
 
 export type ReputationScore = {
@@ -28,7 +29,7 @@ export type ReputationScore = {
   }>;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const API_BASE = getPublicApiV1Base();
 
 export function useBuilderReputation(address: string | null) {
   return useQuery<ReputationScore>({

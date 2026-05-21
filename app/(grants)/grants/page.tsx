@@ -1,10 +1,8 @@
 'use client';
 
 import OnboardingShell from '@/app/(onboarding)/OnboardingShell';
-import { isUiDemoMode } from '@/demo';
 import ReputationBadge from '@/components/ReputationBadge';
 import {
-  getDaoDashboardSnapshot,
   gradeTone,
   hoursUntil,
   letterGradeFromScore,
@@ -132,10 +130,7 @@ export default function GrantsExplorerPage() {
   );
 
   const grants = useMemo((): DaoGrantCardModel[] => {
-    if (isUiDemoMode() || !CONTRACTS_READY) {
-      return getDaoDashboardSnapshot(0).grants;
-    }
-    if (!grantsData) return [];
+    if (!CONTRACTS_READY || !grantsData) return [];
     return grantsData
       .map((row: any, i: number) => {
         if (row.status !== 'success' || !row.result) return null;
@@ -195,7 +190,6 @@ export default function GrantsExplorerPage() {
 
   const isLoading =
     CONTRACTS_READY &&
-    !isUiDemoMode() &&
     (isCountLoading || isAddressesLoading || isGrantsLoading || isIdentitiesLoading || isEnrichedLoading);
 
   const [filter, setFilter] = useState<ExplorerFilter>('all');

@@ -90,6 +90,9 @@ function CreateGrantPageContent() {
     }
   }, [searchParams, setGrantCreationSource]);
 
+  const step0Complete =
+    isAddress(builderAddress.trim()) && builderIdentity !== null;
+
   const stepError = useMemo(() => {
     if (currentStep === 0) {
       if (!builderAddress.trim()) {
@@ -97,6 +100,9 @@ function CreateGrantPageContent() {
       }
       if (!isAddress(builderAddress)) {
         return 'Enter a valid builder wallet address.';
+      }
+      if (!builderIdentity) {
+        return 'Wait for builder identity to load from the registry before continuing.';
       }
     }
     if (currentStep === 1) {
@@ -120,7 +126,7 @@ function CreateGrantPageContent() {
       }
     }
     return '';
-  }, [builderAddress, committeeMembers, currentStep, milestones, quorum]);
+  }, [builderAddress, builderIdentity, committeeMembers, currentStep, milestones, quorum]);
 
   const showStepError = attemptedStep === currentStep && Boolean(stepError);
 
@@ -136,15 +142,7 @@ function CreateGrantPageContent() {
     setBuilderIdentity(identity);
   }, [setBuilderIdentity]);
 
-  if (!hasHydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
-        Restoring session…
-      </div>
-    );
-  }
-
-  const canContinueStep0 = true;
+  const canContinueStep0 = step0Complete;
   const canContinueStep1 =
     milestones.length >= 1 &&
     milestones.length <= 10 &&
@@ -155,6 +153,14 @@ function CreateGrantPageContent() {
     new Set(committeeMembers.map((m) => m.toLowerCase())).size === committeeMembers.length &&
     quorum >= 1 &&
     quorum <= Math.max(1, committeeMembers.length);
+
+  const highestCompletedStep = useMemo(() => {
+    if (!step0Complete) return -1;
+    if (!canContinueStep1) return 0;
+    if (!canContinueStep2) return 1;
+    return STEP_LABELS.length - 1;
+  }, [canContinueStep1, canContinueStep2, step0Complete]);
+
   const canContinue =
     currentStep === 0
       ? canContinueStep0 && !stepError
@@ -163,6 +169,15 @@ function CreateGrantPageContent() {
         : currentStep === 2
           ? canContinueStep2
         : true;
+
+  if (!hasHydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Restoring session…
+      </div>
+    );
+  }
+
   const isLastStep = currentStep === STEP_LABELS.length - 1;
   const isMilestoneStep = currentStep === 1;
   const isCommitteeStep = currentStep === 2;
@@ -172,13 +187,14 @@ function CreateGrantPageContent() {
   const resolvedGrantId = createdGrantId || (builderAddress ? builderAddress.slice(2, 8).toUpperCase() : '000000');
 
   function isStepUnlocked(stepIndex: number) {
-    return stepIndex >= 0;
+    if (stepIndex < 0 || stepIndex >= STEP_LABELS.length) return false;
+    return stepIndex <= highestCompletedStep + 1;
   }
 
   function attemptStepChange(stepIndex: number) {
     if (stepIndex === currentStep) return;
-    if (stepIndex > currentStep && !isStepUnlocked(stepIndex)) {
-      setAttemptedStep(currentStep);
+    if (!isStepUnlocked(stepIndex)) {
+      if (stepIndex > currentStep) setAttemptedStep(currentStep);
       return;
     }
     setAttemptedStep(null);
@@ -239,8 +255,9 @@ function CreateGrantPageContent() {
                   <button
                     type="button"
                     onClick={() => attemptStepChange(index)}
+                    disabled={!isStepUnlocked(index)}
                     aria-disabled={!isStepUnlocked(index)}
-                    className="group relative flex min-w-0 flex-col items-center gap-2 text-center"
+                    className="group relative flex min-w-0 flex-col items-center gap-2 text-center disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {index < STEP_LABELS.length - 1 ? (
                       <span
@@ -376,7 +393,8 @@ function CreateGrantPageContent() {
               <button
                 type="button"
                 onClick={handleContinue}
-                className={`order-3 inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold shadow-sm transition ${
+                disabled={!canContinue}
+                className={`order-3 inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed ${
                   canContinue
                     ? 'bg-[#1f1f1f] text-white hover:bg-black'
                     : 'bg-slate-200 text-slate-400'

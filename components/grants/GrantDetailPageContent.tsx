@@ -2,22 +2,17 @@
 
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import type { GrantDetailContext } from '@/lib/grant-routes';
-import { buildUiDemoGrantTuple, isUiDemoMode, isUiDemoPathSegment, UI_DEMO_GRANT_DISPLAY_ID } from '@/demo';
 import { easAttestationScanUrl } from '@/lib/eas-scan';
 import {
   CONTRACTS_READY,
   GRANT_ESCROW_ADDRESS,
+  grantEscrowAbi,
   grantEscrowReadAbi,
   IDENTITY_REGISTRY_ADDRESS,
   identityRegistryAbi,
   GRANT_FACTORY_ADDRESS,
   grantFactoryAbi,
 } from '@/lib/escrow';
-import {
-  explorerDemoCardToGrantTuple,
-  explorerSlugAsGrantId,
-  findExplorerDemoGrant,
-} from '@/lib/public-explorer-grant';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import {
   AlertTriangle,
@@ -133,9 +128,6 @@ export function GrantDetailPageContent({
   const params = useParams<{ id: string }>();
   const rawId = params?.id ?? '';
   const grantId = useMemo(() => parseGrantId(rawId), [rawId]);
-  const demoCard = useMemo(() => findExplorerDemoGrant(rawId), [rawId]);
-  const uiDemoPath = isUiDemoMode() && isUiDemoPathSegment(rawId);
-
   const [activeTab, setActiveTab] = useState<TabKey>('milestones');
   const [streamAccumulated, setStreamAccumulated] = useState(0);
   const [votedMap, setVotedMap] = useState<Record<string, boolean>>({});
@@ -215,10 +207,8 @@ export function GrantDetailPageContent({
       };
     }
 
-    if (demoCard) return explorerDemoCardToGrantTuple(demoCard);
-    if (uiDemoPath) return buildUiDemoGrantTuple(zeroAddress);
     return null;
-  }, [chainGrant, chainResolved, backendData, demoCard, uiDemoPath]);
+  }, [chainGrant, chainResolved, backendData]);
 
   useEffect(() => {
     if (!publicClient || !escrowAddress || !resolvedGrant?.committee.length || !resolvedGrant?.milestones.length) return;
@@ -233,7 +223,7 @@ export function GrantDetailPageContent({
             resolvedGrant.committee.map(async (member) => {
               const voted = await publicClient.readContract({
                 address: escrowAddress as Address,
-                abi: grantEscrowReadAbi,
+                abi: grantEscrowAbi,
                 functionName: 'hasVoted',
                 args: [BigInt(mIdx), member],
               });
@@ -259,19 +249,12 @@ export function GrantDetailPageContent({
     };
   }, [publicClient, escrowAddress, resolvedGrant?.committee, resolvedGrant?.milestones.length]);
 
-  const effectiveGrantId = useMemo(() => {
-    if (chainResolved && grantId !== null) return grantId;
-    if (demoCard) return explorerSlugAsGrantId(demoCard.slug);
-    if (uiDemoPath) return UI_DEMO_GRANT_DISPLAY_ID;
-    return grantId;
-  }, [chainResolved, demoCard, grantId, uiDemoPath]);
+  const effectiveGrantId = grantId;
 
   const grantBadgeLabel = useMemo(() => {
-    if (demoCard) return demoCard.displayId.replace(/^#/, '');
-    if (grantId !== null) return `GRT-${grantId.toString()}-X`;
-    if (uiDemoPath) return 'ui-demo';
+    if (grantId !== null) return `GRT-${grantId.toString()}`;
     return '—';
-  }, [demoCard, grantId, uiDemoPath]);
+  }, [grantId]);
 
   const { data: identity } = useReadContract({
     address: IDENTITY_REGISTRY_ADDRESS,
@@ -281,21 +264,13 @@ export function GrantDetailPageContent({
     query: { enabled: Boolean(resolvedGrant?.builder) },
   });
 
-  const zkVerified =
-    Boolean(identity?.isVerified) || (!chainResolved && Boolean(demoCard?.zkVerified));
+  const zkVerified = Boolean(identity?.isVerified);
 
   const committee = resolvedGrant?.committee ?? [];
   const milestones = resolvedGrant?.milestones ?? [];
   const totalUsdc = milestones.reduce((sum, m) => sum + m.amount, BigInt(0));
 
   const { flowRatePerSec, streamSeed } = useMemo(() => {
-    if (demoCard && !chainResolved) {
-      return {
-        flowRatePerSec: demoCard.streamRateUsdcPerSec,
-        streamSeed: demoCard.streamAccumulatedUsdcAtEpoch,
-      };
-    }
-    
     if (resolvedGrant) {
       const totalAmountNum = Number(formatUnits(totalUsdc, USDC_DECIMALS));
       const thirtyDaysInSecs = 30 * 24 * 3600;
@@ -317,7 +292,7 @@ export function GrantDetailPageContent({
       flowRatePerSec: 0.05,
       streamSeed: 12459.472013,
     };
-  }, [demoCard, chainResolved, resolvedGrant, totalUsdc]);
+  }, [chainResolved, resolvedGrant, totalUsdc]);
 
   const streamActive = Boolean(resolvedGrant?.streaming);
 
@@ -428,27 +403,18 @@ export function GrantDetailPageContent({
     return rows.sort((a, b) => (new Date(a.ts).getTime() > new Date(b.ts).getTime() ? -1 : 1));
   }, [committee, milestones, rawId, resolvedGrant, backendData]);
 
-  const routeInvalid =
-    !rawId.trim() ||
-    (grantId === null && !demoCard && !uiDemoPath);
+  const routeInvalid = !rawId.trim() || grantId === null;
 
   const showSkeleton =
     CONTRACTS_READY &&
     isLoading &&
     grantId !== null &&
-    !demoCard &&
     !chainResolved &&
     !resolvedGrant;
 
-  const awaitingChain =
-    CONTRACTS_READY && grantId !== null && isLoading && !demoCard && !uiDemoPath;
+  const awaitingChain = CONTRACTS_READY && grantId !== null && isLoading;
 
-  const showNotFound =
-    Boolean(rawId.trim()) &&
-    !resolvedGrant &&
-    !demoCard &&
-    !uiDemoPath &&
-    !awaitingChain;
+  const showNotFound = Boolean(rawId.trim()) && !resolvedGrant && !awaitingChain;
 
   const showInvalidRoute = !rawId.trim();
 
@@ -500,7 +466,7 @@ export function GrantDetailPageContent({
         <section className="flex min-h-[60vh] flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Grant not found</h1>
           <p className="mt-2 text-sm text-slate-500">
-            This id is not on GrantEscrow and does not match the public explorer demo catalogue.
+            This grant id was not found on GrantEscrow or in the backend API.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             {notFoundLinks.map(({ href, label }, i) => (
@@ -526,16 +492,6 @@ export function GrantDetailPageContent({
         </section>
       ) : resolvedGrant && effectiveGrantId !== null ? (
         <div className="space-y-6">
-          {demoCard && !chainResolved ? (
-            <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-              <span className="font-semibold">Demo grant.</span> This entry comes from the same catalogue as{' '}
-              <Link href="/grants" className="font-semibold underline">
-                /grants
-              </Link>
-              . On-chain <code className="rounded bg-sky-100/80 px-1">getGrant</code> is unavailable or empty for this id — wire your deployment to see live escrow data.
-            </p>
-          ) : null}
-
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
               <div>
@@ -911,7 +867,7 @@ function MilestonesTab({
                   <p className="mt-2 text-xs text-slate-500">No warning attestations recorded.</p>
                 ) : (
                   <ul className="mt-2 space-y-2">
-                    {warningRows.map((w) => (
+                    {warningRows.map((w: { at: string; member: Address; message: string; uid: string }) => (
                       <li key={w.uid} className="rounded-lg border border-amber-200 bg-amber-50 p-2">
                         <p className="text-xs text-amber-900">{w.message}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-amber-800">

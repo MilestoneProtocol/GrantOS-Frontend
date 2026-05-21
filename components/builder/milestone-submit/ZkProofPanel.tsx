@@ -1,5 +1,6 @@
 'use client';
 
+import { getPublicApiV1Base } from '@/lib/api-config';
 import type { ZkProofPreview } from '@/lib/milestone-submit-session';
 import { buildMockZkProofResult, normalizeGithubHandle } from '@/lib/milestone-submit-session';
 import {
@@ -99,7 +100,7 @@ export default function ZkProofPanel({
           throw new Error('Wallet not connected. Please connect your wallet.');
         }
 
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        const apiBase = getPublicApiV1Base();
         let attestation: any = null;
         try {
           const res = await fetch(`${apiBase}/identity/attestation/wallet/${addressRef.current}`);

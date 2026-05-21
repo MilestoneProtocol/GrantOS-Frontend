@@ -1,8 +1,9 @@
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { useQueries } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import type { ReputationScore } from './useBuilderReputation';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const API_BASE = getPublicApiV1Base();
 
 export function useBuilderReputations(addresses: string[]) {
   const queries = useQueries({

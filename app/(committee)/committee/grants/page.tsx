@@ -4,8 +4,8 @@ import CommitteeAccessDeniedToast from '@/components/committee/CommitteeAccessDe
 import CommitteeAppShell from '@/components/committee/CommitteeAppShell';
 import CommitteeReviewSkeleton from '@/components/committee/CommitteeReviewSkeleton';
 import ActiveGrantsSection from '@/components/committee/dashboard/ActiveGrantsSection';
+import type { CommitteeDemoGrant } from '@/demo/committee-demo';
 import DashboardOverview from '@/components/committee/dashboard/DashboardOverview';
-import { getCommitteeDemoEmptyState } from '@/demo/committee-demo';
 import { useAuthGuard } from '@/lib/authGuard';
 import { useCommitteeReviews } from '@/lib/hooks/useCommitteeReviews';
 import { useEffect, useMemo, useState } from 'react';
@@ -27,7 +27,15 @@ export default function CommitteeAllGrantsPage() {
   }, []);
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
-  const summary = useMemo(() => getCommitteeDemoEmptyState(), []);
+  const summary = useMemo(
+    () => ({
+      totalActiveGrants: 0,
+      usdcUnderControl: 0,
+      pendingReviews: reviews?.totalPending ?? 0,
+      grants: [] as CommitteeDemoGrant[],
+    }),
+    [reviews?.totalPending],
+  );
 
   return (
     <CommitteeAppShell breadcrumb="All Grants" reviewsBadge={reviews.tabCounts.pending}>

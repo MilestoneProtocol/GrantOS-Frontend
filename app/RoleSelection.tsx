@@ -47,12 +47,9 @@ const TONE = {
 export default function RoleSelection({
   showDaoCard,
   builderUnverifiedNudge,
-  devBypassActive = false,
 }: {
   showDaoCard: boolean;
   builderUnverifiedNudge: boolean;
-  /** When true, all role cards route directly (no on-chain eligibility required). */
-  devBypassActive?: boolean;
 }) {
   const { address } = useAccount();
   const short = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '';
@@ -96,12 +93,6 @@ export default function RoleSelection({
               Your wallet can act in multiple roles on GrantOS. Pick the surface that
               matches what you’re here to do — you can switch anytime.
             </p>
-            {devBypassActive ? (
-              <p className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-950">
-                Dev mode: on-chain role checks are off. All destinations are open while the
-                backend is unavailable.
-              </p>
-            ) : null}
           </div>
 
           <div className="flex flex-col items-start gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs shadow-sm">

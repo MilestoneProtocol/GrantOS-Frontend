@@ -3,7 +3,19 @@
 // app/verify/success/page.tsx
 
 import ConnectButton from '@/components/ConnectButton';
+import VerifyBackButton from '@/components/verify/VerifyBackButton';
+import VerifyWalletReconnect from '@/components/verify/VerifyWalletReconnect';
 import { api } from '@/lib/api';
+import {
+  clearVerifySession,
+  clearZkProofOnly,
+  persistVerifyAttestation,
+  persistVerifyRequestId,
+  persistZkProof,
+  readVerifyAttestation,
+  readVerifyRequestId,
+  readZkProof,
+} from '@/lib/identity-verify-session';
 import { IDENTITY_REGISTRY_ABI, IDENTITY_REGISTRY_ADDRESS } from '@/lib/contracts';
 import { Check, CheckCircle2, Fingerprint, Shield, AlertTriangle } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -83,34 +95,29 @@ function ZkBadge({ githubLogin, tier, createdYear }: { githubLogin: string; tier
 }
 
 function SuccessContent() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, status: walletStatus } = useAccount();
   const wagmiConfig = useConfig();
   const { switchChainAsync } = useSwitchChain();
   const { openConnectModal }  = useConnectModal();
   const { openAccountModal }  = useAccountModal();
   const searchParams = useSearchParams();
   const router       = useRouter();
-  const requestId    = searchParams.get('requestId');
+  const requestIdFromUrl = searchParams.get('requestId');
+  const [resolvedRequestId, setResolvedRequestId] = useState<string | null>(requestIdFromUrl);
+  const [sessionReady, setSessionReady] = useState(false);
 
   const [attestation,    setAttestation]    = useState<AttestationData | null>(null);
   const [error,          setError]          = useState<string | null>(null);
   const [loading,        setLoading]        = useState(false);
   const [generatingZk,   setGeneratingZk]   = useState(false);
-  const [zkProof,        setZkProof]        = useState<Uint8Array | null>(() => {
-    if (!requestId || typeof window === 'undefined') return null;
-    try {
-      const saved = sessionStorage.getItem(`zkproof:${requestId}`);
-      return saved ? new Uint8Array(JSON.parse(saved)) : null;
-    } catch { return null; }
-  });
-  const [zkPublicInputs, setZkPublicInputs] = useState<string[] | null>(() => {
-    if (!requestId || typeof window === 'undefined') return null;
-    try {
-      const saved = sessionStorage.getItem(`zkpubinputs:${requestId}`);
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+  const [zkProof,        setZkProof]        = useState<Uint8Array | null>(null);
+  const [zkPublicInputs, setZkPublicInputs] = useState<string[] | null>(null);
   const fetchedRef = useRef(false);
+  const autoProofRef = useRef(false);
+  const walletReconnecting =
+    walletStatus === 'connecting' || walletStatus === 'reconnecting';
+  const walletResolved =
+    walletStatus !== 'connecting' && walletStatus !== 'reconnecting';
 
   // Check if already verified on-chain
   const { data: alreadyVerified, isLoading: verifiedLoading } = useReadContract({
@@ -158,14 +165,50 @@ function SuccessContent() {
   }, [address, boundAddress]);
 
   useEffect(() => {
-    // Only redirect if: no requestId, wallet connected, contract confirmed NOT verified
-    if (requestId) return;                    // has requestId — stay
-    if (!address) return;                     // wallet not loaded yet — wait
-    if (verifiedLoading) return;              // contract read in flight — wait
-    if (alreadyVerified) return;              // verified on-chain — stay
-    if (alreadyVerified === undefined) return; // contract read failed/unavailable — stay
+    if (requestIdFromUrl) {
+      persistVerifyRequestId(requestIdFromUrl);
+      setResolvedRequestId(requestIdFromUrl);
+      setSessionReady(true);
+      return;
+    }
+    const stored = readVerifyRequestId();
+    if (stored) {
+      setResolvedRequestId(stored);
+      router.replace(`/verify/success?requestId=${encodeURIComponent(stored)}`);
+    }
+    setSessionReady(true);
+  }, [requestIdFromUrl, router]);
+
+  useEffect(() => {
+    if (!resolvedRequestId) return;
+    const cached = readZkProof(resolvedRequestId);
+    if (cached) {
+      setZkProof(cached.proof);
+      setZkPublicInputs(cached.publicInputs);
+      autoProofRef.current = true;
+    }
+    const cachedAttestation = readVerifyAttestation<AttestationData>(resolvedRequestId);
+    if (cachedAttestation) {
+      setAttestation(cachedAttestation);
+    }
+  }, [resolvedRequestId]);
+
+  useEffect(() => {
+    if (!sessionReady) return;
+    if (resolvedRequestId) return;
+    if (!address) return;
+    if (verifiedLoading) return;
+    if (alreadyVerified) return;
+    if (alreadyVerified === undefined) return;
     router.replace('/verify/identity-verification');
-  }, [requestId, alreadyVerified, verifiedLoading, address, router]);
+  }, [
+    resolvedRequestId,
+    sessionReady,
+    alreadyVerified,
+    verifiedLoading,
+    address,
+    router,
+  ]);
 
   // Eagerly warm up the ZK prover WASM so it's ready when the user clicks "Generate Proof"
   useEffect(() => {
@@ -173,7 +216,7 @@ function SuccessContent() {
   }, []);
 
   useEffect(() => {
-    if (!requestId || fetchedRef.current) return;
+    if (!resolvedRequestId || fetchedRef.current) return;
     fetchedRef.current = true;
     setLoading(true);
 
@@ -183,8 +226,9 @@ function SuccessContent() {
     async function poll() {
       while (attempts < MAX) {
         try {
-          const data = await api.get<AttestationData>(`/identity/attestation/${requestId}`);
+          const data = await api.get<AttestationData>(`/identity/attestation/${resolvedRequestId}`);
           setAttestation(data);
+          persistVerifyAttestation(resolvedRequestId!, data);
           
           // Only stop polling if we have a final state (attested, verified, or failed)
           if (data.status === 'attested' || data.status === 'verified') {
@@ -223,10 +267,9 @@ function SuccessContent() {
     }
 
     poll();
-  }, [requestId]);
+  }, [resolvedRequestId]);
 
   // Auto-generate ZK proof once attestation is ready and no proof exists yet
-  const autoProofRef = useRef(false);
   useEffect(() => {
     if (zkProof || !attestation?.oracleSignature || autoProofRef.current || alreadyVerified) return;
     autoProofRef.current = true;
@@ -235,14 +278,13 @@ function SuccessContent() {
   }, [attestation?.oracleSignature, zkProof, alreadyVerified]);
 
   useEffect(() => {
-    if (!txConfirmed || !txHash || !requestId || confirmedRef.current) return;
+    if (!txConfirmed || !txHash || !resolvedRequestId || confirmedRef.current) return;
     confirmedRef.current = true;
-    sessionStorage.removeItem(`zkproof:${requestId}`);
-    sessionStorage.removeItem(`zkpubinputs:${requestId}`);
-    api.post(`/identity/confirmed/${requestId}`, { txHash }).catch(() => {
+    clearVerifySession(resolvedRequestId);
+    api.post(`/identity/confirmed/${resolvedRequestId}`, { txHash }).catch(() => {
       // Non-critical — the on-chain state is the source of truth
     });
-  }, [txConfirmed, txHash, requestId]);
+  }, [txConfirmed, txHash, resolvedRequestId]);
 
   async function handleGenerateZk() {
     if (!attestation?.oracleSignature || !attestation?.messageHash) {
@@ -293,9 +335,8 @@ function SuccessContent() {
       if (result.success) {
         setZkProof(result.proof);
         setZkPublicInputs(result.publicInputs);
-        if (requestId) {
-          sessionStorage.setItem(`zkproof:${requestId}`, JSON.stringify(Array.from(result.proof)));
-          sessionStorage.setItem(`zkpubinputs:${requestId}`, JSON.stringify(result.publicInputs));
+        if (resolvedRequestId) {
+          persistZkProof(resolvedRequestId, result.proof, result.publicInputs);
         }
       } else {
         throw result.error instanceof Error ? result.error : new Error('Proof generation failed');
@@ -395,10 +436,9 @@ function SuccessContent() {
     const mockHash = '0x' + Array.from({ length: 32 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join('') as `0x${string}`;
     setTxHash(mockHash);
     
-    if (requestId) {
-      sessionStorage.removeItem(`zkproof:${requestId}`);
-      sessionStorage.removeItem(`zkpubinputs:${requestId}`);
-      api.post(`/identity/confirmed/${requestId}`, { txHash: mockHash }).catch(() => {});
+    if (resolvedRequestId) {
+      clearVerifySession(resolvedRequestId);
+      api.post(`/identity/confirmed/${resolvedRequestId}`, { txHash: mockHash }).catch(() => {});
     }
   };
 
@@ -446,19 +486,43 @@ function SuccessContent() {
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (isFullyVerified && requestId) {
+    if (!walletResolved || verifiedLoading) return;
+    if (!alreadyVerified || generatingZk || txPending || txConfirming) return;
+    if (isFullyVerified) return;
+    router.replace('/builder?toast=already_verified');
+  }, [
+    alreadyVerified,
+    generatingZk,
+    isFullyVerified,
+    router,
+    txConfirming,
+    txPending,
+    verifiedLoading,
+    walletResolved,
+  ]);
+
+  useEffect(() => {
+    if (isFullyVerified && resolvedRequestId) {
       const timer = setTimeout(() => {
-        router.push('/?select=1&from=%2Fgrants%2Fnew');
+        router.replace('/builder?toast=identity_verified');
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [isFullyVerified, requestId, router]);
+  }, [isFullyVerified, resolvedRequestId, router]);
+
+  const hasVerifyProgress = Boolean(
+    resolvedRequestId && (attestation || zkProof || loading || generatingZk),
+  );
+  const showConnectWall =
+    !isConnected && !walletReconnecting && !hasVerifyProgress && !loading;
 
   return (
     <div className="min-h-screen bg-white">
+      <VerifyWalletReconnect />
       <header className="border-b border-slate-200 bg-white">
         <div className="flex w-full items-center justify-between gap-4 px-5 py-3 sm:px-8">
           <div className="flex items-center gap-3">
+            <VerifyBackButton />
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
               <span className="text-sm font-bold text-white">G</span>
             </div>
@@ -546,15 +610,30 @@ function SuccessContent() {
                 </div>
               )}
 
+              {!isConnected && (walletReconnecting || hasVerifyProgress) && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  {walletReconnecting ? (
+                    <p>Restoring your wallet session…</p>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p>
+                        Reconnect the same wallet you used to start verification to submit on-chain.
+                      </p>
+                      <ConnectButton variant="black" />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {loading || verifiedLoading ? (
                 <div className="flex flex-1 items-center justify-center">
                   <div className="text-sm text-slate-500">Loading…</div>
                 </div>
 
-              ) : !isConnected ? (
+              ) : showConnectWall ? (
                 <div className="flex flex-1 items-center justify-center">
                   <div className="text-center">
-                    <p className="text-sm text-slate-500 mb-4">Connect your wallet to view your verified identity.</p>
+                    <p className="text-sm text-slate-500 mb-4">Connect your wallet to continue verification.</p>
                     <ConnectButton variant="black" />
                   </div>
                 </div>
@@ -691,9 +770,9 @@ function SuccessContent() {
                     onClick={() => {
                       setZkProof(null);
                       setZkPublicInputs(null);
-                      if (requestId) {
-                        sessionStorage.removeItem(`zkproof:${requestId}`);
-                        sessionStorage.removeItem(`zkpubinputs:${requestId}`);
+                      if (resolvedRequestId) {
+                        clearZkProofOnly(resolvedRequestId);
+                        autoProofRef.current = false;
                       }
                     }}
                     className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-slate-500 hover:text-slate-700"

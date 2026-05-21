@@ -15,12 +15,6 @@ import {
 import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import {
-  buildUiDemoGrantSummary,
-  isUiDemoMode,
-  UI_DEMO_GRANT_PATH_ID,
-} from '@/demo';
-import { demoPathSegmentForChainIndex } from '@/lib/public-explorer-grant';
-import {
   AlertTriangle,
   Check,
   ChevronDown,
@@ -135,22 +129,15 @@ export default function BuilderDashboardPage() {
       .filter(Boolean) as GrantSummary[];
   }, [address, grantsData]);
 
-  const dashboardGrantRows = useMemo(() => {
-    const chainRows = grants.map((g) => ({
-      grant: g,
-      pathSegment: isUiDemoMode()
-        ? demoPathSegmentForChainIndex(g.id, g.builder)
-        : g.id.toString(),
-      isUiDemo: false,
-    }));
-    if (!isUiDemoMode()) return chainRows;
-    const demoBuilder = (address ?? zeroAddress) as Address;
-    const demo = buildUiDemoGrantSummary(demoBuilder) as GrantSummary;
-    return [
-      { grant: demo, pathSegment: UI_DEMO_GRANT_PATH_ID, isUiDemo: true },
-      ...chainRows,
-    ];
-  }, [address, grants]);
+  const dashboardGrantRows = useMemo(
+    () =>
+      grants.map((g) => ({
+        grant: g,
+        pathSegment: g.id.toString(),
+        isUiDemo: false,
+      })),
+    [grants],
+  );
 
   const totals = useMemo(() => {
     let escrow = BigInt(0);

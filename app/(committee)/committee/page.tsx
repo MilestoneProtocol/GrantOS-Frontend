@@ -9,11 +9,10 @@ import CommitteeActionsHeader from '@/components/committee/actions/CommitteeActi
 import MilestoneWarningView from '@/components/committee/actions/MilestoneWarningView';
 import OverdueMilestoneCard from '@/components/committee/actions/OverdueMilestoneCard';
 import PendingReviewTable from '@/components/committee/actions/PendingReviewTable';
-import {
-  getCommitteeDemoActions,
-  type MilestoneActivityEvent,
-  type OverdueMilestone,
-  type OverdueMilestoneState,
+import type {
+  MilestoneActivityEvent,
+  OverdueMilestone,
+  OverdueMilestoneState,
 } from '@/demo/committee-demo';
 import {
   markBuilderWarningSlashed,
@@ -54,14 +53,7 @@ const ACCESS_DENIED_LINGER_MS = 1600;
 
 /** 24h in milliseconds — duration of the warning cool-off enforced onchain. */
 const WARNING_COOLOFF_MS = 24 * 60 * 60 * 1000;
-/**
- * Demo override for the warning cool-off. Real `GrantEscrow.recordWarning`
- * uses the 24h figure above, but for the click-through demo we shrink it so
- * the committee member can see the `EnforcementActionPanel → SlashReadyPanel`
- * transition without waiting a day.
- */
-const WARNING_COOLOFF_DEMO_MS = 30 * 1000;
-/** Wallet placeholder used when no connected address is available (demo only). */
+/** Wallet placeholder used when no connected address is available. */
 const PLACEHOLDER_COMMITTEE_ADDRESS: `0x${string}` =
   '0x0000000000000000000000000000000000000000';
 
@@ -69,9 +61,6 @@ const PLACEHOLDER_COMMITTEE_ADDRESS: `0x${string}` =
 function buildEasScanUrl(attestationUid: string): string {
   return `https://arbitrum-sepolia.easscan.org/attestation/view/${attestationUid}`;
 }
-
-/** True when the UI demo flag is on; chosen at module load. */
-const IS_UI_DEMO = process.env.NEXT_PUBLIC_GRANTOS_UI_DEMO === 'true';
 
 export default function CommitteeDashboardPage() {
   const guard = useAuthGuard('committee');
@@ -175,11 +164,7 @@ export default function CommitteeDashboardPage() {
       const committeeMember = (address ??
         PLACEHOLDER_COMMITTEE_ADDRESS) as `0x${string}`;
       const issuedAt = new Date(payload.warningTimestampIso);
-      // Production uses the 24h cool-off enforced by `GrantEscrow.slash`'s
-      // require check; in demo mode we collapse it to ~30 seconds so the
-      // full SlashReady → confirmation → SLASHED flow is exercisable in a
-      // single sitting.
-      const cooloffMs = IS_UI_DEMO ? WARNING_COOLOFF_DEMO_MS : WARNING_COOLOFF_MS;
+      const cooloffMs = WARNING_COOLOFF_MS;
       const slashUnlocksAt = new Date(issuedAt.getTime() + cooloffMs);
 
       const nextState: OverdueMilestoneState = {

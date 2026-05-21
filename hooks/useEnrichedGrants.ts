@@ -1,3 +1,4 @@
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { useQuery } from '@tanstack/react-query';
 
 export type EnrichedGrant = {
@@ -19,7 +20,7 @@ export type EnrichedGrant = {
   createdAt: string;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const API_BASE = getPublicApiV1Base();
 
 export function useEnrichedGrants() {
   return useQuery<EnrichedGrant[]>({

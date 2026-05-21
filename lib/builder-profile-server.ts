@@ -1,5 +1,4 @@
-import { getCommitteeDemoActions } from '@/demo/committee-demo';
-import { getDaoDashboardSnapshot, type DaoGrantCardModel, type DaoMilestoneModel } from '@/demo/dao-dashboard';
+import type { DaoMilestoneModel } from '@/demo/dao-dashboard';
 import {
   CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
@@ -10,9 +9,8 @@ import {
   identityRegistryAbi,
 } from '@/lib/escrow';
 import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
-import { isUiDemoMode } from '@/demo';
+import { getServerApiV1Base } from '@/lib/api-config';
 import { parseProfileAddress } from '@/lib/profile-address';
-import { demoPathSegmentForChainIndex } from '@/lib/public-explorer-grant';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import { arbitrumSepolia } from 'viem/chains';
 import {
@@ -27,7 +25,7 @@ import {
 } from 'viem';
 
 export type BuilderProfileGrantRow = {
-  source: 'chain' | 'demo';
+  source: 'chain';
   href: string;
   labelId: string;
   title: string;
@@ -169,13 +167,6 @@ function grantTupleEmpty(g: GrantTuple): boolean {
   );
 }
 
-function demoGrantStatus(card: DaoGrantCardModel): BuilderProfileGrantRow['statusLabel'] {
-  if (card.tags.includes('slashed')) return 'Slashed';
-  if (card.tags.includes('warning_issued') || card.hasWarning) return 'Warning';
-  if (card.tags.includes('completed')) return 'Completed';
-  return 'In Progress';
-}
-
 function usdcFromWei(w: bigint): number {
   return Number(formatUnits(w, USDC_DECIMALS));
 }
@@ -197,129 +188,15 @@ function daoMilestonePending(m: DaoMilestoneModel): boolean {
   return m.status === 'pending';
 }
 
-function computeDemoStats(cards: DaoGrantCardModel[]): BuilderProfileStats {
-  let approved = 0;
-  let nonPending = 0;
-  let usdcEarned = 0;
-  let zkSubmitted = 0;
-
-  for (const c of cards) {
-    for (const m of c.milestones) {
-      const pending = daoMilestonePending(m);
-      if (!pending) nonPending += 1;
-      if (daoMilestoneApproved(m)) {
-        approved += 1;
-        usdcEarned += m.amountUsdc;
-      }
-      if (m.proofType === 'ZK' && !pending) zkSubmitted += 1;
-    }
-  }
-
-  const rep =
-    cards.length > 0
-      ? Math.round(cards.reduce((s, c) => s + c.reputationScore, 0) / cards.length)
-      : 0;
-
-  return {
-    reputationScore: rep,
-    letterGrade: scoreToLetterGrade(rep),
-    deliveryRatePercent:
-      nonPending > 0 ? Math.round((approved / nonPending) * 1000) / 10 : null,
-    deliveryDetail:
-      nonPending > 0
-        ? `${approved} of ${nonPending} milestones approved.`
-        : 'No milestone activity yet.',
-    totalUsdcEarned: Math.round(usdcEarned * 100) / 100,
-    zkProofsSubmitted: zkSubmitted,
-    hasZkSubmission: zkSubmitted > 0,
-  };
-}
-
-function mergeWarningsFromDao(
-  cards: DaoGrantCardModel[],
-): BuilderProfileWarningRow[] {
-  const out: BuilderProfileWarningRow[] = [];
-  for (const c of cards) {
-    for (const m of c.milestones) {
-      for (const w of m.warningHistory) {
-        out.push({
-          id: `${c.slug}-${m.title}-${w.issuedAtIso}-${w.attestationUrl.slice(0, 12)}`,
-          grantLabel: c.displayId.replace(/^#/, ''),
-          milestoneTitle: m.title,
-          message: w.message,
-          issuedAtIso: w.issuedAtIso,
-          easUrl: w.attestationUrl,
-        });
-      }
-    }
-  }
-  return out.sort(
-    (a, b) => new Date(b.issuedAtIso).getTime() - new Date(a.issuedAtIso).getTime(),
-  );
-}
-
-function committeeSeedWarnings(addrLower: string): BuilderProfileWarningRow[] {
-  const view = getCommitteeDemoActions();
-  return view.overdue
-    .filter(
-      (
-        m,
-      ): m is typeof m & {
-        state: Extract<typeof m.state, { kind: 'warning_issued' }>;
-      } => m.state.kind === 'warning_issued',
-    )
-    .filter((m) => m.builderAddress.toLowerCase() === addrLower)
-    .map((m) => ({
-      id: m.id,
-      grantLabel: m.grantId,
-      milestoneTitle: m.milestoneTitle,
-      message: m.state.message,
-      issuedAtIso: m.state.warningIssuedAtIso,
-      easUrl: m.state.attestationUrl,
-    }))
-    .sort(
-      (a, b) =>
-        new Date(b.issuedAtIso).getTime() - new Date(a.issuedAtIso).getTime(),
-    );
-}
-
-function mergeWarningRows(
-  a: BuilderProfileWarningRow[],
-  b: BuilderProfileWarningRow[],
-): BuilderProfileWarningRow[] {
-  const seen = new Set<string>();
-  const out: BuilderProfileWarningRow[] = [];
-  for (const row of [...a, ...b]) {
-    const k = `${row.easUrl}|${row.grantLabel}|${row.message}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(row);
-  }
-  return out.sort(
-    (x, y) =>
-      new Date(y.issuedAtIso).getTime() - new Date(x.issuedAtIso).getTime(),
-  );
-}
-
-function demoCardsForBuilder(address: Address): DaoGrantCardModel[] {
-  const addrLower = address.toLowerCase();
-  const snap = getDaoDashboardSnapshot(0);
-  return snap.grants.filter((g) => g.builder.toLowerCase() === addrLower);
-}
-
-function demoRowsForBuilder(cards: DaoGrantCardModel[]): BuilderProfileGrantRow[] {
-  return cards.map((c) => ({
-    source: 'demo' as const,
-    href: `/grants/${c.slug}`,
-    labelId: c.displayId.replace(/^#/, ''),
-    title: c.milestones[0]?.title ?? 'Grant',
-    committeeCount: 5,
-    totalUsdc: c.totalGrantUsdc,
-    milestoneApproved: c.milestoneCompleted,
-    milestoneTotal: c.milestoneTotal,
-    statusLabel: demoGrantStatus(c),
-  }));
-}
+const EMPTY_STATS: BuilderProfileStats = {
+  reputationScore: 0,
+  letterGrade: '—',
+  deliveryRatePercent: null,
+  deliveryDetail: 'No milestones reached status.',
+  totalUsdcEarned: 0,
+  zkProofsSubmitted: 0,
+  hasZkSubmission: false,
+};
 
 const RPCS = [
   process.env.NEXT_PUBLIC_RPC_URL?.trim(),
@@ -353,13 +230,7 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
     return { kind: 'invalid' };
   }
   const addrLower = address.toLowerCase();
-
-  const demoCards = demoCardsForBuilder(address);
-  const demoRows = demoRowsForBuilder(demoCards);
-  const demoStats = computeDemoStats(demoCards);
-  const daoWarnings = mergeWarningsFromDao(demoCards);
-  const seedWarnings = committeeSeedWarnings(addrLower);
-  const warnings = mergeWarningRows(daoWarnings, seedWarnings);
+  const warnings: BuilderProfileWarningRow[] = [];
 
   let identity: BuilderIdentityView = {
     zkVerified: false,
@@ -385,11 +256,11 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
       hasIdentityRecord: false,
       verifiedAtDisplay: null,
       bindingTxHash: null,
-      stats: demoStats,
-      grants: demoRows,
+      stats: EMPTY_STATS,
+      grants: [],
       warnings,
       chainReadFailed: true,
-      demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
+      demoContributionTierLabel: null,
     };
   }
 
@@ -420,8 +291,7 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
 
         let reputationScore = 0;
         try {
-          const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-          const repRes = await fetch(`${backendUrl}/api/v1/grants/builder/${address}/reputation`);
+          const repRes = await fetch(`${getServerApiV1Base()}/grants/builder/${address}/reputation`);
           if (repRes.ok) {
             const repData = await repRes.json();
             reputationScore = repData.score || 0;
@@ -551,13 +421,9 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
           const totalWei = tuple.milestones.reduce((s, m) => s + m.amount, BigInt(0));
           const completedLike = grantNonPending > 0 && grantApproved === tuple.milestones.length && !tuple.streaming;
 
-          const grantPathId = isUiDemoMode()
-            ? demoPathSegmentForChainIndex(BigInt(chainRows.length), tuple.builder)
-            : addr;
-
           chainRows.push({
             source: 'chain',
-            href: `/grants/${grantPathId}`,
+            href: `/grants/${addr}`,
             labelId: `GRT-${addr.slice(2, 8)}`,
             title: tuple.milestones[0]?.title ?? 'Grant',
             committeeCount: tuple.committee.length,
@@ -586,15 +452,14 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
           verifiedAtDisplay: null,
           bindingTxHash,
           stats: mergedStats,
-          grants: mergeGrantRows(chainRows, demoRows),
+          grants: chainRows,
           warnings,
           chainReadFailed: false,
-          demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
+          demoContributionTierLabel: null,
         };
       }
     }
 
-    // No chain grants found but identity might be real
     return {
       kind: 'ok',
       address,
@@ -602,11 +467,11 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
       hasIdentityRecord,
       verifiedAtDisplay: null,
       bindingTxHash,
-      stats: demoStats,
-      grants: demoRows,
+      stats: EMPTY_STATS,
+      grants: [],
       warnings,
       chainReadFailed: false,
-      demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
+      demoContributionTierLabel: null,
     };
   } catch (e) {
     console.error('Chain read error:', e);
@@ -620,32 +485,12 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
     hasIdentityRecord,
     verifiedAtDisplay: null,
     bindingTxHash: null,
-    stats: demoStats,
-    grants: demoRows,
+    stats: EMPTY_STATS,
+    grants: [],
     warnings,
     chainReadFailed: true,
-    demoContributionTierLabel: demoCards[0]?.contributionTier ?? null,
+    demoContributionTierLabel: null,
   };
-}
-
-function mergeGrantRows(
-  chain: BuilderProfileGrantRow[],
-  demo: BuilderProfileGrantRow[],
-): BuilderProfileGrantRow[] {
-  const bySlug = new Map<string, BuilderProfileGrantRow>();
-  for (const d of demo) {
-    const slug = d.href.replace(/^\/grants\//, '');
-    bySlug.set(slug, d);
-  }
-  const out: BuilderProfileGrantRow[] = [];
-  for (const c of chain) {
-    const id = c.href.replace(/^\/grants\//, '');
-    const dup = bySlug.get(id);
-    if (dup) bySlug.delete(id);
-    out.push(c);
-  }
-  for (const d of bySlug.values()) out.push(d);
-  return out;
 }
 
 export function formatBuilderPageTitle(address: Address): string {

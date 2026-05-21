@@ -15,9 +15,9 @@ export const UI_DEMO_GRANT_DISPLAY_ID = BigInt(9_000_001);
 /** Human-readable grant name shown in milestone submission header (UI demo only). */
 export const UI_DEMO_GRANT_TITLE = 'Decentralized Identity Protocol Integration';
 
+/** UI demo is disabled while the app uses live backend / chain data. */
 export function isUiDemoMode(): boolean {
-  const raw = process.env.NEXT_PUBLIC_GRANTOS_UI_DEMO?.trim().toLowerCase();
-  return raw === 'true' || raw === '1';
+  return false;
 }
 
 export function isUiDemoPathSegment(raw: string): boolean {

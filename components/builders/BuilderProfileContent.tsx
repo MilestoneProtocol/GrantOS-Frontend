@@ -221,8 +221,8 @@ export default function BuilderProfileContent({ data }: { data: BuilderProfileDa
 
       {chainReadFailed ? (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <span className="font-semibold">Chain data unavailable.</span> Showing explorer demo grants for this address. Configure{' '}
-          <code className="rounded bg-amber-100/80 px-1">NEXT_PUBLIC_RPC_URL</code> for live reads.
+          <span className="font-semibold">Chain data unavailable.</span> Configure{' '}
+          <code className="rounded bg-amber-100/80 px-1">NEXT_PUBLIC_RPC_URL</code> and contract addresses for live reads.
         </p>
       ) : null}
 

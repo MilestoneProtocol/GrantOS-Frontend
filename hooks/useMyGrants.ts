@@ -1,6 +1,5 @@
 'use client';
 
-import { loadDemoMyGrants } from '@/lib/my-grants/demo-history';
 import type { MyGrantRecord } from '@/lib/my-grants/types';
 import { computeSummary, mapChainGrantToRecord } from '@/lib/my-grants/utils';
 import {
@@ -134,10 +133,6 @@ export function useMyGrants() {
         const record = mapChainGrantToRecord(id, row.result, statuses);
         byKey.set(record.key, record);
       });
-    }
-
-    for (const demo of loadDemoMyGrants(address)) {
-      if (!byKey.has(demo.key)) byKey.set(demo.key, demo);
     }
 
     return Array.from(byKey.values());

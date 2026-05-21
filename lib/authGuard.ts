@@ -1,6 +1,5 @@
 'use client';
 
-import { isRoleCheckBypassed } from '@/lib/role-access';
 import { BUILDER_TOAST_MESSAGES } from '@/lib/builder-toast';
 import { useRoleDetection } from '@/lib/roleDetection';
 import { usePathname, useRouter } from 'next/navigation';
@@ -17,11 +16,9 @@ type GuardState =
 
 function roleFromRoles(requiredRole: RequiredRole, roles: ReturnType<typeof useRoleDetection>) {
   if (requiredRole === 'public') return true;
-  if (isRoleCheckBypassed() || roles.bypassActive) return true;
-
   if (requiredRole === 'dao') return roles.isDaoAdmin;
   if (requiredRole === 'committee') return roles.isCommittee;
-  if (requiredRole === 'builder') return roles.isBuilder;
+  if (requiredRole === 'builder') return roles.isBuilder || roles.isVerified;
 
   return false;
 }

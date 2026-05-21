@@ -17,8 +17,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useGrantDetailFull } from '@/hooks/useGrantDetailFull';
-import { isUiDemoMode } from '@/demo';
-
 type DaoGrantDrawerProps = {
   grant: DaoGrantCardModel | null;
   onClose: () => void;
@@ -37,15 +35,14 @@ type DaoGrantDrawerProps = {
  * - Footer (only when streaming active): live stream panel with 100ms ticker.
  */
 export default function DaoGrantDrawer({ grant, onClose }: DaoGrantDrawerProps) {
-  const isDemo = isUiDemoMode();
   const grantId = grant ? Number(grant.slug) : null;
   const { data: fullDetail, isLoading: isFullDetailLoading } = useGrantDetailFull(
-    !isDemo && grant ? grantId : null
+    grant ? grantId : null
   );
 
   const mappedMilestones = useMemo((): DaoMilestoneModel[] => {
     if (!grant) return [];
-    if (isDemo || !fullDetail) {
+    if (!fullDetail) {
       return grant.milestones;
     }
 
@@ -147,7 +144,7 @@ export default function DaoGrantDrawer({ grant, onClose }: DaoGrantDrawerProps) 
         transactions,
       };
     });
-  }, [grant, isDemo, fullDetail]);
+  }, [grant, fullDetail]);
 
   if (!grant) return null;
 

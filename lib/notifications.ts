@@ -1,6 +1,5 @@
 'use client';
 
-import { isUiDemoMode, UI_DEMO_GRANT_PATH_ID } from '@/demo';
 import {
   GRANT_ESCROW_ADDRESS,
   grantEscrowReadAbi,
@@ -127,7 +126,6 @@ export function formatRelativeTimestamp(ts: number): string {
 }
 
 export function grantPathId(grantId: bigint): string {
-  if (isUiDemoMode() && grantId === BigInt(9_000_001)) return UI_DEMO_GRANT_PATH_ID;
   return grantId.toString();
 }
 
@@ -618,25 +616,6 @@ export function useNotificationListeners() {
     const id = window.setInterval(pollDeadlines, 60_000);
     return () => window.clearInterval(id);
   }, [address, pollDeadlines]);
-
-  const seededDemo = useRef(false);
-  useEffect(() => {
-    if (!isUiDemoMode() || !address || seededDemo.current) return;
-    seededDemo.current = true;
-    const grantId = BigInt(9_000_001);
-    addNotification(
-      builderMilestoneApprovedNotification(grantId, BigInt(1), 'Milestone 2', BigInt(5_000_000_000)),
-    );
-    addNotification(builderDeadlineApproachingNotification(grantId, BigInt(2), 'Milestone 3'));
-    addNotification(
-      committeeMilestoneSubmittedNotification(
-        grantId,
-        BigInt(1),
-        'Phase 2: Core Protocol Smart Contracts',
-        '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' as Address,
-      ),
-    );
-  }, [addNotification, address]);
 
   const onLog = useCallback(
     (factory: () => Omit<AppNotification, 'id' | 'read'>) => {

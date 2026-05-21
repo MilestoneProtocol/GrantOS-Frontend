@@ -19,56 +19,53 @@ const localStorageAdapter = {
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'default';
 
-const connectors =
-  typeof window === 'undefined'
-    ? []
-    : [
-        injected({
-          target: {
-            id: 'io.metamask',
-            name: 'MetaMask',
-            provider: 'isMetaMask',
-          },
-        }),
-        coinbaseWallet({
-          appName: 'GrantOS v3',
-        }),
-        injected({
-          target: {
-            id: 'me.rainbow',
-            name: 'Rainbow',
-            provider: 'isRainbow',
-          },
-        }),
-        walletConnect({
-          projectId,
-          showQrModal: true,
-          metadata: {
-            name: 'GrantOS v3',
-            description: 'Onchain grant enforcement protocol',
-            url: typeof window !== 'undefined' ? window.location.origin : 'https://grantos.local',
-            icons: [],
-          },
-        }),
-        injected({
-          target: {
-            id: 'app.phantom',
-            name: 'Phantom',
-            provider: (window) =>
-              window?.phantom?.ethereum ??
-              (window?.ethereum?.isPhantom
-                ? window.ethereum
-                : window?.ethereum?.providers?.find((provider) => provider.isPhantom)),
-          },
-        }),
-        injected({
-          target: {
-            id: 'io.rabby',
-            name: 'Rabby Wallet',
-            provider: 'isRabby',
-          },
-        }),
-      ];
+const connectors = [
+  injected({
+    target: {
+      id: 'io.metamask',
+      name: 'MetaMask',
+      provider: 'isMetaMask',
+    },
+  }),
+  coinbaseWallet({
+    appName: 'GrantOS v3',
+  }),
+  injected({
+    target: {
+      id: 'me.rainbow',
+      name: 'Rainbow',
+      provider: 'isRainbow',
+    },
+  }),
+  walletConnect({
+    projectId,
+    showQrModal: true,
+    metadata: {
+      name: 'GrantOS v3',
+      description: 'Onchain grant enforcement protocol',
+      url: typeof window !== 'undefined' ? window.location.origin : 'https://grantos.local',
+      icons: [],
+    },
+  }),
+  injected({
+    target: {
+      id: 'app.phantom',
+      name: 'Phantom',
+      provider: (window) =>
+        window?.phantom?.ethereum ??
+        (window?.ethereum?.isPhantom
+          ? window.ethereum
+          : window?.ethereum?.providers?.find((provider) => provider.isPhantom)),
+    },
+  }),
+  injected({
+    target: {
+      id: 'io.rabby',
+      name: 'Rabby Wallet',
+      provider: 'isRabby',
+    },
+  }),
+];
 
 export const config = createConfig({
   chains: [arbitrum, arbitrumSepolia],

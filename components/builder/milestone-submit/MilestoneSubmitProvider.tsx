@@ -21,13 +21,7 @@ import {
 } from '@/lib/milestone-submit-session';
 import { USDC_DECIMALS } from '@/lib/usdc';
 import type { AiVerifierSuccessBody, AiVerifierVerdict } from '@/lib/ai-verifier';
-import {
-  buildUiDemoGrantTuple,
-  isUiDemoMode,
-  isUiDemoPathSegment,
-  UI_DEMO_GRANT_DISPLAY_ID,
-  UI_DEMO_GRANT_TITLE,
-} from '@/demo';
+import { isUiDemoPathSegment } from '@/demo';
 import { useParams, useRouter } from 'next/navigation';
 import {
   createContext,
@@ -178,8 +172,6 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
   const sessionHydrated = useRef(false);
   const [submitSessionReady, setSubmitSessionReady] = useState(false);
 
-  const isDemoRoute = isUiDemoMode() && isUiDemoPathSegment(routeGrantId);
-
   const grantIdParsed = useMemo(() => parseGrantIdFromPath(routeGrantId), [routeGrantId]);
   const milestoneIndex = useMemo(() => {
     const n = Number.parseInt(routeMilestoneId, 10);
@@ -187,17 +179,12 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     return n;
   }, [routeMilestoneId]);
 
-  const demoTuple = useMemo(
-    () => (isDemoRoute && address ? buildUiDemoGrantTuple(address) : null),
-    [address, isDemoRoute]
-  );
-
   const { data: factoryEscrowAddress } = useReadContract({
     address: GRANT_FACTORY_ADDRESS,
     abi: [{ name: 'grants', type: 'function', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'address' }] }],
     functionName: 'grants',
     args: grantIdParsed !== undefined ? [grantIdParsed] : undefined,
-    query: { enabled: grantIdParsed !== undefined && !isDemoRoute },
+    query: { enabled: grantIdParsed !== undefined },
   });
 
   const resolvedEscrowAddress =
@@ -214,7 +201,7 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     address: resolvedEscrowAddress,
     abi: grantEscrowReadAbi,
     functionName: 'getGrant',
-    query: { enabled: resolvedEscrowAddress !== undefined && !isDemoRoute },
+    query: { enabled: resolvedEscrowAddress !== undefined },
   });
 
   const grantTuple = grantData as GrantTuple | undefined;
@@ -258,15 +245,15 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
       statusQueryEnabled && milestoneIndex !== null
         ? [BigInt(milestoneIndex)]
         : undefined,
-    query: { enabled: statusQueryEnabled && !isDemoRoute },
+    query: { enabled: statusQueryEnabled },
   });
 
   const milestoneStatus =
     milestoneStatusData !== undefined ? Number(milestoneStatusData) : undefined;
 
   const storageKey = useMemo(
-    () => milestoneSubmitStorageKey(isDemoRoute, grantIdParsed, milestoneIndex),
-    [grantIdParsed, isDemoRoute, milestoneIndex]
+    () => milestoneSubmitStorageKey(false, grantIdParsed, milestoneIndex),
+    [grantIdParsed, milestoneIndex]
   );
 
   useEffect(() => {
@@ -301,21 +288,8 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     typeof (identityTuple as any)?.githubHandle === 'string' ? ((identityTuple as any).githubHandle as string) : '';
 
   const gate: Gate = useMemo(() => {
-    if (isUiDemoPathSegment(routeGrantId) && !isUiDemoMode()) {
+    if (isUiDemoPathSegment(routeGrantId)) {
       return { kind: 'redirect', toast: 'grant_not_found' };
-    }
-
-    if (isDemoRoute) {
-      if (status === 'connecting' || status === 'reconnecting') return { kind: 'loading' };
-      if (status === 'disconnected') return { kind: 'redirect', toast: 'connect_wallet' };
-      if (status !== 'connected' || !address) return { kind: 'loading' };
-      if (milestoneIndex === null) return { kind: 'redirect', toast: 'milestone_not_found' };
-      if (!demoTuple) return { kind: 'loading' };
-      if (milestoneIndex >= demoTuple.milestones.length)
-        return { kind: 'redirect', toast: 'milestone_not_found' };
-      const dm = demoTuple.milestones[milestoneIndex]!;
-      if (dm.proofType !== 0) return { kind: 'redirect', toast: 'milestone_not_pending' };
-      return { kind: 'ok' };
     }
 
     if (status === 'connecting' || status === 'reconnecting') return { kind: 'loading' };
@@ -343,13 +317,11 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     return { kind: 'ok' };
   }, [
     address,
-    demoTuple,
     grantFetchError,
     grantFetched,
     grantIdParsed,
     grantLoading,
     grantTuple,
-    isDemoRoute,
     milestoneIndex,
     milestoneStatus,
     routeGrantId,
@@ -663,7 +635,7 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     writtenSummary,
   ]);
 
-  const displayTuple: GrantTuple | undefined = isDemoRoute ? (demoTuple ?? undefined) : grantTuple;
+  const displayTuple: GrantTuple | undefined = grantTuple;
   const displayMilestone =
     displayTuple && milestoneIndex !== null && milestoneIndex < displayTuple.milestones.length
       ? displayTuple.milestones[milestoneIndex]!
@@ -683,22 +655,15 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
       : '—';
 
   const grantLabel =
-    isDemoRoute
-      ? 'Demo'
-      : grantIdParsed !== undefined && grantIdParsed <= BigInt(Number.MAX_SAFE_INTEGER)
-        ? grantIdParsed.toString()
-        : grantIdParsed !== undefined
-          ? grantIdParsed.toString(16)
-          : '—';
+    grantIdParsed !== undefined && grantIdParsed <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? grantIdParsed.toString()
+      : grantIdParsed !== undefined
+        ? grantIdParsed.toString(16)
+        : '—';
 
-  const grantHeaderSubtitle = isDemoRoute
-    ? `Grant: ${UI_DEMO_GRANT_TITLE}`
-    : `Grant #${grantLabel}`;
+  const grantHeaderSubtitle = `Grant #${grantLabel}`;
 
-  const effectiveGrantId = useMemo(
-    () => (isDemoRoute ? UI_DEMO_GRANT_DISPLAY_ID : grantIdParsed),
-    [grantIdParsed, isDemoRoute]
-  );
+  const effectiveGrantId = grantIdParsed;
 
   const value: MilestoneSubmitContextValue = {
     gate,
@@ -707,7 +672,7 @@ export function MilestoneSubmitProvider({ children }: { children: ReactNode }) {
     grantIdParsed,
     effectiveGrantId,
     milestoneIndex,
-    isDemoRoute,
+    isDemoRoute: false,
     storageKey,
     displayTuple,
     displayMilestone,

@@ -1,5 +1,6 @@
 'use client';
 
+import { isWalletExtensionNoise } from '@/lib/wallet-extension-errors';
 import Link from 'next/link';
 import { useEffect } from 'react';
 
@@ -14,9 +15,7 @@ export default function BuilderProfileError({
     console.error('[builder profile]', error);
   }, [error]);
 
-  const walletNoise =
-    error.message.includes('chrome.runtime.sendMessage') ||
-    error.message.includes('Extension ID');
+  const walletNoise = isWalletExtensionNoise(error);
 
   return (
     <main className="mx-auto flex min-h-[60vh] w-full max-w-lg flex-col items-center justify-center px-4 py-12 text-center">

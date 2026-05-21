@@ -1,7 +1,5 @@
-import { isUiDemoMode } from '@/demo';
 import type { DaoDashboardSnapshot } from '@/demo/dao-dashboard';
 import { letterGradeFromScore } from '@/demo/dao-dashboard';
-import { CONTRACTS_READY } from '@/lib/escrow';
 import { grantDetailPath } from '@/lib/grant-routes';
 import { builderProfilePath } from '@/lib/profile-address';
 import type { Address } from 'viem';
@@ -72,56 +70,8 @@ const SEVERITY_ORDER: Record<DaoAlertSeverity, number> = {
   watch: 2,
 };
 
-/** Demo-only committee activity metadata until on-chain reads land. */
-/** Slugs must exist on `demo/dao-dashboard.ts` catalogue for grant detail resolution. */
-const DEMO_COMMITTEE_FIXTURES: {
-  grantSlug: string;
-  grantNumericId: string;
-  inactiveDays: number;
-  submittedAwaiting: number;
-  conditionSinceMs: number;
-}[] = [
-  {
-    grantSlug: '8692',
-    grantNumericId: '8692',
-    inactiveDays: 8,
-    submittedAwaiting: 2,
-    conditionSinceMs: Date.now() - MS_PER_DAY,
-  },
-];
-
-const DEMO_MEMBER_INACTIVE_FIXTURES: {
-  grantSlug: string;
-  grantNumericId: string;
-  member: `0x${string}`;
-  inactiveDays: number;
-  conditionSinceMs: number;
-}[] = [
-  {
-    grantSlug: '7731',
-    grantNumericId: '7731',
-    member: '0x1Ab43e5cF0123Ee9d8C4B2A0bE1FFcD12Aa9F022',
-    inactiveDays: 15,
-    conditionSinceMs: Date.now() - 3 * MS_PER_DAY,
-  },
-];
-
-/** Demo ledger builder with reputationScore 12 (`#GRT-6102`). */
-const DEMO_REPUTATION_FIXTURE: {
-  builder: `0x${string}`;
-  score: number;
-  activeGrants: number;
-  conditionSinceMs: number;
-} = {
-  builder: '0x2F8a3C4D5E6F7a8B9C0D1E2F3a4B5C6D7E8F9a0B',
-  score: 12,
-  activeGrants: 1,
-  conditionSinceMs: Date.now() - 2 * 60 * 60 * 1000,
-};
-
 /**
  * Produce DAO oversight alerts from escrow + reputation inputs.
- * Demo mode enriches with fixture rows that match the UX Pilot dashboard.
  */
 export function generateDaoAlerts(input: DaoAlertsInput): DaoAlert[] {
   const alerts: DaoAlert[] = [];
@@ -134,9 +84,6 @@ export function generateDaoAlerts(input: DaoAlertsInput): DaoAlert[] {
   if (input.chainGrants?.length) {
     alerts.push(...committeeInactivityFromChain(input.chainGrants, now));
     alerts.push(...memberInactiveFromChain(input.chainGrants, now));
-  }
-  if (!input.chainGrants?.length && (isUiDemoMode() || !CONTRACTS_READY)) {
-    alerts.push(...demoCommitteeAlerts(now));
   }
 
   return sortDaoAlerts(dedupeAlerts(alerts));
@@ -232,26 +179,6 @@ function reputationAlerts(
     });
   }
 
-  if (isUiDemoMode()) {
-    const f = DEMO_REPUTATION_FIXTURE;
-    const demoId = `reputation:demo:${f.builder.toLowerCase()}`;
-    if (!alerts.some((a) => a.id === demoId)) {
-      alerts.push({
-        id: demoId,
-        category: 'builder_reputation_critical',
-        severity: 'critical',
-        title: 'Builder Reputation Critical',
-        message: `Builder ${shortenAlertAddress(f.builder)} reputation score is F (${f.score}) — ${f.activeGrants} active grants affected.`,
-        conditionSinceMs: f.conditionSinceMs,
-        action: {
-          kind: 'link',
-          label: 'View Profile →',
-          href: builderProfilePath(f.builder) ?? '/grants',
-        },
-      });
-    }
-  }
-
   return alerts;
 }
 
@@ -279,44 +206,6 @@ function unwarnedOverdueAlerts(snapshot: DaoDashboardSnapshot, now: number): Dao
         },
       });
     }
-  }
-
-  return alerts;
-}
-
-function demoCommitteeAlerts(now: number): DaoAlert[] {
-  const alerts: DaoAlert[] = [];
-
-  for (const row of DEMO_COMMITTEE_FIXTURES) {
-    alerts.push({
-      id: `committee-inactivity:${row.grantSlug}`,
-      category: 'committee_inactivity',
-      severity: 'urgent',
-      title: 'Committee Inactivity',
-      message: `Grant #${row.grantNumericId} — no committee activity in ${row.inactiveDays} days. ${row.submittedAwaiting} milestones awaiting review.`,
-      conditionSinceMs: row.conditionSinceMs,
-      action: {
-        kind: 'link',
-        label: 'View Grant →',
-        href: grantDetailPath(row.grantSlug, 'dao'),
-      },
-    });
-  }
-
-  for (const row of DEMO_MEMBER_INACTIVE_FIXTURES) {
-    alerts.push({
-      id: `member-inactive:${row.grantSlug}:${row.member}`,
-      category: 'committee_member_inactive',
-      severity: 'watch',
-      title: 'Committee Member Gone Inactive',
-      message: `Committee member ${shortenAlertAddress(row.member)} on Grant #${row.grantNumericId} has been inactive for ${row.inactiveDays} days.`,
-      conditionSinceMs: row.conditionSinceMs,
-      action: {
-        kind: 'link',
-        label: 'View Grant →',
-        href: grantDetailPath(row.grantSlug, 'dao'),
-      },
-    });
   }
 
   return alerts;

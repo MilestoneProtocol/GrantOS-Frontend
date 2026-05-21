@@ -1,3 +1,4 @@
+import { getPublicApiV1Base } from '@/lib/api-config';
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
 
@@ -13,7 +14,7 @@ export function useBuilderSubmissions() {
 
     const fetchSubmissions = async () => {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+        const apiBase = getPublicApiV1Base();
         const res = await fetch(`${apiBase}/milestones/builder?address=${address}`);
         if (!res.ok) throw new Error(`Failed to fetch builder submissions: ${res.status}`);
         const data = await res.json();

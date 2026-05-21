@@ -1,6 +1,5 @@
 'use client';
 
-import { isRoleCheckBypassed } from '@/lib/role-access';
 import {
   CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
@@ -27,8 +26,6 @@ export type DetectedRoles = {
    * should present a role selection UI instead of redirecting.
    */
   hasMultipleRoles: boolean;
-  /** True when role checks are skipped for local / demo development. */
-  bypassActive: boolean;
 };
 
 const grantCountAbi = [
@@ -51,26 +48,9 @@ const factoryGrantsAbi = [
   },
 ] as const;
 
-function bypassRoles(address: `0x${string}`): DetectedRoles {
-  return {
-    loading: false,
-    address,
-    isVerified: true,
-    builderGrantIds: [],
-    committeeGrantIds: [BigInt(1), BigInt(2), BigInt(3)],
-    isBuilder: true,
-    isCommittee: true,
-    isDaoAdmin: true,
-    isNewWallet: false,
-    hasMultipleRoles: true,
-    bypassActive: true,
-  };
-}
-
 export function useRoleDetection(): DetectedRoles {
   const { address, status } = useAccount();
-  const bypass = isRoleCheckBypassed();
-  const enabled = Boolean(address) && !bypass && CONTRACTS_READY;
+  const enabled = Boolean(address) && CONTRACTS_READY;
 
   const countRead = useReadContracts({
     contracts: enabled
@@ -154,10 +134,6 @@ export function useRoleDetection(): DetectedRoles {
   return useMemo((): DetectedRoles => {
     const walletResolved = status !== 'connecting' && status !== 'reconnecting';
 
-    if (bypass && address && walletResolved) {
-      return bypassRoles(address as `0x${string}`);
-    }
-
     if (!address || !walletResolved) {
       return {
         loading: false,
@@ -170,7 +146,6 @@ export function useRoleDetection(): DetectedRoles {
         isDaoAdmin: false,
         isNewWallet: false,
         hasMultipleRoles: false,
-        bypassActive: bypass,
       };
     }
 
@@ -222,11 +197,9 @@ export function useRoleDetection(): DetectedRoles {
       isDaoAdmin,
       isNewWallet,
       hasMultipleRoles,
-      bypassActive: false,
     };
   }, [
     address,
-    bypass,
     escrowReady,
     factoryReady,
     roleReads.data,

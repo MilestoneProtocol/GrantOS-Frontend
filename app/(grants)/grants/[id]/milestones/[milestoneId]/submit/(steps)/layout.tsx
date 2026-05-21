@@ -73,11 +73,6 @@ function SubmitStepsChrome({ children }: { children: ReactNode }) {
               <span className="text-slate-300">/</span>
               <span className="min-w-0 truncate font-semibold text-slate-900">{milestoneTitle}</span>
             </div>
-            {isDemoRoute ? (
-              <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-900">
-                UI demo — not on-chain
-              </span>
-            ) : null}
           </div>
 
           <div className="flex min-h-[min(680px,calc(100vh-10rem))] flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
