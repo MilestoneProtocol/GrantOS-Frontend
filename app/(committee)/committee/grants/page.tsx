@@ -4,11 +4,11 @@ import CommitteeAccessDeniedToast from '@/components/committee/CommitteeAccessDe
 import CommitteeAppShell from '@/components/committee/CommitteeAppShell';
 import CommitteeReviewSkeleton from '@/components/committee/CommitteeReviewSkeleton';
 import ActiveGrantsSection from '@/components/committee/dashboard/ActiveGrantsSection';
-import type { CommitteeDemoGrant } from '@/demo/committee-demo';
 import DashboardOverview from '@/components/committee/dashboard/DashboardOverview';
 import { useAuthGuard } from '@/lib/authGuard';
+import { useCommitteeGrants } from '@/lib/hooks/useCommitteeGrants';
 import { useCommitteeReviews } from '@/lib/hooks/useCommitteeReviews';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const MIN_VALIDATION_MS = 1500;
 
@@ -19,6 +19,12 @@ const MIN_VALIDATION_MS = 1500;
 export default function CommitteeAllGrantsPage() {
   const guard = useAuthGuard('committee');
   const { data: reviews } = useCommitteeReviews();
+  const {
+    grants,
+    totalActiveGrants,
+    usdcUnderControl,
+    isLoading: grantsLoading,
+  } = useCommitteeGrants();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
@@ -27,28 +33,23 @@ export default function CommitteeAllGrantsPage() {
   }, []);
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
-  const summary = useMemo(
-    () => ({
-      totalActiveGrants: 0,
-      usdcUnderControl: 0,
-      pendingReviews: reviews?.totalPending ?? 0,
-      grants: [] as CommitteeDemoGrant[],
-    }),
-    [reviews?.totalPending],
-  );
+  const pendingReviews = reviews?.totalPending ?? 0;
 
   return (
-    <CommitteeAppShell breadcrumb="All Grants" reviewsBadge={reviews.tabCounts.pending}>
+    <CommitteeAppShell
+      breadcrumb="All Grants"
+      reviewsBadge={reviews.tabCounts.pending}
+    >
       {authorized ? (
         <main className="w-full px-4 py-6 sm:px-6 lg:px-10">
           <div className="mx-auto w-full max-w-6xl space-y-2">
             <DashboardOverview
-              totalActiveGrants={summary.totalActiveGrants}
-              usdcUnderControl={summary.usdcUnderControl}
-              pendingReviews={summary.pendingReviews}
-              showAllCaughtUpBanner={summary.pendingReviews === 0}
+              totalActiveGrants={totalActiveGrants}
+              usdcUnderControl={usdcUnderControl}
+              pendingReviews={pendingReviews}
+              showAllCaughtUpBanner={pendingReviews === 0}
             />
-            <ActiveGrantsSection grants={summary.grants} />
+            <ActiveGrantsSection grants={grants} isLoading={grantsLoading} />
           </div>
         </main>
       ) : (

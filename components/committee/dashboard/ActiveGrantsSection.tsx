@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 type ActiveGrantsSectionProps = {
   grants: CommitteeDemoGrant[];
+  isLoading?: boolean;
 };
 
 type GrantFilter = 'recent' | 'all';
@@ -15,7 +16,10 @@ type GrantFilter = 'recent' | 'all';
  * Renders the "Active Grants" section header (with Recent / All segmented toggle
  * and a Filter button) and the responsive grid of grant cards underneath.
  */
-export default function ActiveGrantsSection({ grants }: ActiveGrantsSectionProps) {
+export default function ActiveGrantsSection({
+  grants,
+  isLoading = false,
+}: ActiveGrantsSectionProps) {
   const [filter, setFilter] = useState<GrantFilter>('recent');
 
   const visible =
@@ -51,20 +55,45 @@ export default function ActiveGrantsSection({ grants }: ActiveGrantsSectionProps
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {visible.map((grant) => (
-          <CommitteeGrantCard key={grant.id} grant={grant} />
-        ))}
-      </div>
-
-      {visible.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
-          <p className="text-sm font-semibold text-slate-700">No grants in this view</p>
-          <p className="mt-1 text-xs text-slate-500">
-            Try switching to the <span className="font-semibold">All</span> tab to see archived grants.
-          </p>
+      {isLoading ? (
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-44 animate-pulse rounded-xl border border-slate-200 bg-slate-50"
+            />
+          ))}
         </div>
-      ) : null}
+      ) : (
+        <>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {visible.map((grant) => (
+              <CommitteeGrantCard key={grant.id} grant={grant} />
+            ))}
+          </div>
+
+          {visible.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+              <p className="text-sm font-semibold text-slate-700">
+                {grants.length === 0
+                  ? 'No grants yet'
+                  : 'No grants in this view'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {grants.length === 0
+                  ? 'You will see grants here once a grantor adds your wallet to a grant committee.'
+                  : (
+                      <>
+                        Try switching to the{' '}
+                        <span className="font-semibold">All</span> tab to see
+                        archived grants.
+                      </>
+                    )}
+              </p>
+            </div>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }
