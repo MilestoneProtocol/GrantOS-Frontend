@@ -17,6 +17,7 @@ export type DetectedRoles = {
   isVerified: boolean;
   builderGrantIds: bigint[];
   committeeGrantIds: bigint[];
+  grantorGrantIds: bigint[];
   isBuilder: boolean;
   isCommittee: boolean;
   isDaoAdmin: boolean;
@@ -117,6 +118,11 @@ export function useRoleDetection(): DetectedRoles {
         abi: grantEscrowAbi,
         functionName: 'grantId' as const,
       },
+      {
+        address: addr,
+        abi: grantEscrowAbi,
+        functionName: 'grantor' as const,
+      },
     ]);
     return [...base, ...perEscrow];
   }, [address, enabled, escrowAddresses]);
@@ -141,6 +147,7 @@ export function useRoleDetection(): DetectedRoles {
         isVerified: false,
         builderGrantIds: [],
         committeeGrantIds: [],
+        grantorGrantIds: [],
         isBuilder: false,
         isCommittee: false,
         isDaoAdmin: false,
@@ -159,12 +166,14 @@ export function useRoleDetection(): DetectedRoles {
 
     const builderIds: bigint[] = [];
     const committeeIds: bigint[] = [];
+    const grantorIds: bigint[] = [];
     const roleResults = data.slice(1);
 
-    for (let i = 0; i < roleResults.length; i += 3) {
+    for (let i = 0; i < roleResults.length; i += 4) {
       const builderRes = roleResults[i] as { status: string; result?: string } | undefined;
       const committeeRes = roleResults[i + 1] as { status: string; result?: boolean } | undefined;
       const grantIdRes = roleResults[i + 2] as { status: string; result?: bigint } | undefined;
+      const grantorRes = roleResults[i + 3] as { status: string; result?: string } | undefined;
 
       if (grantIdRes?.status === 'success' && grantIdRes.result !== undefined) {
         const gid = grantIdRes.result;
@@ -177,12 +186,18 @@ export function useRoleDetection(): DetectedRoles {
         if (committeeRes?.status === 'success' && committeeRes.result) {
           committeeIds.push(gid);
         }
+        if (
+          grantorRes?.status === 'success' &&
+          grantorRes.result?.toLowerCase() === address.toLowerCase()
+        ) {
+          grantorIds.push(gid);
+        }
       }
     }
 
     const isBuilder = builderIds.length > 0;
     const isCommittee = committeeIds.length > 0;
-    const isDaoAdmin = committeeIds.length >= 3;
+    const isDaoAdmin = grantorIds.length > 0 || committeeIds.length >= 3;
     const isNewWallet = !isVerified && !isBuilder && !isCommittee;
     const hasMultipleRoles = isBuilder && isCommittee;
 
@@ -192,6 +207,7 @@ export function useRoleDetection(): DetectedRoles {
       isVerified,
       builderGrantIds: builderIds,
       committeeGrantIds: committeeIds,
+      grantorGrantIds: grantorIds,
       isBuilder,
       isCommittee,
       isDaoAdmin,
