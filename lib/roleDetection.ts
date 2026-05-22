@@ -1,5 +1,6 @@
 'use client';
 
+import { getPublicApiV1Base } from '@/lib/api-config';
 import {
   CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
@@ -114,6 +115,32 @@ export function useRoleDetection(): DetectedRoles {
     refetchOnWindowFocus: false,
   });
   const isGrantorByLog = Boolean(grantorLogQuery.data);
+
+  // Backend-based committee membership check. The backend is the source of
+  // truth for committee data the moment ReviewConfirm POSTs it — independent
+  // of RPC indexing or per-escrow on-chain reads, and works across any browser
+  // or device. Used as an additive signal alongside the on-chain check.
+  const committeeBackendQuery = useQuery({
+    queryKey: ['role-detection:committee-backend', address],
+    queryFn: async () => {
+      if (!address) return false;
+      try {
+        const apiBase = getPublicApiV1Base();
+        const res = await fetch(`${apiBase}/grants/committee?address=${address}`);
+        if (!res.ok) return false;
+        const data = (await res.json()) as unknown;
+        return Array.isArray(data) && data.length > 0;
+      } catch (err) {
+        console.error('role-detection committee backend query failed:', err);
+        return false;
+      }
+    },
+    enabled: Boolean(address),
+    staleTime: 10_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+  const isCommitteeByBackend = Boolean(committeeBackendQuery.data);
 
   const countRead = useReadContracts({
     contracts: enabled
@@ -245,12 +272,14 @@ export function useRoleDetection(): DetectedRoles {
       !factoryReady ||
       !escrowReady ||
       roleReads.isLoading ||
-      grantorLogQuery.isLoading;
+      grantorLogQuery.isLoading ||
+      committeeBackendQuery.isLoading;
     const anyFetching =
       countRead.isFetching ||
       escrowReads.isFetching ||
       roleReads.isFetching ||
-      grantorLogQuery.isFetching;
+      grantorLogQuery.isFetching ||
+      committeeBackendQuery.isFetching;
 
     const data = roleReads.data ?? [];
     const verifiedRow = data[0] as { status: string; result?: boolean } | undefined;
@@ -312,7 +341,11 @@ export function useRoleDetection(): DetectedRoles {
     }
 
     const isBuilder = builderIds.length > 0;
-    const isCommittee = committeeIds.length > 0;
+    // Committee membership = any of:
+    //   1. On-chain: `committee[]` from `getGrant()` includes this wallet on any escrow.
+    //   2. Backend: `/grants/committee?address=…` returns grants for this wallet.
+    //      Faster than on-chain reads and not affected by RPC indexing delays.
+    const isCommittee = committeeIds.length > 0 || isCommitteeByBackend;
     // DAO admin = any of:
     //   1. Local hint: wallet just signed a createGrant in this browser.
     //   2. Event log: factory `GrantCreated` event emitted with this wallet as grantor
@@ -349,6 +382,8 @@ export function useRoleDetection(): DetectedRoles {
     };
   }, [
     address,
+    committeeBackendQuery.isFetching,
+    committeeBackendQuery.isLoading,
     countRead.isFetching,
     escrowReads.isFetching,
     escrowReady,
@@ -356,6 +391,7 @@ export function useRoleDetection(): DetectedRoles {
     grantorLogQuery.isFetching,
     grantorLogQuery.isLoading,
     hintedDaoAdmin,
+    isCommitteeByBackend,
     isGrantorByLog,
     roleReads.data,
     roleReads.isFetching,
