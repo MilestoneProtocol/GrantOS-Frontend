@@ -47,7 +47,11 @@ function EntryPageInner() {
     } else if (roles.hasMultipleRoles) {
       return;
     } else if (roles.isCommittee && !roles.isBuilder) {
-      target = '/committee';
+      // Committee routes require ZK verification too — send unverified
+      // committee members to /verify first, otherwise the guard would bounce.
+      target = roles.isVerified
+        ? '/committee'
+        : '/verify?toast=complete_verification';
     } else if (roles.isBuilder && !roles.isVerified) {
       target = '/verify?toast=complete_verification';
     } else if (roles.isBuilder) {

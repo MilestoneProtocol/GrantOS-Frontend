@@ -17,7 +17,9 @@ type GuardState =
 function roleFromRoles(requiredRole: RequiredRole, roles: ReturnType<typeof useRoleDetection>) {
   if (requiredRole === 'public' || requiredRole === 'connected') return true;
   if (requiredRole === 'dao') return roles.isDaoAdmin;
-  if (requiredRole === 'committee') return roles.isCommittee;
+  // Committee routes require BOTH on-chain committee membership AND ZK identity
+  // verification. Either alone is insufficient.
+  if (requiredRole === 'committee') return roles.isCommittee && roles.isVerified;
   if (requiredRole === 'builder') return roles.isBuilder || roles.isVerified;
 
   return false;
@@ -77,6 +79,19 @@ export function useAuthGuard(requiredRole: RequiredRole): GuardState {
     if (roles.loading || roles.isFetching) return;
 
     if (!roleFromRoles(requiredRole, roles)) {
+      // Tailor the redirect to the specific failure for committee routes:
+      //   - On-chain committee member but not yet ZK-verified → /verify with toast.
+      //   - Not a committee member at all → onboarding / role selection.
+      if (requiredRole === 'committee') {
+        if (roles.isCommittee && !roles.isVerified) {
+          router.replace(`/verify?toast=complete_verification`);
+          return;
+        }
+        router.replace(
+          `/?toast=not_committee&from=${encodeURIComponent(pathname ?? '')}`,
+        );
+        return;
+      }
       router.replace(`/?select=1&from=${encodeURIComponent(pathname ?? '')}`);
     }
   }, [isConnected, pathname, requiredRole, roles, router, walletResolved]);
