@@ -40,14 +40,14 @@ function EntryPageInner() {
 
     let target: string | null = null;
 
-    if (roles.hasMultipleRoles) {
-      return;
-    }
-
-    if (roles.isDaoAdmin && !roles.isCommittee && !roles.isBuilder) {
+    // DAO admin (grantor on any grant, or member of 3+ committees) wins when not also a builder.
+    // A grantor seated on their own grant's committee still belongs in /dao.
+    if (roles.isDaoAdmin && !roles.isBuilder) {
       target = '/dao';
+    } else if (roles.hasMultipleRoles) {
+      return;
     } else if (roles.isCommittee && !roles.isBuilder) {
-      target = roles.isDaoAdmin ? '/dao' : '/committee';
+      target = '/committee';
     } else if (roles.isBuilder && !roles.isVerified) {
       target = '/verify?toast=complete_verification';
     } else if (roles.isBuilder) {
@@ -88,7 +88,10 @@ function EntryPageInner() {
       roles.isNewWallet ||
       roles.hasMultipleRoles ||
       (roles.isBuilder && roles.isCommittee) ||
-      (roles.isVerified && !roles.isBuilder && !roles.isCommittee));
+      (roles.isVerified &&
+        !roles.isBuilder &&
+        !roles.isCommittee &&
+        !roles.isDaoAdmin));
 
   const builderUnverifiedNudge =
     shouldDetect && !roles.loading && roles.isBuilder && !roles.isVerified;

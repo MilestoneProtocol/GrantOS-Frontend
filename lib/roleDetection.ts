@@ -217,7 +217,12 @@ export function useRoleDetection(): DetectedRoles {
     const isCommittee = committeeIds.length > 0;
     const isDaoAdmin = grantorIds.length > 0 || committeeIds.length >= 3;
     const isNewWallet = !isVerified && !isBuilder && !isCommittee && !isDaoAdmin;
-    const protectedRoleCount = Number(isBuilder || isVerified) + Number(isCommittee) + Number(isDaoAdmin);
+    // DAO admin subsumes committee — a grantor sitting on their own grant's committee
+    // is still one surface (/dao), not two. Builder/verified is always a separate surface.
+    const protectedRoleCount =
+      Number(isBuilder || isVerified) +
+      Number(isCommittee && !isDaoAdmin) +
+      Number(isDaoAdmin);
     const hasMultipleRoles = protectedRoleCount > 1;
 
     return {
