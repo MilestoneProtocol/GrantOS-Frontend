@@ -89,7 +89,7 @@ const EMPTY_TREASURY_SNAPSHOT: TreasurySnapshot = {
 };
 
 export default function TreasuryPage() {
-  const guard = useAuthGuard('dao');
+  const guard = useAuthGuard('connected');
   const snapshot = useTreasuryStore((s) => s.snapshot);
   const setSnapshot = useTreasuryStore((s) => s.setSnapshot);
   const refresh = useTreasuryStore((s) => s.refresh);

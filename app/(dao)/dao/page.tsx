@@ -40,7 +40,7 @@ const MIN_VALIDATION_MS = 1500;
  */
 export default function DaoDashboardPage() {
   const router = useRouter();
-  const guard = useAuthGuard('dao');
+  const guard = useAuthGuard('connected');
   const { search, setSearch, selected, onToggle } = useDaoFilters();
   const snapshot = useDaoDashboardStore((s) => s.snapshot);
   const openGrant = useDaoDashboardStore((s) => s.openGrant);
