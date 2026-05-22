@@ -17,6 +17,7 @@ export type DetectedRoles = {
   isVerified: boolean;
   builderGrantIds: bigint[];
   committeeGrantIds: bigint[];
+  grantorGrantIds: bigint[];
   isBuilder: boolean;
   isCommittee: boolean;
   isDaoAdmin: boolean;
@@ -146,6 +147,7 @@ export function useRoleDetection(): DetectedRoles {
         isVerified: false,
         builderGrantIds: [],
         committeeGrantIds: [],
+        grantorGrantIds: [],
         isBuilder: false,
         isCommittee: false,
         isDaoAdmin: false,
@@ -164,7 +166,7 @@ export function useRoleDetection(): DetectedRoles {
 
     const builderIds: bigint[] = [];
     const committeeIds: bigint[] = [];
-    const createdIds: bigint[] = [];
+    const grantorIds: bigint[] = [];
     const roleResults = data.slice(1);
 
     for (let i = 0; i < roleResults.length; i += 4) {
@@ -188,14 +190,14 @@ export function useRoleDetection(): DetectedRoles {
           grantorRes?.status === 'success' &&
           grantorRes.result?.toLowerCase() === address.toLowerCase()
         ) {
-          createdIds.push(gid);
+          grantorIds.push(gid);
         }
       }
     }
 
     const isBuilder = builderIds.length > 0;
     const isCommittee = committeeIds.length > 0;
-    const isDaoAdmin = createdIds.length > 0;
+    const isDaoAdmin = grantorIds.length > 0 || committeeIds.length >= 3;
     const isNewWallet = !isVerified && !isBuilder && !isCommittee && !isDaoAdmin;
     const hasMultipleRoles = isBuilder && isCommittee;
 
@@ -205,6 +207,7 @@ export function useRoleDetection(): DetectedRoles {
       isVerified,
       builderGrantIds: builderIds,
       committeeGrantIds: committeeIds,
+      grantorGrantIds: grantorIds,
       isBuilder,
       isCommittee,
       isDaoAdmin,

@@ -1,12 +1,12 @@
 'use client';
 
 import ConnectButton from '@/components/ConnectButton';
-import VerifyBackButton from '@/components/verify/VerifyBackButton';
 import VerifyWalletReconnect from '@/components/verify/VerifyWalletReconnect';
 import { api } from '@/lib/api';
 import { useRedirectIfAlreadyVerified } from '@/hooks/useRedirectIfAlreadyVerified';
 import { persistVerifyRequestId, persistVerifyWallet } from '@/lib/identity-verify-session';
 import { Check, Circle, Shield } from 'lucide-react';
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 
@@ -83,13 +83,12 @@ export default function IdentityVerificationPage() {
       <VerifyWalletReconnect />
       <header className="border-b border-slate-200 bg-white">
         <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <VerifyBackButton />
+          <Link href="/?select=1" className="flex items-center gap-3 transition hover:opacity-80">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500">
               <GithubIcon className="h-4 w-4 text-white" />
             </div>
             <h1 className="text-[15px] font-semibold text-slate-900">GrantOS</h1>
-          </div>
+          </Link>
           {isConnected ? <ConnectButton variant="header" /> : <ConnectButton variant="green" />}
         </div>
       </header>

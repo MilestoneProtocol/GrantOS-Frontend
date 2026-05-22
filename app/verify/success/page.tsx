@@ -3,7 +3,6 @@
 // app/verify/success/page.tsx
 
 import ConnectButton from '@/components/ConnectButton';
-import VerifyBackButton from '@/components/verify/VerifyBackButton';
 import VerifyWalletReconnect from '@/components/verify/VerifyWalletReconnect';
 import { api } from '@/lib/api';
 import {
@@ -18,6 +17,7 @@ import {
 } from '@/lib/identity-verify-session';
 import { IDENTITY_REGISTRY_ABI, IDENTITY_REGISTRY_ADDRESS } from '@/lib/contracts';
 import { Check, CheckCircle2, Fingerprint, Shield, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useConfig, useSwitchChain, useBalance } from 'wagmi';
@@ -521,8 +521,7 @@ function SuccessContent() {
       <VerifyWalletReconnect />
       <header className="border-b border-slate-200 bg-white">
         <div className="flex w-full items-center justify-between gap-4 px-5 py-3 sm:px-8">
-          <div className="flex items-center gap-3">
-            <VerifyBackButton />
+          <Link href="/?select=1" className="flex items-center gap-3 transition hover:opacity-80">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
               <span className="text-sm font-bold text-white">G</span>
             </div>
@@ -530,7 +529,7 @@ function SuccessContent() {
             <span className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500 sm:inline-flex">
               Sepolia
             </span>
-          </div>
+          </Link>
           <div className="flex items-center gap-3">
             {isFullyVerified && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
