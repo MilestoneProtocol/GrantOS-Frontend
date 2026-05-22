@@ -47,7 +47,13 @@ export function useAuthGuard(requiredRole: RequiredRole): GuardState {
     if (!isConnected) return { state: 'blocked' };
     if (requiredRole === 'connected') return { state: 'allowed' };
     if (roles.loading) return { state: 'loading' };
-    return roleFromRoles(requiredRole, roles) ? { state: 'allowed' } : { state: 'blocked' };
+
+    const matches = roleFromRoles(requiredRole, roles);
+    // If the role doesn't match BUT a refetch is in flight, the cached data may
+    // be stale (e.g. just after a `createGrant` tx). Surface a loading skeleton
+    // rather than the access-denied UI until the fetch settles.
+    if (!matches && roles.isFetching) return { state: 'loading' };
+    return matches ? { state: 'allowed' } : { state: 'blocked' };
   }, [isConnected, requiredRole, roles, walletResolved]);
 
   useEffect(() => {
@@ -64,7 +70,13 @@ export function useAuthGuard(requiredRole: RequiredRole): GuardState {
 
     if (requiredRole === 'connected') return;
 
-    if (!roles.loading && !roleFromRoles(requiredRole, roles)) {
+    // Don't bounce while role detection is still resolving — including background
+    // refetches. After a `createGrant` tx the data flows in a 3-stage cascade
+    // (grantCount → escrow addresses → per-escrow role reads); bouncing on the
+    // stale snapshot would kick a fresh grantor to onboarding.
+    if (roles.loading || roles.isFetching) return;
+
+    if (!roleFromRoles(requiredRole, roles)) {
       router.replace(`/?select=1&from=${encodeURIComponent(pathname ?? '')}`);
     }
   }, [isConnected, pathname, requiredRole, roles, router, walletResolved]);

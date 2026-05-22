@@ -13,6 +13,13 @@ import { useAccount, useReadContracts } from 'wagmi';
 
 export type DetectedRoles = {
   loading: boolean;
+  /**
+   * True when any of the role-detection queries is currently fetching, including
+   * background refetches. Use this to delay protected-route bounces while the
+   * count → escrow addresses → role reads cascade is still settling (e.g. right
+   * after a `createGrant` tx).
+   */
+  isFetching: boolean;
   address?: `0x${string}`;
   isVerified: boolean;
   builderGrantIds: bigint[];
@@ -165,6 +172,7 @@ export function useRoleDetection(): DetectedRoles {
     if (!address || !walletResolved) {
       return {
         loading: false,
+        isFetching: false,
         address: address as `0x${string}` | undefined,
         isVerified: false,
         builderGrantIds: [],
@@ -179,6 +187,8 @@ export function useRoleDetection(): DetectedRoles {
     }
 
     const pending = !factoryReady || !escrowReady || roleReads.isLoading;
+    const anyFetching =
+      countRead.isFetching || escrowReads.isFetching || roleReads.isFetching;
 
     const data = roleReads.data ?? [];
     const verifiedRow = data[0] as { status: string; result?: boolean } | undefined;
@@ -230,6 +240,7 @@ export function useRoleDetection(): DetectedRoles {
 
     return {
       loading: pending,
+      isFetching: anyFetching,
       address: address as `0x${string}`,
       isVerified,
       builderGrantIds: builderIds,
@@ -243,6 +254,8 @@ export function useRoleDetection(): DetectedRoles {
     };
   }, [
     address,
+    countRead.isFetching,
+    escrowReads.isFetching,
     escrowReady,
     factoryReady,
     roleReads.data,

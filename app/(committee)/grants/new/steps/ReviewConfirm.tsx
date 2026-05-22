@@ -125,18 +125,25 @@ export default function ReviewConfirm({
   useEffect(() => {
     if (!createIsConfirmed || !createHash || !createReceipt) return;
 
-    // Force role detection (and any other on-chain reads) to refetch so the wallet
-    // shows up as a DAO admin / grantor immediately after this tx confirms.
-    queryClient.invalidateQueries();
+    const finalizeAndAdvance = async () => {
+      // 1) Refetch every active on-chain read (including useRoleDetection's) AND
+      //    AWAIT it before moving to the success screen. Otherwise the wallet's
+      //    role cache still says "not DAO admin" when the user clicks
+      //    "Go to DAO Dashboard", and the /dao guard bounces them to onboarding.
+      try {
+        await queryClient.refetchQueries({ type: 'active' });
+      } catch (err) {
+        // Refetch errors are non-fatal — role detection's own polling will recover.
+        console.error('refetchQueries after createGrant failed:', err);
+      }
 
-    const indexInBackend = async () => {
       let onChainId = 0;
       try {
         // Find the GrantCreated event in logs
         const log = createReceipt.logs.find(
           (l) => l.address.toLowerCase() === GRANT_FACTORY_ADDRESS.toLowerCase()
         );
-        
+
         let escrowAddr = '0x0000000000000000000000000000000000000000';
 
         if (log) {
@@ -180,7 +187,7 @@ export default function ReviewConfirm({
       }
     };
 
-    indexInBackend();
+    finalizeAndAdvance();
   }, [createIsConfirmed, createHash, createReceipt, builderAddress, committeeMembers, milestones, paymentMode, quorum, totalUsdc, onSuccess, queryClient]);
 
   const approveError =
