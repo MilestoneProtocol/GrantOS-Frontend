@@ -100,7 +100,11 @@ function EntryPageInner() {
         <DetectingRoleSkeleton />
       ) : showRoleSelection ? (
         <RoleSelection
-          showDaoCard={roles.isDaoAdmin}
+          showDaoCard={
+            roles.isNewWallet ||
+            roles.isDaoAdmin ||
+            (roles.isVerified && !roles.isBuilder && !roles.isCommittee)
+          }
           builderUnverifiedNudge={builderUnverifiedNudge}
         />
       ) : (
