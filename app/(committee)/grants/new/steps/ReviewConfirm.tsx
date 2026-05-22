@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { maxUint256, parseUnits } from 'viem';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 
 type ReviewConfirmProps = {
   builderAddress: string;
@@ -61,6 +62,7 @@ export default function ReviewConfirm({
     [milestones]
   );
   const { address: userAddress } = useAccount();
+  const queryClient = useQueryClient();
 
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: USDC_ADDRESS,
@@ -123,6 +125,10 @@ export default function ReviewConfirm({
   useEffect(() => {
     if (!createIsConfirmed || !createHash || !createReceipt) return;
 
+    // Force role detection (and any other on-chain reads) to refetch so the wallet
+    // shows up as a DAO admin / grantor immediately after this tx confirms.
+    queryClient.invalidateQueries();
+
     const indexInBackend = async () => {
       let onChainId = 0;
       try {
@@ -175,7 +181,7 @@ export default function ReviewConfirm({
     };
 
     indexInBackend();
-  }, [createIsConfirmed, createHash, createReceipt, builderAddress, committeeMembers, milestones, paymentMode, quorum, totalUsdc, onSuccess]);
+  }, [createIsConfirmed, createHash, createReceipt, builderAddress, committeeMembers, milestones, paymentMode, quorum, totalUsdc, onSuccess, queryClient]);
 
   const approveError =
     (approveWriteError as Error | null)?.message ||

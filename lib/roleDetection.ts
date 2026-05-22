@@ -65,10 +65,12 @@ export function useRoleDetection(): DetectedRoles {
       : [],
     query: {
       enabled,
-      staleTime: 0,
+      // Cache freshness: short, so post-tx navigations refresh; not zero, so quick
+      // re-mounts don't churn. Background refreshes happen via the interval below.
+      staleTime: 5_000,
       refetchOnMount: true,
-      refetchOnWindowFocus: true,
-      refetchInterval: enabled ? 4000 : false,
+      refetchOnWindowFocus: false,
+      refetchInterval: enabled ? 15_000 : false,
     },
   });
 
@@ -90,10 +92,10 @@ export function useRoleDetection(): DetectedRoles {
     })),
     query: {
       enabled: enabled && factoryIndices.length > 0,
-      staleTime: 0,
+      staleTime: 5_000,
       refetchOnMount: true,
-      refetchOnWindowFocus: true,
-      refetchInterval: enabled ? 4000 : false,
+      refetchOnWindowFocus: false,
+      refetchInterval: enabled ? 15_000 : false,
     },
   });
 
@@ -139,19 +141,21 @@ export function useRoleDetection(): DetectedRoles {
     return [...base, ...perEscrow];
   }, [address, enabled, escrowAddresses]);
 
-  const factoryReady =
-    !enabled || (!countRead.isLoading && !countRead.isFetching);
+  // Only count the FIRST load as "not ready"; background refetches keep the previously
+  // resolved data and must not flip `loading` back on, otherwise the role-detect skeleton
+  // flickers every refetch interval.
+  const factoryReady = !enabled || !countRead.isLoading;
   const escrowReady =
-    !enabled || factoryIndices.length === 0 || (!escrowReads.isLoading && !escrowReads.isFetching);
+    !enabled || factoryIndices.length === 0 || !escrowReads.isLoading;
 
   const roleReads = useReadContracts({
     contracts: roleContracts,
     query: {
       enabled: enabled && factoryReady && escrowReady && roleContracts.length > 0,
-      staleTime: 0,
+      staleTime: 5_000,
       refetchOnMount: true,
-      refetchOnWindowFocus: true,
-      refetchInterval: enabled ? 4000 : false,
+      refetchOnWindowFocus: false,
+      refetchInterval: enabled ? 15_000 : false,
     },
   });
 
@@ -174,8 +178,7 @@ export function useRoleDetection(): DetectedRoles {
       };
     }
 
-    const pending =
-      !factoryReady || !escrowReady || roleReads.isLoading || roleReads.isFetching;
+    const pending = !factoryReady || !escrowReady || roleReads.isLoading;
 
     const data = roleReads.data ?? [];
     const verifiedRow = data[0] as { status: string; result?: boolean } | undefined;
