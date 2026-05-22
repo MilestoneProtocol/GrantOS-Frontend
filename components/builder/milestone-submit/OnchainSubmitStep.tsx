@@ -22,7 +22,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseUnits, type Hex } from 'viem';
-import { arbitrum } from 'wagmi/chains';
+import { arbitrumSepolia } from 'wagmi/chains';
 import { useWaitForTransactionReceipt, useWriteContract, useAccount } from 'wagmi';
 
 const ZERO_UID =
@@ -88,7 +88,7 @@ export default function OnchainSubmitStep() {
     [repoTrimmed, prTrimmed]
   );
 
-  const explorerBase = arbitrum.blockExplorers.default.url;
+  const explorerBase = arbitrumSepolia.blockExplorers.default.url;
 
   const [invalidProof, setInvalidProof] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -173,6 +173,7 @@ export default function OnchainSubmitStep() {
         // Legacy gas price and limit to prevent testnet gas estimation failures
         gasPrice: parseUnits('2', 9), // 2 Gwei
         gas: BigInt(3000000),         // Generous limit for ZK proof verification
+        chainId: arbitrumSepolia.id,
       });
       setSubmitHash(hash);
     } catch (e: unknown) {

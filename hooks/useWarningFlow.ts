@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { arbitrumSepolia } from 'wagmi/chains';
 import { issueWarning, recordSlash } from '@/lib/warning-api';
 import type { Address } from 'viem';
 
@@ -63,6 +64,7 @@ export function useWarningFlow(): UseWarningFlowResult {
           ],
           functionName: 'issueWarning',
           args: [grantIdBytes32, BigInt(params.milestoneIndex), params.builderAddress, params.message],
+          chainId: arbitrumSepolia.id,
         });
 
         // Wait for confirmation
@@ -112,6 +114,7 @@ export function useWarningFlow(): UseWarningFlowResult {
           ],
           functionName: 'slashMilestone',
           args: [BigInt(params.milestoneIndex)],
+          chainId: arbitrumSepolia.id,
         });
 
         // Wait for confirmation

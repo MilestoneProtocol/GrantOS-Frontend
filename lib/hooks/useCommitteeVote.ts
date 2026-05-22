@@ -1,6 +1,7 @@
 import { getPublicApiV1Base } from '@/lib/api-config';
 import { useCallback, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
+import { arbitrumSepolia } from 'wagmi/chains';
 import { grantEscrowAbi } from '@/lib/escrow';
 import type { Address, Hex } from 'viem';
 
@@ -26,6 +27,7 @@ export function useCommitteeVote(escrowAddress: Address, milestoneIndex: number,
         abi: grantEscrowAbi,
         functionName: intent === 'approve' ? 'approveMilestone' : 'rejectMilestone',
         args: [BigInt(milestoneIndex)],
+        chainId: arbitrumSepolia.id,
       });
 
       setState({ kind: 'submitted', intent, txHash: hash });

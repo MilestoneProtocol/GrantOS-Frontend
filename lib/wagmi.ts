@@ -1,6 +1,6 @@
 import { createConfig, createStorage, http } from 'wagmi';
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors';
-import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
+import { arbitrumSepolia } from 'wagmi/chains';
 
 const localStorageAdapter = {
   getItem(key: string) {
@@ -68,10 +68,9 @@ const connectors = [
 ];
 
 export const config = createConfig({
-  chains: [arbitrum, arbitrumSepolia],
+  chains: [arbitrumSepolia],
   connectors,
   transports: {
-    [arbitrum.id]: http(),
     [arbitrumSepolia.id]: http(),
   },
   ssr: true,
