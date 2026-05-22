@@ -44,7 +44,9 @@ function EntryPageInner() {
       return;
     }
 
-    if (roles.isCommittee && !roles.isBuilder) {
+    if (roles.isDaoAdmin && !roles.isCommittee && !roles.isBuilder) {
+      target = '/dao';
+    } else if (roles.isCommittee && !roles.isBuilder) {
       target = roles.isDaoAdmin ? '/dao' : '/committee';
     } else if (roles.isBuilder && !roles.isVerified) {
       target = '/verify?toast=complete_verification';
@@ -98,11 +100,7 @@ function EntryPageInner() {
         <DetectingRoleSkeleton />
       ) : showRoleSelection ? (
         <RoleSelection
-          showDaoCard={
-            roles.isNewWallet ||
-            roles.isDaoAdmin ||
-            (roles.isVerified && !roles.isBuilder && !roles.isCommittee)
-          }
+          showDaoCard={roles.isDaoAdmin}
           builderUnverifiedNudge={builderUnverifiedNudge}
         />
       ) : (

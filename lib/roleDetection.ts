@@ -23,7 +23,7 @@ export type DetectedRoles = {
   isDaoAdmin: boolean;
   isNewWallet: boolean;
   /**
-   * True when the connected wallet has both builder + committee history, so onboarding
+   * True when the connected wallet can validly enter more than one protected app shell, so onboarding
    * should present a role selection UI instead of redirecting.
    */
   hasMultipleRoles: boolean;
@@ -63,7 +63,13 @@ export function useRoleDetection(): DetectedRoles {
           },
         ]
       : [],
-    query: { enabled },
+    query: {
+      enabled,
+      staleTime: 0,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchInterval: enabled ? 4000 : false,
+    },
   });
 
   const grantCount = safeFactoryGrantCount(
@@ -82,7 +88,13 @@ export function useRoleDetection(): DetectedRoles {
       functionName: 'grants',
       args: [index],
     })),
-    query: { enabled: enabled && factoryIndices.length > 0 },
+    query: {
+      enabled: enabled && factoryIndices.length > 0,
+      staleTime: 0,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchInterval: enabled ? 4000 : false,
+    },
   });
 
   const escrowAddresses = useMemo(() => {
@@ -134,7 +146,13 @@ export function useRoleDetection(): DetectedRoles {
 
   const roleReads = useReadContracts({
     contracts: roleContracts,
-    query: { enabled: enabled && factoryReady && escrowReady && roleContracts.length > 0 },
+    query: {
+      enabled: enabled && factoryReady && escrowReady && roleContracts.length > 0,
+      staleTime: 0,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchInterval: enabled ? 4000 : false,
+    },
   });
 
   return useMemo((): DetectedRoles => {
@@ -199,7 +217,8 @@ export function useRoleDetection(): DetectedRoles {
     const isCommittee = committeeIds.length > 0;
     const isDaoAdmin = grantorIds.length > 0 || committeeIds.length >= 3;
     const isNewWallet = !isVerified && !isBuilder && !isCommittee && !isDaoAdmin;
-    const hasMultipleRoles = isBuilder && isCommittee;
+    const protectedRoleCount = Number(isBuilder || isVerified) + Number(isCommittee) + Number(isDaoAdmin);
+    const hasMultipleRoles = protectedRoleCount > 1;
 
     return {
       loading: pending,
