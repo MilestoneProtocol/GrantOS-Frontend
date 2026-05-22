@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { maxUint256, parseUnits } from 'viem';
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDaoAdminHintStore } from '@/store/daoAdminHintStore';
 
 type ReviewConfirmProps = {
   builderAddress: string;
@@ -63,6 +64,7 @@ export default function ReviewConfirm({
   );
   const { address: userAddress } = useAccount();
   const queryClient = useQueryClient();
+  const markDaoAdmin = useDaoAdminHintStore((s) => s.markDaoAdmin);
 
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: USDC_ADDRESS,
@@ -125,11 +127,18 @@ export default function ReviewConfirm({
   useEffect(() => {
     if (!createIsConfirmed || !createHash || !createReceipt) return;
 
+    // Immediately mark this wallet as a DAO admin locally. The on-chain
+    // `grantor()` read in useRoleDetection can lag by several seconds after a
+    // fresh createGrant tx (RPC indexing + the count → escrows → role-reads
+    // cascade). The hint bridges that gap so /dao is accessible right away.
+    if (createReceipt.from) {
+      markDaoAdmin(createReceipt.from);
+    }
+
     const finalizeAndAdvance = async () => {
-      // 1) Refetch every active on-chain read (including useRoleDetection's) AND
-      //    AWAIT it before moving to the success screen. Otherwise the wallet's
-      //    role cache still says "not DAO admin" when the user clicks
-      //    "Go to DAO Dashboard", and the /dao guard bounces them to onboarding.
+      // Refetch every active on-chain read (including useRoleDetection's) so
+      // the cache catches up to the new grant. The hint above is the safety net
+      // in case the cascade hasn't fully resolved by the time the user navigates.
       try {
         await queryClient.refetchQueries({ type: 'active' });
       } catch (err) {
@@ -188,7 +197,7 @@ export default function ReviewConfirm({
     };
 
     finalizeAndAdvance();
-  }, [createIsConfirmed, createHash, createReceipt, builderAddress, committeeMembers, milestones, paymentMode, quorum, totalUsdc, onSuccess, queryClient]);
+  }, [createIsConfirmed, createHash, createReceipt, builderAddress, committeeMembers, milestones, paymentMode, quorum, totalUsdc, onSuccess, queryClient, markDaoAdmin]);
 
   const approveError =
     (approveWriteError as Error | null)?.message ||

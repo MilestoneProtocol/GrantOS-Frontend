@@ -8,8 +8,15 @@ import {
   identityRegistryAbi,
 } from '@/lib/escrow';
 import { factoryIndexRange, safeFactoryGrantCount } from '@/lib/grant-factory-read';
+import { useDaoAdminHintStore } from '@/store/daoAdminHintStore';
+import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { useAccount, useReadContracts } from 'wagmi';
+import { parseAbiItem } from 'viem';
+import { useAccount, usePublicClient, useReadContracts } from 'wagmi';
+
+const grantCreatedEvent = parseAbiItem(
+  'event GrantCreated(uint256 indexed grantId, address indexed escrow, address indexed grantor, address grantee, uint256 totalAmount)',
+);
 
 export type DetectedRoles = {
   loading: boolean;
@@ -58,7 +65,55 @@ const factoryGrantsAbi = [
 
 export function useRoleDetection(): DetectedRoles {
   const { address, status } = useAccount();
+  const publicClient = usePublicClient();
   const enabled = Boolean(address) && CONTRACTS_READY;
+  const hintedDaoAdmin = useDaoAdminHintStore((s) =>
+    address ? s.daoAdminAddresses.includes(address.toLowerCase()) : false,
+  );
+
+  // Event-log-based grantor check. More reliable than the per-escrow `grantor()`
+  // view because `GrantCreated` is indexed by grantor on the factory — one query
+  // tells us whether this wallet has ever created a grant, regardless of how many
+  // escrows exist or how fast the multi-stage chain reads settle.
+  const grantorLogQuery = useQuery({
+    queryKey: ['role-detection:grantor-logs', address, GRANT_FACTORY_ADDRESS],
+    queryFn: async () => {
+      if (!publicClient || !address) return false;
+      try {
+        const logs = await publicClient.getLogs({
+          address: GRANT_FACTORY_ADDRESS,
+          event: grantCreatedEvent,
+          args: { grantor: address },
+          fromBlock: 'earliest',
+          toBlock: 'latest',
+        });
+        return logs.length > 0;
+      } catch (err) {
+        // Some RPCs cap log ranges. Fall back to a recent window so we still
+        // catch wallets that created grants in the last few thousand blocks.
+        console.error('role-detection grantor log query failed, retrying narrow:', err);
+        try {
+          const latest = await publicClient.getBlockNumber();
+          const fromBlock = latest > 50_000n ? latest - 50_000n : 0n;
+          const logs = await publicClient.getLogs({
+            address: GRANT_FACTORY_ADDRESS,
+            event: grantCreatedEvent,
+            args: { grantor: address },
+            fromBlock,
+            toBlock: latest,
+          });
+          return logs.length > 0;
+        } catch {
+          return false;
+        }
+      }
+    },
+    enabled: enabled && Boolean(publicClient),
+    staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+  const isGrantorByLog = Boolean(grantorLogQuery.data);
 
   const countRead = useReadContracts({
     contracts: enabled
@@ -186,9 +241,16 @@ export function useRoleDetection(): DetectedRoles {
       };
     }
 
-    const pending = !factoryReady || !escrowReady || roleReads.isLoading;
+    const pending =
+      !factoryReady ||
+      !escrowReady ||
+      roleReads.isLoading ||
+      grantorLogQuery.isLoading;
     const anyFetching =
-      countRead.isFetching || escrowReads.isFetching || roleReads.isFetching;
+      countRead.isFetching ||
+      escrowReads.isFetching ||
+      roleReads.isFetching ||
+      grantorLogQuery.isFetching;
 
     const data = roleReads.data ?? [];
     const verifiedRow = data[0] as { status: string; result?: boolean } | undefined;
@@ -228,7 +290,17 @@ export function useRoleDetection(): DetectedRoles {
 
     const isBuilder = builderIds.length > 0;
     const isCommittee = committeeIds.length > 0;
-    const isDaoAdmin = grantorIds.length > 0 || committeeIds.length >= 3;
+    // DAO admin = any of:
+    //   1. Local hint: wallet just signed a createGrant in this browser.
+    //   2. Event log: factory `GrantCreated` event emitted with this wallet as grantor
+    //      (works across browsers/sessions, doesn't depend on per-escrow reads).
+    //   3. On-chain `grantor()` view aggregated across all escrows.
+    //   4. Legacy: wallet sits on 3+ committees.
+    const isDaoAdmin =
+      hintedDaoAdmin ||
+      isGrantorByLog ||
+      grantorIds.length > 0 ||
+      committeeIds.length >= 3;
     const isNewWallet = !isVerified && !isBuilder && !isCommittee && !isDaoAdmin;
     // DAO admin subsumes committee — a grantor sitting on their own grant's committee
     // is still one surface (/dao), not two. Builder/verified is always a separate surface.
@@ -258,6 +330,10 @@ export function useRoleDetection(): DetectedRoles {
     escrowReads.isFetching,
     escrowReady,
     factoryReady,
+    grantorLogQuery.isFetching,
+    grantorLogQuery.isLoading,
+    hintedDaoAdmin,
+    isGrantorByLog,
     roleReads.data,
     roleReads.isFetching,
     roleReads.isLoading,
