@@ -177,17 +177,17 @@ export function useRoleDetection(): DetectedRoles {
         args: [address] as const,
       },
     ];
+    // Per-escrow reads. Use `getGrant()` (single tuple) to obtain both the
+    // builder (grantee) AND the committee array in one call, then derive
+    // membership client-side. Avoids depending on the per-address
+    // `isCommitteeMember()` view, which can be unreliable on freshly-created
+    // escrows. `grantId` and `grantor` stay as separate reads since they're
+    // not part of the `getGrant` tuple.
     const perEscrow = escrowAddresses.flatMap((addr) => [
       {
         address: addr,
         abi: grantEscrowAbi,
-        functionName: 'builder' as const,
-      },
-      {
-        address: addr,
-        abi: grantEscrowAbi,
-        functionName: 'isCommitteeMember' as const,
-        args: [address] as const,
+        functionName: 'getGrant' as const,
       },
       {
         address: addr,
@@ -261,27 +261,50 @@ export function useRoleDetection(): DetectedRoles {
     const committeeIds: bigint[] = [];
     const grantorIds: bigint[] = [];
     const roleResults = data.slice(1);
+    const lowerAddr = address.toLowerCase();
 
-    for (let i = 0; i < roleResults.length; i += 4) {
-      const builderRes = roleResults[i] as { status: string; result?: string } | undefined;
-      const committeeRes = roleResults[i + 1] as { status: string; result?: boolean } | undefined;
-      const grantIdRes = roleResults[i + 2] as { status: string; result?: bigint } | undefined;
-      const grantorRes = roleResults[i + 3] as { status: string; result?: string } | undefined;
+    type GrantTuple = {
+      builder: `0x${string}`;
+      streaming: boolean;
+      committee: readonly `0x${string}`[];
+      quorum: bigint;
+      createdAt: bigint;
+      milestones: readonly unknown[];
+    };
+
+    for (let i = 0; i < roleResults.length; i += 3) {
+      const grantRes = roleResults[i] as
+        | { status: string; result?: GrantTuple }
+        | undefined;
+      const grantIdRes = roleResults[i + 1] as
+        | { status: string; result?: bigint }
+        | undefined;
+      const grantorRes = roleResults[i + 2] as
+        | { status: string; result?: string }
+        | undefined;
 
       if (grantIdRes?.status === 'success' && grantIdRes.result !== undefined) {
         const gid = grantIdRes.result;
-        if (
-          builderRes?.status === 'success' &&
-          builderRes.result?.toLowerCase() === address.toLowerCase()
-        ) {
-          builderIds.push(gid);
+
+        if (grantRes?.status === 'success' && grantRes.result) {
+          // Builder (grantee) check.
+          if (grantRes.result.builder?.toLowerCase() === lowerAddr) {
+            builderIds.push(gid);
+          }
+          // Committee check — client-side membership lookup against the
+          // committee array returned by `getGrant`. More robust than the
+          // per-address `isCommitteeMember` view.
+          const onCommittee = grantRes.result.committee?.some(
+            (m) => m.toLowerCase() === lowerAddr,
+          );
+          if (onCommittee) {
+            committeeIds.push(gid);
+          }
         }
-        if (committeeRes?.status === 'success' && committeeRes.result) {
-          committeeIds.push(gid);
-        }
+
         if (
           grantorRes?.status === 'success' &&
-          grantorRes.result?.toLowerCase() === address.toLowerCase()
+          grantorRes.result?.toLowerCase() === lowerAddr
         ) {
           grantorIds.push(gid);
         }
