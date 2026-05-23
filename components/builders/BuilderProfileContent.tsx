@@ -1,3 +1,4 @@
+import BuilderGithubAvatar from '@/components/builders/BuilderGithubAvatar';
 import type { BuilderProfileData } from '@/lib/builder-profile-server';
 import { contributionTierLabel } from '@/lib/builder-profile-server';
 import {
@@ -203,10 +204,6 @@ export default function BuilderProfileContent({ data }: { data: BuilderProfileDa
     ? contributionTierLabel(identity.contributionTier)
     : demoContributionTierLabel ?? 'Contributor';
 
-  const avatarSrc = gh
-    ? `https://github.com/${gh.replace(/^@/, '')}.png?size=128`
-    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(address)}`;
-
   const score = Math.max(0, Math.min(100, stats.reputationScore));
 
   return (
@@ -304,12 +301,10 @@ export default function BuilderProfileContent({ data }: { data: BuilderProfileDa
 
           <div className="relative mx-auto shrink-0 lg:mx-0">
             <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-slate-100 bg-slate-50 shadow-inner sm:h-28 sm:w-28">
-              <img
-                src={avatarSrc}
-                alt=""
-                width={112}
-                height={112}
-                className="h-full w-full object-cover"
+              <BuilderGithubAvatar
+                address={address}
+                githubHandle={identity.githubHandle}
+                size={128}
               />
             </div>
           </div>

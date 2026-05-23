@@ -1,5 +1,6 @@
 'use client';
 
+import BuilderGithubAvatar from '@/components/builders/BuilderGithubAvatar';
 import ProfileActiveWarnings from '@/components/builder/profile/ProfileActiveWarnings';
 import ProfileStatSkeleton from '@/components/builder/profile/ProfileStatSkeleton';
 import ReverifyIdentityModal from '@/components/builder/profile/ReverifyIdentityModal';
@@ -153,10 +154,6 @@ export default function PrivateBuilderProfileContent({
       ? String(identity.accountCreationYear)
       : null;
 
-  const avatarSrc = gh
-    ? `https://github.com/${gh.replace(/^@/, '')}.png?size=160`
-    : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(address)}`;
-
   const publicProfileHref = `/builders/${address}`;
 
   useEffect(() => {
@@ -228,7 +225,11 @@ export default function PrivateBuilderProfileContent({
           <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
             <div className="relative mx-auto shrink-0 sm:mx-0">
               <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-slate-100 bg-slate-50 shadow-inner sm:h-28 sm:w-28">
-                <img src={avatarSrc} alt="" className="h-full w-full object-cover" width={112} height={112} />
+                <BuilderGithubAvatar
+                  address={address}
+                  githubHandle={identity?.githubHandle}
+                  size={160}
+                />
               </div>
               {identity?.zkVerified ? (
                 <span className="absolute -bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
