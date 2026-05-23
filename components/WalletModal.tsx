@@ -88,20 +88,46 @@ function RabbyIcon() {
 
 /* ─── Wallet defs ─────────────────────────────────────────────────────────── */
 
+/**
+ * Connector matchers are LOWERCASED tokens we compare against each connector's
+ * id / name / type / rdns (also lowercased). We list every shape a wallet
+ * could surface as:
+ *   - manual declaration in `lib/wagmi.ts` (e.g. `metaMaskSDK`, `coinbaseWalletSDK`)
+ *   - EIP-6963 announcement (rdns: `io.metamask`, `io.rabby`, `me.rainbow`, …)
+ *   - legacy injected id (e.g. `metamask`, `rainbow`)
+ *
+ * The `installUrl` is used when the user taps a wallet that's not present
+ * (e.g. mobile browser with no extension and no app installed). We hand them
+ * a deep link to the wallet's app/extension store instead of throwing
+ * "Provider not found".
+ */
 const WALLET_DEFS = [
   {
     id: 'io.metamask',
     label: 'MetaMask',
-    description: 'Browser extension',
+    description: 'Browser extension & mobile',
     icon: MetaMaskIcon,
-    connectorMatchers: ['io.metamask', 'io.metamask.mobile', 'metamask', 'metaMask', 'metaMaskSDK'],
+    connectorMatchers: [
+      'io.metamask',
+      'io.metamask.mobile',
+      'metamask',
+      'metamasksdk',
+    ],
+    installUrl: 'https://metamask.io/download/',
   },
   {
     id: 'com.coinbase.wallet',
     label: 'Coinbase Wallet',
     description: 'Smart Wallet & extension',
     icon: CoinbaseIcon,
-    connectorMatchers: ['com.coinbase.wallet', 'coinbase', 'coinbase wallet', 'coinbaseWallet', 'coinbaseWalletSDK'],
+    connectorMatchers: [
+      'com.coinbase.wallet',
+      'coinbase',
+      'coinbase wallet',
+      'coinbasewallet',
+      'coinbasewalletsdk',
+    ],
+    installUrl: 'https://www.coinbase.com/wallet/downloads',
   },
   {
     id: 'me.rainbow',
@@ -109,13 +135,15 @@ const WALLET_DEFS = [
     description: 'Mobile & extension',
     icon: RainbowIcon,
     connectorMatchers: ['me.rainbow', 'rainbow', 'rainbow wallet'],
+    installUrl: 'https://rainbow.me/download',
   },
   {
     id: 'walletConnect',
     label: 'WalletConnect',
     description: 'Scan with any wallet',
     icon: WalletConnectIcon,
-    connectorMatchers: ['walletconnect', 'wallet connect', 'walletConnect'],
+    connectorMatchers: ['walletconnect', 'wallet connect'],
+    installUrl: undefined,
   },
   {
     id: 'app.phantom',
@@ -123,6 +151,7 @@ const WALLET_DEFS = [
     description: 'Multi-chain wallet',
     icon: PhantomIcon,
     connectorMatchers: ['app.phantom', 'phantom'],
+    installUrl: 'https://phantom.app/download',
   },
   {
     id: 'io.rabby',
@@ -130,6 +159,7 @@ const WALLET_DEFS = [
     description: 'Browser extension',
     icon: RabbyIcon,
     connectorMatchers: ['io.rabby', 'rabby', 'rabby wallet'],
+    installUrl: 'https://rabby.io/',
   },
 ] as const;
 
@@ -159,12 +189,34 @@ function resolveWalletConnector(
 ): Connector | undefined {
   const normalizedMatchers = matchers.map((token) => token.toLowerCase());
 
+  // Pass 1: prefer connectors whose `rdns` matches. EIP-6963-discovered
+  // wallets always set `rdns` (it's literally how wallets announce
+  // themselves), so this prioritises the wallet's *real* injected provider
+  // over any manually-declared injected connector that may not be able to
+  // resolve its provider in a multi-wallet Chrome.
+  const byRdns = connectors.find((candidate) => {
+    const rdns =
+      'rdns' in candidate
+        ? Array.isArray(candidate.rdns)
+          ? candidate.rdns
+          : candidate.rdns
+            ? [candidate.rdns]
+            : []
+        : [];
+    return rdns.some((value) =>
+      normalizedMatchers.includes(value.toLowerCase()),
+    );
+  });
+  if (byRdns) return byRdns;
+
+  // Pass 2: exact match on any of id/name/type.
   const exact = connectors.find((candidate) => {
     const candidateTokens = getConnectorTokens(candidate);
     return normalizedMatchers.some((token) => candidateTokens.includes(token));
   });
   if (exact) return exact;
 
+  // Pass 3: substring match (handles e.g. `metamasksdk` vs `metamask`).
   const partial = connectors.find((candidate) => {
     const candidateTokens = getConnectorTokens(candidate);
     return normalizedMatchers.some((token) =>
@@ -178,7 +230,9 @@ function resolveWalletConnector(
 
   if (walletId === 'walletConnect') {
     return connectors.find((candidate) =>
-      getConnectorTokens(candidate).some((token) => token.includes('walletconnect')),
+      getConnectorTokens(candidate).some((token) =>
+        token.includes('walletconnect'),
+      ),
     );
   }
 
@@ -266,14 +320,24 @@ export default function WalletModal({ onClose }: WalletModalProps) {
       if (state === 'connecting') return;
 
       const walletDef = WALLET_DEFS.find((wallet) => wallet.id === walletId);
-      const matchers = walletDef?.connectorMatchers.map((token) => token.toLowerCase()) ?? [
-        walletId.toLowerCase(),
-      ];
+      const matchers = walletDef?.connectorMatchers.map((token) =>
+        token.toLowerCase(),
+      ) ?? [walletId.toLowerCase()];
       const connector = resolveWalletConnector(connectors, walletId, matchers);
 
       if (!connector) {
+        // No connector matched — most often this means the user is on mobile
+        // without the wallet's app/extension installed, or the wallet didn't
+        // announce via EIP-6963. Offer the install page instead of dead-ending
+        // on "Provider not found".
+        if (walletDef?.installUrl && typeof window !== 'undefined') {
+          window.open(walletDef.installUrl, '_blank', 'noopener,noreferrer');
+          return;
+        }
         setState('error');
-        setErrorMsg(`No ${walletDef?.label ?? 'wallet'} connector is available. Please try another wallet.`);
+        setErrorMsg(
+          `${walletDef?.label ?? 'This wallet'} isn't available in this browser. Try WalletConnect to pair from your phone.`,
+        );
         return;
       }
 
