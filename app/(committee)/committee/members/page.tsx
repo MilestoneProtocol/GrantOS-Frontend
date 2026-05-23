@@ -27,7 +27,41 @@ export default function CommitteeMembersPage() {
   }, []);
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
-  const rosters = useMemo((): CommitteeGrantRoster[] => [], []);
+  const [rosters, setRosters] = useState<CommitteeGrantRoster[]>([]);
+  const [loadingRosters, setLoadingRosters] = useState(true);
+
+  useEffect(() => {
+    if (!address) return;
+    const fetchRosters = async () => {
+      try {
+        const { getPublicApiV1Base } = await import('@/lib/api-config');
+        const apiBase = getPublicApiV1Base();
+        const res = await fetch(`${apiBase}/grants/committee?address=${address}`);
+        if (!res.ok) throw new Error('Failed to fetch committee grants');
+        const grants = await res.json();
+        
+        const mappedRosters = grants.map((g: any) => {
+          let members = [];
+          try {
+             members = typeof g.committee === 'string' ? JSON.parse(g.committee) : g.committee;
+          } catch(e) {}
+          
+          return {
+            grantId: `#${g.onChainId}`,
+            grantTitle: g.title || `Grant #${g.onChainId}`,
+            quorum: g.quorum,
+            members: members || [],
+          };
+        });
+        setRosters(mappedRosters);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingRosters(false);
+      }
+    };
+    fetchRosters();
+  }, [address]);
 
   return (
     <CommitteeAppShell breadcrumb="Committee" reviewsBadge={reviews.tabCounts.pending}>
