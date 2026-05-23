@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { grantEscrowAbi } from '@/lib/escrow';
-import type { Address, Hex } from 'viem';
+import { parseUnits, type Address, type Hex } from 'viem';
 
 export type VoteIntent = 'approve' | 'reject';
 
@@ -27,6 +27,7 @@ export function useCommitteeVote(escrowAddress: Address, milestoneIndex: number,
         abi: grantEscrowAbi,
         functionName: intent === 'approve' ? 'approveMilestone' : 'rejectMilestone',
         args: [BigInt(milestoneIndex)],
+        gasPrice: parseUnits('2', 9),
         chainId: arbitrumSepolia.id,
       });
 

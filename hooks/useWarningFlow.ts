@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { issueWarning, recordSlash } from '@/lib/warning-api';
-import type { Address } from 'viem';
+import { parseUnits, type Address } from 'viem';
 
 export interface UseWarningFlowResult {
   issueWarning: (params: IssueWarningParams) => Promise<void>;
@@ -64,6 +64,7 @@ export function useWarningFlow(): UseWarningFlowResult {
           ],
           functionName: 'issueWarning',
           args: [grantIdBytes32, BigInt(params.milestoneIndex), params.builderAddress, params.message],
+          gasPrice: parseUnits('2', 9),
           chainId: arbitrumSepolia.id,
         });
 
@@ -114,6 +115,7 @@ export function useWarningFlow(): UseWarningFlowResult {
           ],
           functionName: 'slashMilestone',
           args: [BigInt(params.milestoneIndex)],
+          gasPrice: parseUnits('2', 9),
           chainId: arbitrumSepolia.id,
         });
 
