@@ -494,5 +494,5 @@ export async function loadBuilderProfile(raw: string): Promise<BuilderProfileDat
 }
 
 export function formatBuilderPageTitle(address: Address): string {
-  return `Builder ${shortenAddr(address)} — GrantOS v3`;
+  return `Builder ${shortenAddr(address)} — GrantOS`;
 }

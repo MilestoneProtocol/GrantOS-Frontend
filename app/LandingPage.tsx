@@ -94,7 +94,7 @@ function LandingHeader() {
       <div className="max-w-2xl">
         <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">
           <Sparkles className="h-3.5 w-3.5 text-violet-500" aria-hidden />
-          GrantOS v3
+          GrantOS
           <span className="text-slate-300">·</span>
           <span className="text-slate-500">Arbitrum Sepolia</span>
         </div>

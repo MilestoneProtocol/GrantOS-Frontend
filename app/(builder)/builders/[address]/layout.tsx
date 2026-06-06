@@ -11,7 +11,7 @@ export async function generateMetadata({
   const trimmed = decodeURIComponent(raw ?? '').trim();
   const address = parseProfileAddress(trimmed);
   if (!address) {
-    return { title: 'Builder — GrantOS v3' };
+    return { title: 'Builder — GrantOS' };
   }
   return { title: formatBuilderPageTitle(address) };
 }

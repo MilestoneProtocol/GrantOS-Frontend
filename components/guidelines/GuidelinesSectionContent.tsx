@@ -1,7 +1,7 @@
 'use client';
 
 import GuidelinesCallout from '@/components/guidelines/GuidelinesCallout';
-import GuidelinesContractsTable from '@/components/guidelines/GuidelinesContractsTable';
+import ContractAddresses from '@/app/guidelines/sections/ContractAddresses';
 import GuidelinesFaq from '@/components/guidelines/GuidelinesFaq';
 import GuidelinesFlowchart from '@/components/guidelines/GuidelinesFlowchart';
 import GuidelinesScoringTable from '@/components/guidelines/GuidelinesScoringTable';
@@ -42,7 +42,7 @@ function SectionHowItWorks() {
   return (
     <SectionShell
       id="how-it-works"
-      lead="GrantOS v3 is an onchain grant enforcement protocol built on Arbitrum. It replaces spreadsheets, forum posts, and social pressure with cryptographic proofs and smart contract automation. When a DAO creates a grant on GrantOS v3, the following happens automatically and in order — no human coordination required."
+      lead="GrantOS is an onchain grant enforcement protocol built on Arbitrum. It replaces spreadsheets, forum posts, and social pressure with cryptographic proofs and smart contract automation. When a DAO creates a grant on GrantOS, the following happens automatically and in order — no human coordination required."
     >
       <GuidelinesSubheading>The end of trust-based grant delivery.</GuidelinesSubheading>
       <GuidelinesFlowchart />
@@ -77,7 +77,7 @@ function SectionZkProof() {
   return (
     <SectionShell
       id="zk-proof"
-      lead={'When you see a ZK Verified badge on GrantOS v3, it means a zero-knowledge proof confirmed that something happened — not that a person said it happened, not that a screenshot showed it happened, but that mathematics confirmed it happened.'}
+      lead={'When you see a ZK Verified badge on GrantOS, it means a zero-knowledge proof confirmed that something happened — not that a person said it happened, not that a screenshot showed it happened, but that mathematics confirmed it happened.'}
     >
       <GuidelinesSubheading>What does &quot;cryptographically verified&quot; actually mean?</GuidelinesSubheading>
       <GuidelinesSubheading>What is TLSNotary?</GuidelinesSubheading>
@@ -92,7 +92,7 @@ function SectionZkProof() {
       <GuidelinesBody>
         It means the WebProofVerifier smart contract on Arbitrum ran the mathematical verification of the ZK proof in the same transaction as the milestone submission. If verification failed, the entire transaction reverted. The milestone cannot advance to Submitted state unless the proof passes. No committee member approved this. No admin reviewed it. The math either checks out or the transaction fails.
       </GuidelinesBody>
-      <GuidelinesSubheading>Three things ZK proofs prevent on GrantOS v3:</GuidelinesSubheading>
+      <GuidelinesSubheading>Three things ZK proofs prevent on GrantOS:</GuidelinesSubheading>
       <GuidelinesList>
         <GuidelinesListItem>
           <strong>First — Forged pull requests.</strong> A builder cannot submit a PR opened against a private repository that gets deleted after approval. The TLSNotary proof captures the GitHub API response at the moment of proof generation. The repository and PR must exist and be publicly verifiable.
@@ -115,7 +115,7 @@ function SectionCommittee() {
   return (
     <SectionShell
       id="committee"
-      lead="Being a committee member on GrantOS v3 is different from being a committee member in a traditional DAO grant program. Your role is governance, not verification. The smart contract handles verification. You handle judgment."
+      lead="Being a committee member on GrantOS is different from being a committee member in a traditional DAO grant program. Your role is governance, not verification. The smart contract handles verification. You handle judgment."
     >
       <GuidelinesSubheading>What you are responsible for as a committee member.</GuidelinesSubheading>
       <GuidelinesSubheading>Your responsibilities in order:</GuidelinesSubheading>
@@ -151,9 +151,9 @@ function SectionBuilderRights() {
   return (
     <SectionShell
       id="builder-rights"
-      lead="GrantOS v3 does not just protect DAOs from bad builders. It protects builders from bad committees. The following rights are enforced at the smart contract level. They are not policies. They cannot be overridden by a committee member, a DAO admin, or Anthropic."
+      lead="GrantOS does not just protect DAOs from bad builders. It protects builders from bad committees. The following rights are enforced at the smart contract level. They are not policies. They cannot be overridden by a committee member, a DAO admin, or Anthropic."
     >
-      <GuidelinesSubheading>Your cryptographic rights as a builder on GrantOS v3.</GuidelinesSubheading>
+      <GuidelinesSubheading>Your cryptographic rights as a builder on GrantOS.</GuidelinesSubheading>
       <GuidelinesList>
         <GuidelinesListItem>
           <strong>Right 1 — The right to a 24-hour warning before slash.</strong> No committee member can slash your milestone without first submitting an onchain warning EAS attestation for that specific milestone. The warning must be timestamped at least 24 hours before the slash transaction. If a slash is attempted without a valid warning, the transaction reverts. You have 24 hours from the warning timestamp to respond, communicate, or prepare. You can verify any warning issued against you by viewing the EAS attestation directly on easscan.org.
@@ -228,7 +228,7 @@ function SectionReputation() {
   return (
     <SectionShell
       id="reputation"
-      lead="Every builder address on GrantOS v3 has a permanent public reputation score derived entirely from onchain EAS attestation history. No admin controls it. No committee member can modify it. No DAO can reset it. It is a mathematical function of what you actually did."
+      lead="Every builder address on GrantOS has a permanent public reputation score derived entirely from onchain EAS attestation history. No admin controls it. No committee member can modify it. No DAO can reset it. It is a mathematical function of what you actually did."
     >
       <GuidelinesSubheading>Your reputation score is your onchain track record. It cannot be faked.</GuidelinesSubheading>
       <GuidelinesSubheading>Scoring events table:</GuidelinesSubheading>
@@ -269,7 +269,7 @@ function SectionReputation() {
 
 function SectionFaq() {
   return (
-    <SectionShell id="faq" lead="Frequently asked questions about GrantOS v3 protocol mechanics.">
+    <SectionShell id="faq" lead="Frequently asked questions about GrantOS protocol mechanics.">
       <GuidelinesSubheading>Frequently asked questions.</GuidelinesSubheading>
       <GuidelinesFaq />
     </SectionShell>
@@ -283,7 +283,7 @@ function SectionContracts() {
       lead="All contracts are deployed on Arbitrum Sepolia, verified on Arbiscan, and open source."
     >
       <GuidelinesSubheading>All contracts are deployed on Arbitrum Sepolia, verified on Arbiscan, and open source.</GuidelinesSubheading>
-      <GuidelinesContractsTable />
+      <ContractAddresses />
       <GuidelinesBody>
         All contracts are open source. You can read every function, every mapping, every event. There are no hidden admin functions. There are no upgrade proxies. What you see is what runs.
       </GuidelinesBody>

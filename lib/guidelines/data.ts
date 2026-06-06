@@ -1,11 +1,16 @@
-import { GRANT_ESCROW_ADDRESS, IDENTITY_REGISTRY_ADDRESS } from '@/lib/escrow';
-import type { Address } from 'viem';
+export const GUIDELINES_DEPLOYED_CONTRACTS = [
+  { name: 'GrantFactory', address: '0xb1fb4eda99821db96cb830413bfb3b18eb67b05f' },
+  { name: 'GrantIdentityRegistry', address: '0xaf2b31d9b6d10010d32bc99d69807c8da2a3894d' },
+  { name: 'UltraHonkVerifier', address: '0x888573502e6766744e28f447d1c44536f0d2cddd' },
+  { name: 'SentinelEAS', address: '0x6d19b30ce66ea738f906f8daf032aeb273e83b5a' },
+  { name: 'GrantEscrow (Implementation)', address: '0xf45be567e8dfe3982c3e40eb20b47124b626ce2c' },
+] as const;
 
-const REPUTATION_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_REPUTATION_REGISTRY_ADDRESS ||
-  '0x0000000000000000000000000000000000000003') as Address;
-
-const WEB_PROOF_VERIFIER_ADDRESS = (process.env.NEXT_PUBLIC_WEB_PROOF_VERIFIER_ADDRESS ||
-  '0x0000000000000000000000000000000000000004') as Address;
+export const GUIDELINES_EXTERNAL_CONTRACTS = [
+  { name: 'Sablier V2 (Fixed)', address: '0x483bdd560dE53DC20f72dC66ACdB622C5075de34' },
+  { name: 'USDC (Testnet)', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' },
+  { name: 'EAS', address: '0x2521021fc8BF070473E1e1801D3c7B4aB701E1dE' },
+] as const;
 
 export type FlowchartStepKind = 'dao' | 'builder' | 'contract';
 
@@ -117,7 +122,7 @@ export const GUIDELINES_FAQ = [
   {
     question: 'How do I appeal a slash?',
     answer:
-      'There is no appeal mechanism built into the GrantOS v3 protocol. Slashes are irreversible onchain actions. The due process protection — the mandatory 24-hour warning — is the appeal window. If you believe a slash was executed without a valid warning, verify the attestation timestamps on easscan.org and the transaction timestamps on Arbiscan. If the warning timestamp is less than 24 hours before the slash transaction, the slash transaction should have reverted — contact the DAO directly with the onchain evidence.',
+      'There is no appeal mechanism built into the GrantOS protocol. Slashes are irreversible onchain actions. The due process protection — the mandatory 24-hour warning — is the appeal window. If you believe a slash was executed without a valid warning, verify the attestation timestamps on easscan.org and the transaction timestamps on Arbiscan. If the warning timestamp is less than 24 hours before the slash transaction, the slash transaction should have reverted — contact the DAO directly with the onchain evidence.',
   },
   {
     question: 'Can I use the same GitHub account for multiple wallets?',
@@ -125,19 +130,12 @@ export const GUIDELINES_FAQ = [
       'No. The GrantIdentityRegistry.sol contract enforces a one-to-one binding between GitHub handles and wallet addresses. If a GitHub handle is already registered to a wallet, attempting to register it to a different wallet will revert with AlreadyRegistered(). Each GitHub identity can only be bound to one wallet address permanently.',
   },
   {
-    question: 'What chains does GrantOS v3 support?',
+    question: 'What chains does GrantOS support?',
     answer:
-      'GrantOS v3 is deployed exclusively on Arbitrum Sepolia. All contracts, all attestations, all Superfluid streams, and all ZK proof verifications happen on Arbitrum Sepolia. There are no plans to deploy on other chains at this time.',
+      'GrantOS is deployed exclusively on Arbitrum Sepolia. All contracts, all attestations, all Superfluid streams, and all ZK proof verifications happen on Arbitrum Sepolia. There are no plans to deploy on other chains at this time.',
   },
 ] as const;
 
-export const GUIDELINES_CONTRACTS = [
-  { name: 'GrantEscrow.sol', address: GRANT_ESCROW_ADDRESS },
-  { name: 'GrantIdentityRegistry.sol', address: IDENTITY_REGISTRY_ADDRESS },
-  { name: 'ReputationRegistry.sol', address: REPUTATION_REGISTRY_ADDRESS },
-  { name: 'WebProofVerifier.sol', address: WEB_PROOF_VERIFIER_ADDRESS },
-] as const;
-
 export function arbiscanAddressUrl(address: string) {
-  return `https://sepolia.arbiscan.io/address/${address}`;
+  return `https://arbiscan.io/address/${address}`;
 }

@@ -525,7 +525,7 @@ function SuccessContent() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800">
               <span className="text-sm font-bold text-white">G</span>
             </div>
-            <h1 className="text-base font-bold text-slate-900">GrantOS v3</h1>
+            <h1 className="text-base font-bold text-slate-900">GrantOS</h1>
             <span className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500 sm:inline-flex">
               Sepolia
             </span>

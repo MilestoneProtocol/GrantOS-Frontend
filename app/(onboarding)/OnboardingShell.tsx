@@ -77,11 +77,8 @@ export default function OnboardingShell({
             href="/"
             className="flex items-center gap-2.5 border-b border-slate-100 px-5 py-5"
           >
-            <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
               G
-              <span className="absolute -right-1 -top-1 rounded-full border border-slate-200 bg-white px-1 text-[8px] font-bold text-slate-700">
-                v3
-              </span>
             </span>
             <span className="text-base font-bold tracking-tight">GrantOS</span>
           </Link>
@@ -120,7 +117,7 @@ export default function OnboardingShell({
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-violet-500" />
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  Now in v3
+                  GrantOS
                 </p>
               </div>
               <p className="mt-2 text-sm font-semibold leading-snug text-slate-900">
@@ -177,7 +174,7 @@ export default function OnboardingShell({
               G
             </span>
             <span className="truncate text-base font-bold tracking-tight">
-              GrantOS<span className="ml-0.5 text-xs font-medium text-slate-500">v3</span>
+              GrantOS
             </span>
           </Link>
 
@@ -216,11 +213,8 @@ export default function OnboardingShell({
               onClick={closeDrawer}
               className="flex items-center gap-2.5"
             >
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
                 G
-                <span className="absolute -right-1 -top-1 rounded-full border border-slate-200 bg-white px-1 text-[8px] font-bold text-slate-700">
-                  v3
-                </span>
               </span>
               <span className="text-base font-bold tracking-tight">GrantOS</span>
             </Link>
@@ -262,7 +256,7 @@ export default function OnboardingShell({
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5 text-violet-500" aria-hidden />
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  Now in v3
+                  GrantOS
                 </p>
               </div>
               <p className="mt-2 text-sm font-semibold leading-snug text-slate-900">

@@ -77,7 +77,7 @@ export default function AppShellHeader({
             G
           </span>
           <span className="truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg">
-            GrantOS<span className="ml-0.5 text-xs font-medium text-slate-500">v3</span>
+            GrantOS
           </span>
         </Link>
 
@@ -102,7 +102,7 @@ export default function AppShellHeader({
               G
             </span>
             <span className="whitespace-nowrap text-base font-semibold tracking-tight text-slate-900">
-              GrantOS v3
+              GrantOS
             </span>
           </Link>
 

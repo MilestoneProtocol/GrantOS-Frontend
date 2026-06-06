@@ -207,7 +207,7 @@ function SuccessContent() {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
               <GithubIcon className="h-4 w-4 text-white" />
             </div>
-            <h1 className="truncate text-[15px] font-semibold text-slate-900 sm:text-[16px]">GrantOS v3</h1>
+            <h1 className="truncate text-[15px] font-semibold text-slate-900 sm:text-[16px]">GrantOS</h1>
           </div>
           {isConnected ? (
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">

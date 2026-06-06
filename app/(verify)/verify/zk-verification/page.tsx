@@ -70,7 +70,7 @@ export default function VerifyIdentity() {
               <span className="text-sm font-bold text-white">G</span>
             </div>
             <h1 className="text-base font-bold text-slate-900 sm:text-lg">
-              GrantOS v3
+              GrantOS
             </h1>
             <div className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500 sm:inline-flex">
               Arbitrum Sepolia

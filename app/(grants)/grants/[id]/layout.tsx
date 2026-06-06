@@ -8,8 +8,8 @@ export async function generateMetadata({
   const { id } = await params;
   const label = id?.trim() || '—';
   return {
-    title: `Grant #${label} — GrantOS v3`,
-    description: 'Public grant detail, milestones, and committee activity on GrantOS v3.',
+    title: `Grant #${label} — GrantOS`,
+    description: 'Public grant detail, milestones, and committee activity on GrantOS.',
   };
 }
 

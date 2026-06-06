@@ -18,7 +18,7 @@ export default function GuidelinesPageContent() {
           Protocol Reference
         </span>
         <h1 className="text-[26px] font-bold tracking-tight text-slate-900 sm:text-[32px] xl:text-[48px] xl:leading-tight">
-          GrantOS v3 — Protocol Guidelines
+          GrantOS — Protocol Guidelines
         </h1>
         <p className="text-base leading-relaxed text-slate-600">
           Everything you need to know about how cryptographic grant enforcement works.

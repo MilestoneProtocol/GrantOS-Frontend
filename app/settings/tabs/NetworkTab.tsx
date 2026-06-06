@@ -75,7 +75,7 @@ export default function NetworkTab() {
         >
           <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />
           <p className="font-medium">
-            GrantOS v3 runs on Arbitrum Sepolia — please switch networks.
+            GrantOS runs on Arbitrum Sepolia — please switch networks.
           </p>
         </div>
       ) : null}

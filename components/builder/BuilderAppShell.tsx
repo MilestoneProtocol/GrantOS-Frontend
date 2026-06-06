@@ -127,7 +127,7 @@ export default function BuilderAppShell({ children, navActive }: BuilderAppShell
               G
             </span>
             <span className="text-base font-bold tracking-tight text-slate-900">
-              GrantOS v3
+              GrantOS
             </span>
           </Link>
         }

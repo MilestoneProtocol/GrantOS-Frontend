@@ -3,7 +3,7 @@ import type { GuidelinesSectionId, GuidelinesTocItem } from './types';
 export const GUIDELINES_TOC: GuidelinesTocItem[] = [
   {
     id: 'how-it-works',
-    label: 'How GrantOS v3 Works',
+    label: 'How GrantOS Works',
     shortLabel: 'How It Works',
   },
   {

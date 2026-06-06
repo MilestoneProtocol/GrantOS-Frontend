@@ -21,13 +21,13 @@ export async function generateMetadata({
   const { address: raw } = await params;
   const trimmed = decodeURIComponent(raw ?? '').trim();
   if (!trimmed || !isAddress(trimmed)) {
-    return { title: 'Builder — GrantOS v3' };
+    return { title: 'Builder — GrantOS' };
   }
   try {
     const address = getAddress(trimmed) as Address;
     return { title: formatBuilderPageTitle(address) };
   } catch {
-    return { title: 'Builder — GrantOS v3' };
+    return { title: 'Builder — GrantOS' };
   }
 }
 
