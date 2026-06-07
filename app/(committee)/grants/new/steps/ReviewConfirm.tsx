@@ -394,7 +394,7 @@ export default function ReviewConfirm({
                     : 'bg-slate-100 text-slate-700'
                 }`}
               >
-                {paymentMode === 'streaming' ? 'Superfluid Streaming' : 'Lump-Sum Release'}
+                {paymentMode === 'streaming' ? 'Sablier Streaming' : 'Lump-Sum Release'}
               </span>
             </div>
             <div className="flex items-center justify-between">

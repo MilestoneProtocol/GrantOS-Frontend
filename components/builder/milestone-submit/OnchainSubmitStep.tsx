@@ -209,6 +209,10 @@ export default function OnchainSubmitStep() {
             prNumber: parseInt(prTrimmed, 10),
             isZkRequired: true,
             proofHash: proofPreview?.proofHash,
+            // The backend re-verifies these with Barretenberg and derives the
+            // authoritative zkVerified value — this client flag is advisory only.
+            proof: proofPreview?.proof,
+            publicInputs: proofPreview?.publicInputs,
             zkVerified: true,
             easAttestationUid: lastEasUidRef.current !== ZERO_UID ? lastEasUidRef.current : undefined,
             aiVerdict: aiSnapshot?.verdict,

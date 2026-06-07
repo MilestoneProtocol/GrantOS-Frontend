@@ -384,7 +384,7 @@ function VotingBlock({
           <span className="font-semibold text-slate-900">
             {formatUsd(submission.payoutUsdc)} USDC
           </span>{' '}
-          {submission.payoutMode === 'superfluid' ? 'via Superfluid' : 'lump-sum'}
+          {submission.payoutMode === 'superfluid' ? 'via Sablier' : 'lump-sum'}
         </p>
       </div>
 

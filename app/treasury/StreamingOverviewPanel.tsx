@@ -9,7 +9,7 @@ type Props = {
 };
 
 /**
- * Live Superfluid stream board. Total accumulated USDC ticks every 100ms
+ * Live Sablier stream board. Total accumulated USDC ticks every 100ms
  * via `setInterval`, cleaned up on unmount per the PRD requirement.
  *
  * Returns null when there are no active streams so the section disappears

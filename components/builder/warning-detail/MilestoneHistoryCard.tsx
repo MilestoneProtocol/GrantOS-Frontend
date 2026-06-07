@@ -126,7 +126,7 @@ function buildTimeline(record: BuilderWarningRecord): TimelineEntry[] {
       id: 'approved',
       title: 'Milestone Approved (Pending)',
       dateIso: approvedAt.toISOString(),
-      description: 'Initial grant funding locked in Superfluid stream.',
+      description: 'Initial grant funding locked in Sablier stream.',
       tone: 'past',
     },
     {

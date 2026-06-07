@@ -106,7 +106,7 @@ export type TreasuryHero = {
   totalUsdcLocked: number;
   totalReleasedAllTime: number;
   totalRecoveredViaSlashing: number;
-  /** USDC/sec across all active flows (Superfluid). */
+  /** USDC/sec across all active flows (Sablier). */
   currentlyStreamingFlowRate: number;
   totalGrantsCreated: number;
   averageGrantSizeUsdc: number;

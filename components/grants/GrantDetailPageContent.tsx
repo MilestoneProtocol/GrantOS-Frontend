@@ -541,7 +541,7 @@ export function GrantDetailPageContent({
                   <div className="col-span-2 rounded-lg border border-slate-200 bg-white p-2.5">
                     <p className="text-slate-500">Payment Mode</p>
                     <p className="font-semibold text-slate-900">
-                      {resolvedGrant.streaming ? 'Superfluid Stream' : 'Milestone Escrow'}
+                      {resolvedGrant.streaming ? 'Sablier Stream' : 'Milestone Escrow'}
                     </p>
                   </div>
                 </div>

@@ -49,7 +49,7 @@ export type BuilderWarningRecord = {
   slashUnlocksAtIso: string;
   attestationUrl: string;
   /**
-   * When the milestone was originally approved (and the Superfluid stream
+   * When the milestone was originally approved (and the Sablier stream
    * started). Drives the first entry of the milestone history timeline on
    * the detail page.
    */

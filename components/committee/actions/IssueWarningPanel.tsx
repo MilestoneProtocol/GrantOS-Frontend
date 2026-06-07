@@ -124,7 +124,7 @@ export default function IssueWarningPanel({
 
       <PanelHeader
         title="Issue Official Warning"
-        description="This action will be recorded onchain via EAS and pause the Superfluid stream."
+        description="This action will be recorded onchain via EAS and pause the Sablier stream."
         onCancel={isLocked ? undefined : onCancel}
       />
 
@@ -262,7 +262,7 @@ function PanelFooter({
           <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-blue-50 text-blue-500">
             <DropletIcon />
           </span>
-          Superfluid Pause
+          Sablier Pause
         </span>
       </div>
 

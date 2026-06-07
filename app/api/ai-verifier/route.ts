@@ -2,6 +2,7 @@ import type {
   AiVerifierSuccessBody,
   AiVerifierVerdict,
 } from '@/lib/ai-verifier';
+import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 
 function fallbackBody(reason?: string): AiVerifierSuccessBody {
@@ -63,6 +64,59 @@ async function fetchPrContent(prUrl: string): Promise<string | null> {
     ].filter(Boolean).join('\n');
 
     return summary;
+  } catch {
+    return null;
+  }
+}
+
+/** Preferred provider: Claude via the official Anthropic SDK. */
+async function tryClaude(params: {
+  milestoneDescription: string;
+  prUrl: string;
+  zkVerified: boolean;
+}): Promise<AiVerifierSuccessBody | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  const prContent = await fetchPrContent(params.prUrl);
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const message = await client.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 400,
+      system:
+        'You are reviewing a grant milestone submission. Reply ONLY with compact JSON: {"verdict":"LIKELY_FULFILLED"|"UNCERTAIN"|"LIKELY_INSUFFICIENT","explanation":"one short paragraph, advisory tone, no markdown"}',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            `Milestone requirements:\n${params.milestoneDescription || '(none)'}`,
+            `Pull request: ${params.prUrl || '(none)'}`,
+            prContent
+              ? `\nPR Content:\n${prContent}`
+              : '\nNote: PR file contents are unavailable; judge from the description and PR reference only, and lean UNCERTAIN if you cannot confirm the work was delivered.',
+            `\nZK identity checks vs registry (signal): ${params.zkVerified ? 'verified / aligned' : 'not verified or unknown'}`,
+          ].join('\n\n'),
+        },
+      ],
+    });
+
+    const rawText = message.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+      .trim();
+    if (!rawText) return null;
+
+    const parsedUnknown = JSON.parse(stripCodeFence(rawText)) as Record<string, unknown>;
+    const verdict = normalizeVerdict(parsedUnknown.verdict);
+    const explanation =
+      typeof parsedUnknown.explanation === 'string' && parsedUnknown.explanation.trim().length > 0
+        ? parsedUnknown.explanation.trim()
+        : fallbackBody().explanation;
+
+    return { verdict, explanation, id: `aiv-${Math.random().toString(36).slice(2, 8)}` };
   } catch {
     return null;
   }
@@ -149,27 +203,6 @@ async function tryOpenAi(params: {
   }
 }
 
-function deterministicMock(seed: string): AiVerifierSuccessBody {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const r = h % 3;
-  const verdict: AiVerifierVerdict =
-    r === 0 ? 'LIKELY_FULFILLED' : r === 1 ? 'UNCERTAIN' : 'LIKELY_INSUFFICIENT';
-
-  const explanation =
-    verdict === 'LIKELY_FULFILLED'
-      ? `The PR scope appears consistent with the milestone description and ZK signals; treat this as advisory until committee review.`
-      : verdict === 'UNCERTAIN'
-        ? `Some requirements may need manual verification beyond automated signals; advisory only.`
-        : `Signals suggest gaps versus the stated milestone scope; advisory only—committee decides.`;
-
-  return {
-    verdict,
-    explanation,
-    id: `aiv-${Math.random().toString(36).slice(2, 6)}`,
-  };
-}
-
 export async function POST(req: Request) {
   try {
     let body: Record<string, unknown> = {};
@@ -189,13 +222,23 @@ export async function POST(req: Request) {
       zkVerified = legacy.identityMatches;
     }
 
+    const claude = await tryClaude({ milestoneDescription, prUrl, zkVerified });
+    if (claude) {
+      return NextResponse.json(claude);
+    }
+
     const openai = await tryOpenAi({ milestoneDescription, prUrl, zkVerified });
     if (openai) {
       return NextResponse.json(openai);
     }
 
-    const seed = `${prUrl}:${zkVerified}:${milestoneDescription.slice(0, 120)}`;
-    return NextResponse.json(deterministicMock(seed));
+    // No model available — return an explicit "advisory unavailable" verdict.
+    // We never fabricate a LIKELY_FULFILLED / LIKELY_INSUFFICIENT result.
+    return NextResponse.json(
+      fallbackBody(
+        'Automated AI review is not configured (no model API key). This milestone relies on its ZK proof and committee review; the AI verdict is advisory and was not produced.',
+      ),
+    );
   } catch {
     return NextResponse.json(fallbackBody());
   }

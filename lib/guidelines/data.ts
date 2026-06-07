@@ -117,7 +117,7 @@ export const GUIDELINES_FAQ = [
   {
     question: 'What happens to streaming payments if I get slashed?',
     answer:
-      "Superfluid's deleteFlow() is called in the slash transaction. The stream stops at that exact millisecond. Whatever USDC had already flowed to your wallet before the slash remains yours. The unstreamed portion returns to the DAO treasury instantly. You earned exactly what streamed before cancellation — not a cent more, not a cent less.",
+      "Sablier's cancel() is called in the slash transaction. The stream stops at that exact millisecond. Whatever USDC had already flowed to your wallet before the slash remains yours. The unstreamed portion returns to the DAO treasury instantly. You earned exactly what streamed before cancellation — not a cent more, not a cent less.",
   },
   {
     question: 'How do I appeal a slash?',
@@ -132,7 +132,7 @@ export const GUIDELINES_FAQ = [
   {
     question: 'What chains does GrantOS support?',
     answer:
-      'GrantOS is deployed exclusively on Arbitrum Sepolia. All contracts, all attestations, all Superfluid streams, and all ZK proof verifications happen on Arbitrum Sepolia. There are no plans to deploy on other chains at this time.',
+      'GrantOS is deployed exclusively on Arbitrum Sepolia. All contracts, all attestations, all Sablier streams, and all ZK proof verifications happen on Arbitrum Sepolia. There are no plans to deploy on other chains at this time.',
   },
 ] as const;
 

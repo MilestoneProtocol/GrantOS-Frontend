@@ -72,7 +72,7 @@ function badgeTone(outcome: GrantMilestoneOutcome): {
  * absorbs all of the milestone substates:
  *  - awaiting_vote        → "Your Vote is Required" + Reject / Approve buttons
  *  - awaiting_quorum      → "Awaiting Quorum (N/M votes)" + `You voted X` chip
- *  - approved_streaming   → green quorum banner + live Superfluid flow rate
+ *  - approved_streaming   → green quorum banner + live Sablier flow rate
  *  - approved_lump_sum    → green quorum banner + "USDC transferred to builder"
  *  - rejected             → red banner + EAS attestation note + reason quote
  */
@@ -254,7 +254,7 @@ function deriveEffectiveOutcome(
   };
 }
 
-/** Approximate a Superfluid flow rate from a lump-sum amount + 30-day window. */
+/** Approximate a Sablier flow rate from a lump-sum amount + 30-day window. */
 function deriveFlowRate(usdc: number) {
   const ratePerSec = usdc / (30 * 86_400);
   return `${ratePerSec.toFixed(6)} USDC/sec`;

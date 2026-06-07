@@ -396,7 +396,7 @@ function PrimitivesSection() {
         <PrimitiveTile
           tone="sky"
           title="Conditional release"
-          description="USDC unlocks when milestones verify. Lump-sum or Superfluid streams."
+          description="USDC unlocks when milestones verify. Lump-sum or Sablier streams."
           features={[
             'USDC escrow',
             'Per-second streaming',

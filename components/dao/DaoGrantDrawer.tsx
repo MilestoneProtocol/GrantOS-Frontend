@@ -223,7 +223,7 @@ function DrawerHeader({ grant, onClose }: { grant: DaoGrantCardModel; onClose: (
             <HeaderStat label="Total Grant Amount" value={`${formatUsd(grant.totalGrantUsdc)} USDC`} />
             <HeaderStat
               label="Payment Mode"
-              value={grant.paymentMode === 'streaming' ? 'Superfluid Stream' : 'Lump Sum'}
+              value={grant.paymentMode === 'streaming' ? 'Sablier Stream' : 'Lump Sum'}
               icon={grant.paymentMode === 'streaming' ? <Waves className="h-3.5 w-3.5 text-sky-600" /> : undefined}
             />
             <HeaderStat label="Creation Date" value={formatDate(grant.createdAtIso)} />
@@ -511,7 +511,7 @@ function StreamPanel({ grant }: { grant: DaoGrantCardModel }) {
     <div className="border-t border-slate-200 bg-slate-900 px-4 py-4 text-white sm:px-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-300">Superfluid stream active</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-300">Sablier stream active</p>
           <p className="mt-1 font-mono text-2xl font-bold tabular-nums">
             ${total.toFixed(6)}
           </p>

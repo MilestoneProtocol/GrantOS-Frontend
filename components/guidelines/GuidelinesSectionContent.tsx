@@ -60,7 +60,7 @@ function SectionHowItWorks() {
           Committee members see the ZK proof verification status, the AI verifier verdict, and the builder&apos;s written summary side by side. The ZK Verified checkmark is the most important signal. The AI verdict is advisory. The committee votes approve or reject. When quorum is reached, payment executes automatically.
         </GuidelinesStepBlock>
         <GuidelinesStepBlock title="Step 5 — Payment Releases">
-          If lump-sum mode: USDC transfers to the builder&apos;s wallet immediately when quorum is reached. If streaming mode: USDC flows to the builder per second via Superfluid from the moment of approval until the next milestone deadline. The builder earns exactly what they earned — to the millisecond.
+          If lump-sum mode: USDC transfers to the builder&apos;s wallet immediately when quorum is reached. If streaming mode: USDC flows to the builder per second via Sablier from the moment of approval until the next milestone deadline. The builder earns exactly what they earned — to the millisecond.
         </GuidelinesStepBlock>
         <GuidelinesStepBlock title="Step 6 — Missed Deadlines">
           If a builder misses a deadline, the committee issues an onchain warning EAS attestation. The builder has 24 hours to respond. After 24 hours, the committee can execute a slash. USDC returns to the DAO treasury automatically. The builder&apos;s reputation score updates immediately.
@@ -80,28 +80,28 @@ function SectionZkProof() {
       lead={'When you see a ZK Verified badge on GrantOS, it means a zero-knowledge proof confirmed that something happened — not that a person said it happened, not that a screenshot showed it happened, but that mathematics confirmed it happened.'}
     >
       <GuidelinesSubheading>What does &quot;cryptographically verified&quot; actually mean?</GuidelinesSubheading>
-      <GuidelinesSubheading>What is TLSNotary?</GuidelinesSubheading>
+      <GuidelinesSubheading>How your GitHub identity is bound to your wallet</GuidelinesSubheading>
       <GuidelinesBody>
-        TLSNotary is a protocol developed by the Ethereum Foundation. When your browser makes a request to a website like GitHub, TLS encryption protects that connection. TLSNotary splits the TLS session keys between you and a notary server — neither party can alter the data without breaking the proof. The result is a cryptographic certificate that says: this specific API response genuinely came from GitHub&apos;s servers at this specific time and has not been modified by anyone.
+        At <code>/verify</code> you authorize GitHub through OAuth. GrantOS reads your account — handle, account age, and contribution activity — and an independent oracle signs an attestation of those facts. Your browser then generates a Noir zero-knowledge proof that binds that signed attestation to your wallet address, <em>without</em> ever putting your access token or raw account data onchain. The proof is what proves &quot;this wallet belongs to this verified GitHub contributor.&quot;
       </GuidelinesBody>
       <GuidelinesSubheading>What is the Noir ZK Coprocessor?</GuidelinesSubheading>
       <GuidelinesBody>
-        The Noir ZK Coprocessor generates a compact zero-knowledge proof that can be verified by a smart contract on Arbitrum in a single transaction. Without it, the raw proof would be too large and expensive to verify onchain. The coprocessor makes onchain web proof verification practical.
+        Noir is the circuit language that produces the compact zero-knowledge proof of your verified identity. The proof reveals only the public facts (contribution tier, account year) and your wallet binding — the underlying numbers stay private. The same proof is re-checked by Barretenberg on the backend and validated by the verifier contract on Arbitrum before your identity registers.
       </GuidelinesBody>
-      <GuidelinesSubheading>What does &quot;the contract verified this&quot; mean?</GuidelinesSubheading>
+      <GuidelinesSubheading>How a milestone pull request is verified</GuidelinesSubheading>
       <GuidelinesBody>
-        It means the WebProofVerifier smart contract on Arbitrum ran the mathematical verification of the ZK proof in the same transaction as the milestone submission. If verification failed, the entire transaction reverted. The milestone cannot advance to Submitted state unless the proof passes. No committee member approved this. No admin reviewed it. The math either checks out or the transaction fails.
+        When you submit a milestone, GrantOS queries the pull request directly from GitHub&apos;s API in real time and reads its true title, author, merge status, and branch. It then confirms the PR&apos;s author matches the GitHub handle bound to your wallet. Your zero-knowledge identity proof is re-verified by the backend with Barretenberg, and the milestone is recorded onchain. If the PR can&apos;t be found, or the proof fails verification, the submission is rejected — the server never takes the client&apos;s word for it.
       </GuidelinesBody>
-      <GuidelinesSubheading>Three things ZK proofs prevent on GrantOS:</GuidelinesSubheading>
+      <GuidelinesSubheading>Three things this verification prevents on GrantOS:</GuidelinesSubheading>
       <GuidelinesList>
         <GuidelinesListItem>
-          <strong>First — Forged pull requests.</strong> A builder cannot submit a PR opened against a private repository that gets deleted after approval. The TLSNotary proof captures the GitHub API response at the moment of proof generation. The repository and PR must exist and be publicly verifiable.
+          <strong>First — Forged pull requests.</strong> The PR is fetched live from GitHub at submission time. A PR that does not exist — or a private repo GrantOS cannot read — fails verification. You cannot submit a milestone against a PR that is not publicly verifiable.
         </GuidelinesListItem>
         <GuidelinesListItem>
-          <strong>Second — Shared evidence.</strong> A builder cannot submit the same PR link across multiple grant applications with minor modifications. The proof is cryptographically bound to the builder&apos;s verified GitHub identity and wallet address. The same evidence cannot pass verification for a different wallet.
+          <strong>Second — Shared evidence.</strong> Your identity proof is cryptographically bound to your wallet address through its public inputs. The same proof cannot pass verification for a different wallet, so evidence cannot be transplanted between builders.
         </GuidelinesListItem>
         <GuidelinesListItem>
-          <strong>Third — Identity spoofing.</strong> A builder cannot use a PR authored by a different GitHub account. The ZK identity binding established at /verify permanently links one wallet to one GitHub handle. The WebProofVerifier checks that the PR author matches the registered identity.
+          <strong>Third — Identity spoofing.</strong> The identity binding established at <code>/verify</code> links one wallet to one GitHub handle. At submission, GrantOS compares the PR&apos;s author against that registered handle — a PR authored by a different account is blocked before it can be submitted.
         </GuidelinesListItem>
       </GuidelinesList>
       <GuidelinesCallout variant="info" title="ZK Verified badge">
@@ -207,7 +207,7 @@ function SectionSlashing() {
           <strong>Step 6 — Contract validates the warning.</strong> GrantEscrow.sol checks: does a warningRecord exist for this milestone with a timestamp older than 24 hours? If not, the transaction reverts with WarningRequired(). If yes, the slash executes.
         </GuidelinesListItem>
         <GuidelinesListItem>
-          <strong>Step 7 — Funds return to treasury.</strong> If lump-sum mode: the full escrowed milestone amount transfers back to the DAO treasury address in the same transaction. If streaming mode: Superfluid&apos;s deleteFlow() is called, the stream stops instantly, and all unstreamed USDC returns to the treasury. The builder keeps whatever had already streamed to their wallet before the cancellation — down to the millisecond.
+          <strong>Step 7 — Funds return to treasury.</strong> If lump-sum mode: the full escrowed milestone amount transfers back to the DAO treasury address in the same transaction. If streaming mode: Sablier&apos;s cancel() is called, the stream stops instantly, and all unstreamed USDC returns to the treasury. The builder keeps whatever had already streamed to their wallet before the cancellation — down to the millisecond.
         </GuidelinesListItem>
         <GuidelinesListItem>
           <strong>Step 8 — Reputation updates.</strong> The builder&apos;s reputation score updates immediately: -5 for the warning received, -15 for the slash. The milestone status updates to Slashed permanently. No further submissions or votes are possible on this milestone.

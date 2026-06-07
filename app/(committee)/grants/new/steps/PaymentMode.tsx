@@ -57,7 +57,7 @@ export default function PaymentModeStep({ value, onChange, onBack, onNext }: Pay
             </p>
           </button>
 
-          {/* Superfluid Streaming Card */}
+          {/* Sablier Streaming Card */}
           <button
             type="button"
             onClick={() => onChange('streaming')}
@@ -92,7 +92,7 @@ export default function PaymentModeStep({ value, onChange, onBack, onNext }: Pay
 
             {/* Title + badge */}
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold text-slate-900">Superfluid Streaming</h3>
+              <h3 className="text-base font-semibold text-slate-900">Sablier Streaming</h3>
               <span className="inline-flex items-center rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                 Recommended
               </span>

@@ -2,7 +2,7 @@
 
 import { getPublicApiV1Base } from '@/lib/api-config';
 import type { ZkProofPreview } from '@/lib/milestone-submit-session';
-import { buildMockZkProofResult, normalizeGithubHandle } from '@/lib/milestone-submit-session';
+import { normalizeGithubHandle } from '@/lib/milestone-submit-session';
 import {
   AlertTriangle,
   Check,
@@ -20,8 +20,8 @@ import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
 
 const PHASE_LABELS = [
-  'Fetching Noir circuit...',
-  'Initializing UltraHonk backend...',
+  'Verifying pull request on GitHub...',
+  'Loading Noir identity circuit...',
   'Generating witness...',
   'Generating proof...',
 ] as const;
@@ -120,10 +120,23 @@ export default function ZkProofPanel({
           throw new Error('Register your GitHub identity in Verify before continuing.');
         }
 
+        // Phase 0 — verify the pull request against the live GitHub API.
+        const prResp = await fetch('/api/github-pr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo, pr }),
+        });
+        const prData = await prResp.json().catch(() => null);
+        if (!prData?.found) {
+          throw new Error(prData?.error || 'Pull request could not be verified on GitHub.');
+        }
+        const prAuthor = normalizeGithubHandle(prData.authorLogin || '');
+        const identityMatches = Boolean(reg) && prAuthor === reg;
+
         const t0 = formatLogTime(new Date());
         setPhaseTimes((prev) => ({ ...prev, [0]: t0 }));
         setPhaseStates(['done', 'running', 'pending', 'pending']);
-        await sleep(1000);
+        await sleep(800);
         if (cancelled) return;
 
         const { generateProof } = await import('@/lib/zk/prover');
@@ -181,22 +194,18 @@ export default function ZkProofPanel({
           return `0x${hex}` as `0x${string}`;
         });
 
-        const slug = repo.includes('/') ? repo.split('/')[1] || 'repo' : 'repo';
-        const prTitle = `feat(${slug}): deliver milestone scope with tests and integration`;
-        const mergedAt = new Date();
-        const encoder = new TextEncoder();
         const proofHashBuf = await crypto.subtle.digest('SHA-256', result.proof as any);
         const proofHash = ('0x' + Array.from(new Uint8Array(proofHashBuf))
           .map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`;
 
         const preview: ZkProofPreview = {
-          prTitle,
-          merged: true,
-          authorLogin: `@${reg}`,
-          branch: 'main',
-          mergedAtIso: mergedAt.toISOString(),
+          prTitle: prData.title || `Pull request #${pr}`,
+          merged: Boolean(prData.merged),
+          authorLogin: prData.authorLogin ? `@${prData.authorLogin}` : '@unknown',
+          branch: prData.branch || prData.baseBranch || 'main',
+          mergedAtIso: prData.mergedAt || '',
           proofHash,
-          identityMatches: true,
+          identityMatches,
           proof: proofHex,
           publicInputs: pubInputsBytes32,
         };
@@ -254,9 +263,9 @@ export default function ZkProofPanel({
           <span className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-blue-600 border-r-blue-500/40 duration-[3s]" />
           <Fingerprint className="relative z-10 h-11 w-11 text-blue-600" strokeWidth={1.5} />
         </div>
-        <h2 className="text-center text-xl font-semibold text-slate-900">Generating Zero-Knowledge Proof</h2>
+        <h2 className="text-center text-xl font-semibold text-slate-900">Verifying Pull Request</h2>
         <p className="mt-2 max-w-lg text-center text-sm leading-relaxed text-slate-500">
-          Cryptographically verifying your GitHub contributions via Noir ZK Coprocessor without revealing your access tokens.
+          Fetching the pull request from GitHub and generating a zero-knowledge proof of your verified identity.
         </p>
 
         <div className="mt-8 w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -381,9 +390,9 @@ export default function ZkProofPanel({
             <Check className="h-7 w-7 stroke-[2.5]" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Proof Generated</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Pull Request Verified</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Cryptographic proof of your GitHub PR has been successfully created.
+              Live data fetched from GitHub, and your zero-knowledge identity proof was generated.
             </p>
           </div>
         </div>
@@ -424,14 +433,16 @@ export default function ZkProofPanel({
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Merge timestamp</p>
               <p className="mt-1 text-sm text-slate-700">
-                {new Date(proofPreview.mergedAtIso).toLocaleString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  timeZoneName: 'short',
-                })}
+                {proofPreview.mergedAtIso
+                  ? new Date(proofPreview.mergedAtIso).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZoneName: 'short',
+                    })
+                  : 'Not merged yet'}
               </p>
             </div>
             <div className="sm:col-span-2">

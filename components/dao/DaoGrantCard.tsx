@@ -17,7 +17,7 @@ function truncateAddress(addr: `0x${string}`): string {
 
 /**
  * Committee-facing grant summary card. Clicking anywhere opens the detail
- * drawer (placeholder until the next screen ships). Live Superfluid ticker
+ * drawer (placeholder until the next screen ships). Live Sablier ticker
  * updates every 100ms when `isStreamingActive` is true.
  */
 export default function DaoGrantCard({ grant, onOpen }: DaoGrantCardProps) {
@@ -152,7 +152,7 @@ export default function DaoGrantCard({ grant, onOpen }: DaoGrantCardProps) {
         ) : null}
 
         <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          {grant.paymentMode === 'streaming' ? 'Superfluid stream' : 'Lump sum'}
+          {grant.paymentMode === 'streaming' ? 'Sablier stream' : 'Lump sum'}
         </p>
       </div>
 

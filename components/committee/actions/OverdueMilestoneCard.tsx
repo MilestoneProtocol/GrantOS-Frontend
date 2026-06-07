@@ -70,7 +70,7 @@ function MetadataStrip({ milestone }: { milestone: OverdueMilestone }) {
         primary={`${formatTokenAmount(milestone.amount.value)} ${milestone.amount.token}`}
         primaryClassName="font-mono tabular-nums"
         secondary={
-          milestone.paymentMode === 'superfluid' ? 'Superfluid Flow' : 'Lump-sum'
+          milestone.paymentMode === 'superfluid' ? 'Sablier Flow' : 'Lump-sum'
         }
       />
       <DeadlineCell deadlineIso={milestone.deadlineIso} />
