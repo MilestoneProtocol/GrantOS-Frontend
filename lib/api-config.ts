@@ -24,3 +24,16 @@ export function getPublicApiV1Base(): string {
 export function getServerApiV1Base(): string {
   return `${getBackendOrigin()}/api/v1`;
 }
+
+/**
+ * Public backend origin usable from the browser — needed for the WebSocket
+ * notification connection, which can't go through the Next.js HTTP rewrite.
+ * Reads a `NEXT_PUBLIC_*` var (inlined into the client bundle) and falls back
+ * to the default Render origin.
+ */
+export function getPublicBackendOrigin(): string {
+  const raw =
+    process.env.NEXT_PUBLIC_BACKEND_URL?.trim() ||
+    process.env.NEXT_PUBLIC_WS_URL?.trim();
+  return (raw || DEFAULT_BACKEND_ORIGIN).replace(/\/+$/, '');
+}

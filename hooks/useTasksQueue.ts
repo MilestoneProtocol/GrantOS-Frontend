@@ -1,12 +1,10 @@
 'use client';
 
 import { generateTasks } from '@/lib/tasks';
-import { grantEscrowEventsAbi } from '@/lib/notifications';
-import { GRANT_ESCROW_ADDRESS } from '@/lib/escrow';
+import { useGrantActivityWatcher } from '@/lib/grant-events';
 import { useTasksStore } from '@/store/tasksStore';
 import { useCallback, useEffect, useRef } from 'react';
 import type { Address } from 'viem';
-import { useWatchContractEvent } from 'wagmi';
 
 const POLL_MS = 60_000;
 
@@ -31,37 +29,9 @@ export function useTasksQueue(address: Address | undefined, enabled: boolean) {
     return () => window.clearInterval(id);
   }, [address, enabled, refresh]);
 
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'MilestoneSubmitted',
-    enabled: enabled && Boolean(address),
-    onLogs: () => void refresh(),
-  });
-
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'VoteCast',
-    enabled: enabled && Boolean(address),
-    onLogs: () => void refresh(),
-  });
-
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'WarningIssued',
-    enabled: enabled && Boolean(address),
-    onLogs: () => void refresh(),
-  });
-
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'MilestoneSlashed',
-    enabled: enabled && Boolean(address),
-    onLogs: () => void refresh(),
-  });
+  // Any on-chain grant activity (submission, vote, warning, slash, …) should
+  // re-derive the task queue immediately rather than waiting for the poll.
+  useGrantActivityWatcher(() => void refresh(), enabled && Boolean(address));
 
   const markTaskRemoving = useCallback((taskId: string) => {
     removingRef.current.add(taskId);

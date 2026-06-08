@@ -1158,3 +1158,119 @@ export const committeeMembershipAbis = {
     },
   ] as const satisfies Abi,
 };
+
+// ── On-chain event ABIs (match the deployed contracts) ────────────────────
+//
+// These mirror the events as actually emitted on-chain. Grants are deployed
+// one escrow per grant, so lifecycle events come from each escrow and carry no
+// grantId/title (the escrow IS the grant). `GrantCreated` comes from the
+// factory, and `WarningIssued` from the shared SentinelEAS.
+
+/** Lifecycle events emitted by each per-grant `GrantEscrow`. */
+export const escrowLifecycleEventsAbi = [
+  {
+    type: 'event',
+    name: 'MilestoneSubmitted',
+    inputs: [
+      { name: 'milestoneId', type: 'uint256', indexed: true },
+      { name: 'builder', type: 'address', indexed: true },
+      { name: 'proofHash', type: 'bytes32', indexed: false },
+      { name: 'easAttestationUid', type: 'bytes32', indexed: false },
+      { name: 'builderSummary', type: 'string', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'VoteCast',
+    inputs: [
+      { name: 'milestoneId', type: 'uint256', indexed: true },
+      { name: 'voter', type: 'address', indexed: true },
+      { name: 'approved', type: 'bool', indexed: false },
+      { name: 'approvalCount', type: 'uint256', indexed: false },
+      { name: 'rejectionCount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'MilestoneApproved',
+    inputs: [
+      { name: 'milestoneId', type: 'uint256', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+      { name: 'streaming', type: 'bool', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'MilestoneRejected',
+    inputs: [
+      { name: 'milestoneId', type: 'uint256', indexed: true },
+      { name: 'rejectionCount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'MilestoneSlashed',
+    inputs: [
+      { name: 'milestoneId', type: 'uint256', indexed: true },
+      { name: 'grantor', type: 'address', indexed: true },
+      { name: 'amount', type: 'uint256', indexed: false },
+      { name: 'slashedAt', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'GrantCancelled',
+    inputs: [
+      { name: 'grantor', type: 'address', indexed: true },
+      { name: 'refundedAmount', type: 'uint256', indexed: false },
+    ],
+  },
+] as const satisfies Abi;
+
+/** `GrantCreated`, emitted by the `GrantFactory` (a single contract). */
+export const factoryGrantCreatedEventsAbi = [
+  {
+    type: 'event',
+    name: 'GrantCreated',
+    inputs: [
+      { name: 'grantId', type: 'uint256', indexed: true },
+      { name: 'escrow', type: 'address', indexed: true },
+      { name: 'grantor', type: 'address', indexed: true },
+      { name: 'grantee', type: 'address', indexed: false },
+      { name: 'totalAmount', type: 'uint256', indexed: false },
+    ],
+  },
+] as const satisfies Abi;
+
+/** `WarningIssued`, emitted by the shared `SentinelEAS` contract. */
+export const sentinelWarningEventsAbi = [
+  {
+    type: 'event',
+    name: 'WarningIssued',
+    inputs: [
+      { name: 'grantId', type: 'bytes32', indexed: true },
+      { name: 'milestoneIndex', type: 'uint256', indexed: true },
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'attestationUid', type: 'bytes32', indexed: false },
+      { name: 'message', type: 'string', indexed: false },
+    ],
+  },
+] as const satisfies Abi;
+
+/** Reads the shared SentinelEAS address from a deployed escrow. */
+export const escrowMetaAbi = [
+  {
+    type: 'function',
+    name: 'grantId',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bytes32' }],
+  },
+  {
+    type: 'function',
+    name: 'sentinel',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const satisfies Abi;
