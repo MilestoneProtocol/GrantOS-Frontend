@@ -46,8 +46,16 @@ export function useCommitteeReviews() {
         if (!submissionsRes.ok) throw new Error(`Failed to fetch committee submissions: ${submissionsRes.status}`);
         const rawSubmissions = await submissionsRes.json();
 
-        // 3. Map to UI structure
-        const mappedSubmissions: CommitteeReviewSubmission[] = await Promise.all(rawSubmissions.map(async (s: any) => {
+        // 3. Map to UI structure.
+        //
+        // Each submission is enriched independently with on-chain reads. We
+        // settle per-submission (returning `null` on failure) instead of using
+        // a bare `Promise.all` so that a single bad row — a reverting
+        // `getSubmission`, a stale escrow address, or a transient RPC error —
+        // can't reject the whole batch and blank the entire Pending Review
+        // list. Good rows still render; bad rows are dropped and logged.
+        const mappedResults = await Promise.all(rawSubmissions.map(async (s: any): Promise<CommitteeReviewSubmission | null> => {
+          try {
           // Fetch grant data (committee members, milestone amounts) and submission data in parallel
           const [grantData, submissionData, currentMemberVoted, quorum]: [any, any, any, any] = await Promise.all([
             publicClient.readContract({
@@ -132,11 +140,23 @@ export function useCommitteeReviews() {
             approvers,
             currentMemberVoted: Boolean(currentMemberVoted),
             finalOutcome: s.status === 'approved' ? 'approved' : s.status === 'rejected' ? 'rejected' : undefined,
-            deadline: grantData.milestones?.[s.milestoneIndex]?.deadline 
-              ? Number(grantData.milestones[s.milestoneIndex].deadline) 
+            deadline: grantData.milestones?.[s.milestoneIndex]?.deadline
+              ? Number(grantData.milestones[s.milestoneIndex].deadline)
               : undefined,
           };
+          } catch (enrichErr) {
+            console.error(
+              `Failed to enrich committee submission ${s?.id} (grant #${s?.grantId}, escrow ${s?.escrowAddress}):`,
+              enrichErr,
+            );
+            return null;
+          }
         }));
+
+        // Drop submissions whose on-chain enrichment failed so the rest still render.
+        const mappedSubmissions: CommitteeReviewSubmission[] = mappedResults.filter(
+          (s): s is CommitteeReviewSubmission => s !== null,
+        );
 
         setData({
           totalPending: mappedSubmissions.filter(s => !s.finalOutcome).length,

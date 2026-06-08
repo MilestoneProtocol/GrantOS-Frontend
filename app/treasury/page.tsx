@@ -14,13 +14,12 @@ import DaoAppShell from '@/components/dao/DaoAppShell';
 import { useAuthGuard } from '@/lib/authGuard';
 import { useTreasuryStore } from '@/store/treasuryStore';
 import { useEffect, useState, useMemo } from 'react';
-import { useWatchContractEvent, useReadContract, useReadContracts } from 'wagmi';
+import { useReadContract, useReadContracts } from 'wagmi';
 import { useQueries } from '@tanstack/react-query';
 import { zeroAddress } from 'viem';
 import {
   CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
-  GRANT_ESCROW_ADDRESS,
   IDENTITY_REGISTRY_ADDRESS,
   grantFactoryAbi,
   grantEscrowReadAbi,
@@ -29,7 +28,7 @@ import {
 import { safeFactoryGrantCount } from '@/lib/grant-factory-read';
 import { useEnrichedGrants } from '@/hooks/useEnrichedGrants';
 import { useDashboardStats } from '@/hooks/useGrantStats';
-import { grantEscrowEventsAbi } from '@/lib/notifications';
+import { useGrantActivityWatcher } from '@/lib/grant-events';
 import {
   type TreasurySnapshot,
   type EscrowRow,
@@ -402,12 +401,9 @@ export default function TreasuryPage() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
-  // Refresh on-chain trigger: any GrantEscrow event invalidates the snapshot.
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    onLogs: () => refresh(),
-  });
+  // Refresh on-chain trigger: any grant activity (per-escrow lifecycle, factory
+  // GrantCreated, or sentinel WarningIssued) invalidates the snapshot.
+  useGrantActivityWatcher(refresh, CONTRACTS_READY);
 
   useEffect(() => {
     if (CONTRACTS_READY && mappedSnapshot && !isLoadingData) {

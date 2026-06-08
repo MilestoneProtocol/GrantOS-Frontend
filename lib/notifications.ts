@@ -1,12 +1,33 @@
 'use client';
 
 import {
-  GRANT_ESCROW_ADDRESS,
+  escrowLifecycleEventsAbi,
+  escrowMetaAbi,
+  factoryGrantCreatedEventsAbi,
+  GRANT_FACTORY_ADDRESS,
   grantEscrowReadAbi,
   IDENTITY_REGISTRY_ADDRESS,
   identityRegistryAbi,
   MILESTONE_STATUS_PENDING,
+  sentinelWarningEventsAbi,
 } from '@/lib/escrow';
+
+/**
+ * Minimal factory ABI: `grants(grantId) → escrowAddress`. Grants are deployed
+ * as one escrow contract per grant, so we resolve each grant's escrow from the
+ * factory (the on-chain `grantId` is the factory index) before reading it.
+ */
+const factoryGrantsAbi = [
+  {
+    type: 'function',
+    name: 'grants',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const;
+
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 import { useRoleDetection } from '@/lib/roleDetection';
 import { formatAppTimestamp, formatAppUsdc } from '@/lib/format-display';
 import { USDC_DECIMALS } from '@/lib/usdc';
@@ -20,89 +41,13 @@ import {
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { formatUnits, type Address } from 'viem';
-import { useAccount, useReadContracts, useWatchContractEvent } from 'wagmi';
-
-export const grantEscrowEventsAbi = [
-  {
-    type: 'event',
-    name: 'GrantCreated',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'builder', type: 'address', indexed: true },
-      { name: 'totalAmount', type: 'uint256', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'MilestoneApproved',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'milestoneIndex', type: 'uint256', indexed: true },
-      { name: 'title', type: 'string', indexed: false },
-      { name: 'amount', type: 'uint256', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'MilestoneRejected',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'milestoneIndex', type: 'uint256', indexed: true },
-      { name: 'title', type: 'string', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'WarningIssued',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'milestoneIndex', type: 'uint256', indexed: true },
-      { name: 'title', type: 'string', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'MilestoneSlashed',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'milestoneIndex', type: 'uint256', indexed: true },
-      { name: 'title', type: 'string', indexed: false },
-      { name: 'amount', type: 'uint256', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'MilestoneSubmitted',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'milestoneIndex', type: 'uint256', indexed: true },
-      { name: 'builder', type: 'address', indexed: true },
-      { name: 'title', type: 'string', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'VoteCast',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'milestoneIndex', type: 'uint256', indexed: true },
-      { name: 'voter', type: 'address', indexed: true },
-      { name: 'approve', type: 'bool', indexed: false },
-      { name: 'title', type: 'string', indexed: false },
-      { name: 'approveVotes', type: 'uint256', indexed: false },
-      { name: 'quorum', type: 'uint256', indexed: false },
-    ],
-  },
-  {
-    type: 'event',
-    name: 'QuorumReached',
-    inputs: [
-      { name: 'grantId', type: 'uint256', indexed: true },
-      { name: 'milestoneIndex', type: 'uint256', indexed: true },
-      { name: 'title', type: 'string', indexed: false },
-    ],
-  },
-] as const;
+import {
+  useAccount,
+  usePublicClient,
+  useReadContract,
+  useReadContracts,
+  useWatchContractEvent,
+} from 'wagmi';
 
 export const TREASURY_ALERT_USDC_THRESHOLD = Number(
   process.env.NEXT_PUBLIC_TREASURY_ALERT_USDC_THRESHOLD ?? '500000',
@@ -308,23 +253,6 @@ export function committeeVoteCastNotification(
   });
 }
 
-export function committeeQuorumReachedNotification(
-  grantId: bigint,
-  milestoneIndex: bigint,
-  title: string,
-): Omit<AppNotification, 'id' | 'read'> {
-  return baseNotification({
-    type: 'quorum_reached',
-    role: 'committee',
-    category: 'approval',
-    title: `Quorum reached on ${title}`,
-    source: 'DAO VOTE',
-    message: `Quorum reached on ${title} — payment released to builder`,
-    href: '/committee',
-    dedupeKey: `committee:quorum:${grantId}:${milestoneIndex}`,
-  });
-}
-
 export function daoSlashExecutedNotification(
   grantId: bigint,
   amount: bigint,
@@ -446,7 +374,14 @@ export function resolveFallbackRole(roles: {
 type GrantTuple = {
   builder: Address;
   committee: readonly Address[];
-  milestones: ReadonlyArray<{ title: string; amount: bigint; deadline: bigint }>;
+  quorum: bigint;
+  milestones: ReadonlyArray<{
+    title: string;
+    amount: bigint;
+    deadline: bigint;
+    /** Milestone lifecycle status; `0` (MILESTONE_STATUS_PENDING) = open. */
+    state: number;
+  }>;
 };
 
 function isCommitteeMember(committee: readonly Address[], wallet: Address): boolean {
@@ -458,10 +393,13 @@ async function pollBuilderReputation(
   addNotification: ReturnType<typeof useNotificationStore.getState>['addNotification'],
 ) {
   const { createPublicClient, http } = await import('viem');
-  const { arbitrum } = await import('viem/chains');
+  // The app (factory, escrows, identity registry) is deployed on Arbitrum
+  // Sepolia — reading mainnet here returned no identity, so reputation alerts
+  // never fired.
+  const { arbitrumSepolia } = await import('viem/chains');
   const rpc = process.env.NEXT_PUBLIC_RPC_URL;
   const client = createPublicClient({
-    chain: arbitrum,
+    chain: arbitrumSepolia,
     transport: http(rpc || undefined),
   });
 
@@ -520,29 +458,123 @@ export function useNotificationListeners() {
     return Array.from(ids, (s) => BigInt(s));
   }, [roles.builderGrantIds, roles.committeeGrantIds]);
 
+  // Stage 1 — resolve each grant's escrow address from the factory. Grants are
+  // deployed one-escrow-per-grant, so we can't read a single shared escrow; the
+  // on-chain `grantId` doubles as the factory index.
+  const escrowResolveContracts = useMemo(
+    () =>
+      allGrantIds.map((grantId) => ({
+        address: GRANT_FACTORY_ADDRESS,
+        abi: factoryGrantsAbi,
+        functionName: 'grants' as const,
+        args: [grantId] as const,
+      })),
+    [allGrantIds],
+  );
+
+  const escrowResolveRead = useReadContracts({
+    contracts: escrowResolveContracts,
+    query: {
+      enabled: Boolean(address) && allGrantIds.length > 0,
+      refetchInterval: address ? 60_000 : false,
+    },
+  });
+
+  // Escrow address per grant, index-aligned with `allGrantIds`.
+  const grantEscrowAddresses = useMemo(
+    () =>
+      allGrantIds.map((_, gi) => {
+        const row = escrowResolveRead.data?.[gi];
+        const addr =
+          row?.status === 'success' ? (row.result as Address | undefined) : undefined;
+        return addr && addr !== ZERO_ADDRESS ? addr : undefined;
+      }),
+    [allGrantIds, escrowResolveRead.data],
+  );
+
+  // Stage 2 — read `getGrant()` (no args) on each resolved escrow. The returned
+  // tuple already carries every milestone's `state` and `deadline`, so we no
+  // longer need separate `getMilestoneStatus` calls. One read per grant,
+  // index-aligned with `allGrantIds`.
   const grantContracts = useMemo(
     () =>
-      allGrantIds.flatMap((grantId) => [
-        {
-          address: GRANT_ESCROW_ADDRESS,
-          abi: grantEscrowReadAbi,
-          functionName: 'getGrant' as const,
-          args: [grantId] as const,
-        },
-        ...Array.from({ length: 8 }, (_, milestoneIndex) => ({
-          address: GRANT_ESCROW_ADDRESS,
-          abi: grantEscrowReadAbi,
-          functionName: 'getMilestoneStatus' as const,
-          args: [grantId, BigInt(milestoneIndex)] as const,
-        })),
-      ]),
-    [allGrantIds],
+      grantEscrowAddresses.map((escrow) => ({
+        address: (escrow ?? ZERO_ADDRESS) as Address,
+        abi: grantEscrowReadAbi,
+        functionName: 'getGrant' as const,
+      })),
+    [grantEscrowAddresses],
   );
 
   const grantsRead = useReadContracts({
     contracts: grantContracts,
-    query: { enabled: Boolean(address) && allGrantIds.length > 0 },
+    query: {
+      enabled:
+        Boolean(address) &&
+        grantContracts.length > 0 &&
+        grantEscrowAddresses.some(Boolean),
+      refetchInterval: address ? 60_000 : false,
+    },
   });
+
+  // ── Warning / slash watcher plumbing ──────────────────────────────────────
+  // `WarningIssued` is emitted by the shared SentinelEAS keyed by the escrow's
+  // `bytes32` grantId, and `MilestoneSlashed` by each per-grant escrow. To wire
+  // both back to the `uint256` grant ids the notifications use, we (1) resolve
+  // the sentinel address from any escrow, and (2) read each escrow's `bytes32`
+  // grantId so we can map a warning event to its grant.
+  const publicClient = usePublicClient();
+
+  const firstEscrow = useMemo(
+    () => grantEscrowAddresses.find((a): a is Address => Boolean(a)),
+    [grantEscrowAddresses],
+  );
+
+  const sentinelRead = useReadContract({
+    address: firstEscrow,
+    abi: escrowMetaAbi,
+    functionName: 'sentinel',
+    query: { enabled: Boolean(firstEscrow) },
+  });
+  const sentinelAddress = sentinelRead.data as Address | undefined;
+
+  const grantBytes32Contracts = useMemo(
+    () =>
+      grantEscrowAddresses.map((escrow) => ({
+        address: (escrow ?? ZERO_ADDRESS) as Address,
+        abi: escrowMetaAbi,
+        functionName: 'grantId' as const,
+      })),
+    [grantEscrowAddresses],
+  );
+
+  const grantBytes32Read = useReadContracts({
+    contracts: grantBytes32Contracts,
+    query: {
+      enabled:
+        Boolean(address) &&
+        grantBytes32Contracts.length > 0 &&
+        grantEscrowAddresses.some(Boolean),
+    },
+  });
+
+  // bytes32 grantId (lowercased) → index into `allGrantIds`.
+  const bytes32ToGrantIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    (grantBytes32Read.data ?? []).forEach((row, gi) => {
+      if (row.status === 'success' && row.result) {
+        map.set(String(row.result).toLowerCase(), gi);
+      }
+    });
+    return map;
+  }, [grantBytes32Read.data]);
+
+  // Keep the latest grant data / role available to imperative event handlers
+  // without forcing watcher re-subscription on every 60s refetch.
+  const grantsDataRef = useRef(grantsRead.data);
+  grantsDataRef.current = grantsRead.data;
+  const isDaoAdminRef = useRef(roles.isDaoAdmin);
+  isDaoAdminRef.current = roles.isDaoAdmin;
 
   const pollDeadlines = useCallback(() => {
     if (!address || !walletLc || !grantsRead.data) return;
@@ -552,7 +584,7 @@ export function useNotificationListeners() {
 
     for (let gi = 0; gi < allGrantIds.length; gi++) {
       const grantId = allGrantIds[gi]!;
-      const grantRow = grantsRead.data[gi * 9];
+      const grantRow = grantsRead.data[gi];
       if (!grantRow || grantRow.status !== 'success' || !grantRow.result) continue;
 
       const grant = grantRow.result as GrantTuple;
@@ -561,11 +593,10 @@ export function useNotificationListeners() {
 
       for (let mi = 0; mi < grant.milestones.length; mi++) {
         const milestone = grant.milestones[mi]!;
-        const statusRow = grantsRead.data[gi * 9 + 1 + mi];
-        const status =
-          statusRow?.status === 'success' && statusRow.result !== undefined
-            ? Number(statusRow.result)
-            : MILESTONE_STATUS_PENDING;
+        // Milestone lifecycle status now comes straight from the `getGrant`
+        // tuple's per-milestone `state` field — only "Pending" (open) ones
+        // are eligible for deadline / overdue alerts.
+        const status = Number(milestone.state ?? MILESTONE_STATUS_PENDING);
 
         if (status !== MILESTONE_STATUS_PENDING) continue;
 
@@ -589,7 +620,7 @@ export function useNotificationListeners() {
       let activeGrants = 0;
       const buildersSeen = new Set<string>();
       for (let gi = 0; gi < allGrantIds.length; gi++) {
-        const grantRow = grantsRead.data[gi * 9];
+        const grantRow = grantsRead.data[gi];
         if (!grantRow || grantRow.status !== 'success' || !grantRow.result) continue;
         const grant = grantRow.result as GrantTuple;
         buildersSeen.add(grant.builder.toLowerCase());
@@ -624,202 +655,211 @@ export function useNotificationListeners() {
     [addNotification],
   );
 
+  // GrantCreated — emitted by the GrantFactory (a single contract), not per
+  // escrow. The builder is the `grantee`; the `grantor` is the DAO creator.
   useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
+    address: GRANT_FACTORY_ADDRESS,
+    abi: factoryGrantCreatedEventsAbi,
     eventName: 'GrantCreated',
     enabled: Boolean(walletLc),
     onLogs(logs) {
       for (const log of logs) {
-        const { grantId, builder, totalAmount } = log.args as {
+        const { grantId, grantor, grantee, totalAmount } = log.args as {
           grantId: bigint;
-          builder: Address;
+          escrow: Address;
+          grantor: Address;
+          grantee: Address;
           totalAmount: bigint;
         };
-        if (builder.toLowerCase() === walletLc) {
+        if (grantee.toLowerCase() === walletLc) {
           onLog(() => builderGrantCreatedNotification(grantId, totalAmount));
         }
-        if (roles.isDaoAdmin) {
+        if (grantor.toLowerCase() === walletLc || isDaoAdminRef.current) {
           onLog(() => daoGrantCreatedNotification(grantId, totalAmount));
         }
       }
     },
   });
 
+  // WarningIssued — emitted by the shared SentinelEAS, keyed by the escrow's
+  // `bytes32` grantId and addressed to the warned builder (`recipient`). We
+  // watch the single sentinel contract and map the event back to a `uint256`
+  // grant id (and milestone title) for the builder-facing notification.
   useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'MilestoneApproved',
-    enabled: Boolean(walletLc),
-    onLogs(logs) {
-      for (const log of logs) {
-        const { grantId, milestoneIndex, title, amount } = log.args as {
-          grantId: bigint;
-          milestoneIndex: bigint;
-          title: string;
-          amount: bigint;
-        };
-        onLog(() => builderMilestoneApprovedNotification(grantId, milestoneIndex, title, amount));
-      }
-    },
-  });
-
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'MilestoneRejected',
-    enabled: Boolean(walletLc),
-    onLogs(logs) {
-      for (const log of logs) {
-        const { grantId, milestoneIndex, title } = log.args as {
-          grantId: bigint;
-          milestoneIndex: bigint;
-          title: string;
-        };
-        onLog(() => builderMilestoneRejectedNotification(grantId, milestoneIndex, title));
-      }
-    },
-  });
-
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
+    address: sentinelAddress,
+    abi: sentinelWarningEventsAbi,
     eventName: 'WarningIssued',
-    enabled: Boolean(walletLc),
+    enabled: Boolean(walletLc) && Boolean(sentinelAddress),
     onLogs(logs) {
       for (const log of logs) {
-        const { grantId, milestoneIndex, title } = log.args as {
-          grantId: bigint;
+        const { grantId: grantIdBytes, milestoneIndex, recipient } = log.args as {
+          grantId: `0x${string}`;
           milestoneIndex: bigint;
-          title: string;
+          recipient: Address;
+          attestationUid: `0x${string}`;
+          message: string;
         };
+        // Warnings are builder-facing — only surface the one addressed to us.
+        if (recipient.toLowerCase() !== walletLc) continue;
+
+        const gi = bytes32ToGrantIndex.get(grantIdBytes.toLowerCase());
+        if (gi === undefined) continue;
+        const grantId = allGrantIds[gi]!;
+        const grantRow = grantsDataRef.current?.[gi];
+        const grant =
+          grantRow?.status === 'success' && grantRow.result
+            ? (grantRow.result as GrantTuple)
+            : undefined;
+        const title =
+          grant?.milestones?.[Number(milestoneIndex)]?.title ??
+          `Milestone ${Number(milestoneIndex) + 1}`;
+
         onLog(() => builderWarningIssuedNotification(grantId, milestoneIndex, title));
       }
     },
   });
 
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'MilestoneSlashed',
-    enabled: Boolean(walletLc),
-    onLogs(logs) {
-      for (const log of logs) {
-        const { grantId, milestoneIndex, title, amount } = log.args as {
-          grantId: bigint;
-          milestoneIndex: bigint;
-          title: string;
-          amount: bigint;
-        };
-        const grantIdx = allGrantIds.findIndex((id) => id === grantId);
-        const grantRow = grantIdx >= 0 ? grantsRead.data?.[grantIdx * 9] : undefined;
-        const builder =
-          grantRow?.status === 'success' && grantRow.result
-            ? (grantRow.result as GrantTuple).builder
-            : address!;
+  // Per-escrow lifecycle events (MilestoneSubmitted / VoteCast / Approved /
+  // Rejected / Slashed). The escrow IS the grant, so a single
+  // `useWatchContractEvent` can't span N escrow addresses — we attach one
+  // imperative watcher per escrow (watching all five events at once) and map
+  // each back to its `uint256` grant id by escrow index. Mutable grant data and
+  // role are read via refs so the 60s `getGrant` refetch doesn't tear down and
+  // rebuild every subscription. These mirror the backend push path and share
+  // its dedupe keys, so the two sources never double-add.
+  useEffect(() => {
+    if (!publicClient || !walletLc) return;
+    const unwatchers = grantEscrowAddresses
+      .map((escrow, gi) => {
+        if (!escrow) return null;
+        const grantId = allGrantIds[gi]!;
+        return publicClient.watchContractEvent({
+          address: escrow,
+          abi: escrowLifecycleEventsAbi,
+          onLogs: (logs) => {
+            for (const log of logs) {
+              const grantRow = grantsDataRef.current?.[gi];
+              const grant =
+                grantRow?.status === 'success' && grantRow.result
+                  ? (grantRow.result as GrantTuple)
+                  : undefined;
+              const onCommittee = grant
+                ? isCommitteeMember(grant.committee, walletLc as Address)
+                : false;
+              const isBuilder = grant?.builder?.toLowerCase() === walletLc;
+              const titleFor = (mi: number) =>
+                grant?.milestones?.[mi]?.title ?? `Milestone ${mi + 1}`;
 
-        onLog(() =>
-          builderMilestoneSlashedNotification(grantId, milestoneIndex, title, amount, builder),
-        );
-        if (roles.isDaoAdmin) {
-          onLog(() => daoSlashExecutedNotification(grantId, amount));
-        }
-      }
-    },
-  });
+              switch (log.eventName) {
+                case 'MilestoneSubmitted': {
+                  const { milestoneId, builder } = log.args as {
+                    milestoneId: bigint;
+                    builder: Address;
+                  };
+                  // Committee-facing; don't notify the submitter about itself.
+                  if (!onCommittee || builder.toLowerCase() === walletLc) break;
+                  addNotification(
+                    committeeMilestoneSubmittedNotification(
+                      grantId,
+                      milestoneId,
+                      titleFor(Number(milestoneId)),
+                      builder,
+                    ),
+                  );
+                  break;
+                }
+                case 'VoteCast': {
+                  const { milestoneId, voter, approved, approvalCount } =
+                    log.args as {
+                      milestoneId: bigint;
+                      voter: Address;
+                      approved: boolean;
+                      approvalCount: bigint;
+                      rejectionCount: bigint;
+                    };
+                  // Committee-facing; skip our own vote.
+                  if (!onCommittee || voter.toLowerCase() === walletLc) break;
+                  addNotification(
+                    committeeVoteCastNotification(
+                      grantId,
+                      milestoneId,
+                      titleFor(Number(milestoneId)),
+                      voter,
+                      approved,
+                      approvalCount,
+                      grant?.quorum ?? 0n,
+                    ),
+                  );
+                  break;
+                }
+                case 'MilestoneApproved': {
+                  const { milestoneId, amount } = log.args as {
+                    milestoneId: bigint;
+                    amount: bigint;
+                    streaming: boolean;
+                  };
+                  if (!isBuilder) break;
+                  addNotification(
+                    builderMilestoneApprovedNotification(
+                      grantId,
+                      milestoneId,
+                      titleFor(Number(milestoneId)),
+                      amount,
+                    ),
+                  );
+                  break;
+                }
+                case 'MilestoneRejected': {
+                  const { milestoneId } = log.args as {
+                    milestoneId: bigint;
+                    rejectionCount: bigint;
+                  };
+                  if (!isBuilder) break;
+                  addNotification(
+                    builderMilestoneRejectedNotification(
+                      grantId,
+                      milestoneId,
+                      titleFor(Number(milestoneId)),
+                    ),
+                  );
+                  break;
+                }
+                case 'MilestoneSlashed': {
+                  const { milestoneId, amount } = log.args as {
+                    milestoneId: bigint;
+                    grantor: Address;
+                    amount: bigint;
+                    slashedAt: bigint;
+                  };
+                  const title = titleFor(Number(milestoneId));
+                  const builder = grant?.builder ?? (address as Address);
+                  if (isBuilder) {
+                    addNotification(
+                      builderMilestoneSlashedNotification(
+                        grantId,
+                        milestoneId,
+                        title,
+                        amount,
+                        builder,
+                      ),
+                    );
+                  }
+                  if (isDaoAdminRef.current) {
+                    addNotification(daoSlashExecutedNotification(grantId, amount));
+                  }
+                  break;
+                }
+                default:
+                  break;
+              }
+            }
+          },
+        });
+      })
+      .filter((u): u is () => void => Boolean(u));
 
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'MilestoneSubmitted',
-    enabled: Boolean(walletLc) && roles.isCommittee,
-    onLogs(logs) {
-      for (const log of logs) {
-        const { grantId, milestoneIndex, builder, title } = log.args as {
-          grantId: bigint;
-          milestoneIndex: bigint;
-          builder: Address;
-          title: string;
-        };
-        if (builder.toLowerCase() === walletLc) continue;
-        const grantIdx = allGrantIds.findIndex((id) => id === grantId);
-        const grantRow = grantIdx >= 0 ? grantsRead.data?.[grantIdx * 9] : undefined;
-        if (
-          grantRow?.status === 'success' &&
-          grantRow.result &&
-          isCommitteeMember((grantRow.result as GrantTuple).committee, address!)
-        ) {
-          onLog(() =>
-            committeeMilestoneSubmittedNotification(grantId, milestoneIndex, title, builder),
-          );
-        }
-      }
-    },
-  });
-
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'VoteCast',
-    enabled: Boolean(walletLc) && roles.isCommittee,
-    onLogs(logs) {
-      for (const log of logs) {
-        const { grantId, milestoneIndex, voter, approve, title, approveVotes, quorum } =
-          log.args as {
-            grantId: bigint;
-            milestoneIndex: bigint;
-            voter: Address;
-            approve: boolean;
-            title: string;
-            approveVotes: bigint;
-            quorum: bigint;
-          };
-        if (voter.toLowerCase() === walletLc) continue;
-        const grantIdx = allGrantIds.findIndex((id) => id === grantId);
-        const grantRow = grantIdx >= 0 ? grantsRead.data?.[grantIdx * 9] : undefined;
-        if (
-          grantRow?.status === 'success' &&
-          grantRow.result &&
-          isCommitteeMember((grantRow.result as GrantTuple).committee, address!)
-        ) {
-          onLog(() =>
-            committeeVoteCastNotification(
-              grantId,
-              milestoneIndex,
-              title,
-              voter,
-              approve,
-              approveVotes,
-              quorum,
-            ),
-          );
-        }
-      }
-    },
-  });
-
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    eventName: 'QuorumReached',
-    enabled: Boolean(walletLc) && roles.isCommittee,
-    onLogs(logs) {
-      for (const log of logs) {
-        const { grantId, milestoneIndex, title } = log.args as {
-          grantId: bigint;
-          milestoneIndex: bigint;
-          title: string;
-        };
-        const grantIdx = allGrantIds.findIndex((id) => id === grantId);
-        const grantRow = grantIdx >= 0 ? grantsRead.data?.[grantIdx * 9] : undefined;
-        if (
-          grantRow?.status === 'success' &&
-          grantRow.result &&
-          isCommitteeMember((grantRow.result as GrantTuple).committee, address!)
-        ) {
-          onLog(() => committeeQuorumReachedNotification(grantId, milestoneIndex, title));
-        }
-      }
-    },
-  });
+    return () => {
+      for (const unwatch of unwatchers) unwatch();
+    };
+  }, [publicClient, walletLc, grantEscrowAddresses, allGrantIds, addNotification, address]);
 }

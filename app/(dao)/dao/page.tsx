@@ -8,14 +8,13 @@ import DaoFilterBar, { useDaoFilters } from '@/components/dao/DaoFilterBar';
 import DaoGrantCard from '@/components/dao/DaoGrantCard';
 import DaoGrantDrawer from '@/components/dao/DaoGrantDrawer';
 import DaoTreasuryOverview from '@/components/dao/DaoTreasuryOverview';
-import { grantEscrowEventsAbi } from '@/lib/notifications';
+import { useGrantActivityWatcher } from '@/lib/grant-events';
 import { useAuthGuard } from '@/lib/authGuard';
 import { filterDaoGrants } from '@/lib/dao-dashboard-data';
 import { useDaoDashboardStore } from '@/lib/dao-dashboard-store';
 import {
   CONTRACTS_READY,
   GRANT_FACTORY_ADDRESS,
-  GRANT_ESCROW_ADDRESS,
   IDENTITY_REGISTRY_ADDRESS,
   grantFactoryAbi,
   grantEscrowReadAbi,
@@ -29,7 +28,7 @@ import { useDashboardStats } from '@/hooks/useGrantStats';
 import { Download, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { useWatchContractEvent, useReadContract, useReadContracts } from 'wagmi';
+import { useReadContract, useReadContracts } from 'wagmi';
 import type { DaoGrantCardModel } from '@/demo/dao-dashboard';
 import { zeroAddress } from 'viem';
 
@@ -230,14 +229,10 @@ export default function DaoDashboardPage() {
     return () => window.clearInterval(id);
   }, [refreshAlerts, refreshDashboard]);
 
-  useWatchContractEvent({
-    address: GRANT_ESCROW_ADDRESS,
-    abi: grantEscrowEventsAbi,
-    onLogs: () => {
-      refreshDashboard();
-      refreshAlerts(useDaoDashboardStore.getState().snapshot);
-    },
-  });
+  useGrantActivityWatcher(() => {
+    refreshDashboard();
+    refreshAlerts(useDaoDashboardStore.getState().snapshot);
+  }, CONTRACTS_READY);
 
   const authorized = minTimeElapsed && guard.state === 'allowed';
   const showDeniedToast = minTimeElapsed && guard.state === 'blocked';
