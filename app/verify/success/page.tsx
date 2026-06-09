@@ -47,7 +47,10 @@ type AttestationData = {
   contributionTier?:  string | null;
   walletAddressHi?:   string | null;
   walletAddressLo?:   string | null;
-  // Private ZK witnesses
+  // The exact [tier, githubId, year, hi, lo] bytes32[] the on-chain verifier
+  // checks. `oracleSignature` is the `proof`; no ZK proving needed.
+  publicInputs?:      string[] | null;
+  // Private ZK witnesses (legacy — no longer used by the client)
   commitCount?:       number | null;
   totalStars?:        number | null;
   contributionEvents90d?: number | null;
@@ -286,63 +289,43 @@ function SuccessContent() {
     });
   }, [txConfirmed, txHash, resolvedRequestId]);
 
+  // The on-chain verifier (OracleAttestationVerifier) checks the oracle's ECDSA
+  // signature via native ecrecover, so the signature IS the proof — no in-browser
+  // ZK proving. This step just decodes the backend attestation into the
+  // (proof, publicInputs) pair the contract expects.
   async function handleGenerateZk() {
-    if (!attestation?.oracleSignature || !attestation?.messageHash) {
-      setError('Oracle signature not ready. Please wait a moment and try again.');
+    if (!attestation?.oracleSignature) {
+      setError('Oracle attestation not ready. Please wait a moment and try again.');
       return;
     }
-    if (!attestation.walletAddressHi || !attestation.walletAddressLo) {
-      setError('Attestation is missing wallet address limbs. Please restart verification.');
-      return;
-    }
-    if (attestation.githubId == null || attestation.githubCreatedYear == null) {
-      setError('Attestation is missing github_id / github_created_year.');
+    if (!attestation.publicInputs || attestation.publicInputs.length < 5) {
+      setError('Attestation is missing public inputs. Please restart verification.');
       return;
     }
 
     setGeneratingZk(true);
     setError(null);
     try {
-      const { generateProof } = await import('@/lib/zk/prover');
+      // oracleSignature is a 65-byte (r‖s‖v) hex string — convert to raw bytes.
+      const clean = attestation.oracleSignature.startsWith('0x')
+        ? attestation.oracleSignature.slice(2)
+        : attestation.oracleSignature;
+      if (clean.length !== 130) {
+        throw new Error(`Oracle signature must be 65 bytes, got ${clean.length / 2}`);
+      }
+      const proofBytes = new Uint8Array(65);
+      for (let i = 0; i < 65; i++) proofBytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
 
-      const toBytes = (hex: string, label: string, expectedLength: number): number[] => {
-        const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
-        if (clean.length % 2 !== 0) throw new Error(`${label} has odd hex length`);
-        const bytes = [];
-        for (let i = 0; i < clean.length; i += 2) {
-          const v = parseInt(clean.slice(i, i + 2), 16);
-          if (isNaN(v)) throw new Error(`${label} contains non-hex characters`);
-          bytes.push(v);
-        }
-        if (bytes.length === expectedLength + 1) bytes.pop();
-        if (bytes.length !== expectedLength)
-          throw new Error(`${label} must be ${expectedLength} bytes, got ${bytes.length}`);
-        return bytes;
-      };
+      // publicInputs already arrive as 32-byte hex words from the backend.
+      const publicInputs = attestation.publicInputs;
 
-      const result = await generateProof({
-        signature:           toBytes(attestation.oracleSignature, 'Oracle signature', 64),
-        message_hash:        toBytes(attestation.messageHash,     'Message hash',     32),
-        github_id:           attestation.githubId.toString(),
-        github_created_year: attestation.githubCreatedYear.toString(),
-        commits: attestation.commitCount ?? 0,
-        stars:   attestation.totalStars ?? 0,
-        events:  attestation.contributionEvents90d ?? 0,
-        wallet_address_hi: attestation.walletAddressHi,
-        wallet_address_lo: attestation.walletAddressLo,
-      });
-
-      if (result.success) {
-        setZkProof(result.proof);
-        setZkPublicInputs(result.publicInputs);
-        if (resolvedRequestId) {
-          persistZkProof(resolvedRequestId, result.proof, result.publicInputs);
-        }
-      } else {
-        throw result.error instanceof Error ? result.error : new Error('Proof generation failed');
+      setZkProof(proofBytes);
+      setZkPublicInputs(publicInputs);
+      if (resolvedRequestId) {
+        persistZkProof(resolvedRequestId, proofBytes, publicInputs);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'ZK generation failed');
+      setError(e instanceof Error ? e.message : 'Failed to prepare attestation');
     } finally {
       setGeneratingZk(false);
     }

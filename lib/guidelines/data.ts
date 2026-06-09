@@ -1,9 +1,9 @@
 export const GUIDELINES_DEPLOYED_CONTRACTS = [
-  { name: 'GrantFactory', address: '0xb1fb4eda99821db96cb830413bfb3b18eb67b05f' },
-  { name: 'GrantIdentityRegistry', address: '0xaf2b31d9b6d10010d32bc99d69807c8da2a3894d' },
-  { name: 'UltraHonkVerifier', address: '0x888573502e6766744e28f447d1c44536f0d2cddd' },
-  { name: 'SentinelEAS', address: '0x6d19b30ce66ea738f906f8daf032aeb273e83b5a' },
-  { name: 'GrantEscrow (Implementation)', address: '0xf45be567e8dfe3982c3e40eb20b47124b626ce2c' },
+  { name: 'GrantFactory', address: '0xD71b4DBaaf29b0141F05A570c003bcca3f084E3B' },
+  { name: 'GrantIdentityRegistry', address: '0x1D4A6E4CFa55f9E303aCB129517F0776b93d2Fc2' },
+  { name: 'OracleAttestationVerifier', address: '0x5826f7ebF624B82506F6c1e61152B6BE44678A54' },
+  { name: 'SentinelEAS', address: '0xa6c8f6bC1eBDA206eeB6148b63a5Cbd7dbbDfCf0' },
+  { name: 'GrantEscrow (Implementation)', address: '0x22ca86bC0510bdf00146A6b484aaB17b09f65C9A' },
 ] as const;
 
 export const GUIDELINES_EXTERNAL_CONTRACTS = [
