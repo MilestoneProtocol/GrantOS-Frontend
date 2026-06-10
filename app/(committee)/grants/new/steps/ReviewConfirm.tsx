@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { maxUint256, parseUnits } from 'viem';
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { arbitrumSepolia } from 'wagmi/chains';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDaoAdminHintStore } from '@/store/daoAdminHintStore';
 
@@ -62,7 +63,8 @@ export default function ReviewConfirm({
     () => milestones.reduce((sum, m) => sum + Number(m.amount || 0), 0),
     [milestones]
   );
-  const { address: userAddress } = useAccount();
+  const { address: userAddress, chainId: connectedChainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const queryClient = useQueryClient();
   const markDaoAdmin = useDaoAdminHintStore((s) => s.markDaoAdmin);
 
@@ -249,10 +251,27 @@ export default function ReviewConfirm({
       ? 1
       : 0;
 
-  function handleApprove() {
+  /**
+   * The wallet session's active chain can drift from what wagmi reports
+   * (e.g. MetaMask's multichain SDK keeps its own selected chain). Switching
+   * explicitly re-syncs the provider before we send, otherwise the SDK
+   * rejects the request with a "not configured in supportedNetworks" error.
+   */
+  async function ensureTargetChain() {
+    if (connectedChainId === arbitrumSepolia.id) return;
+    await switchChainAsync({ chainId: arbitrumSepolia.id });
+  }
+
+  async function handleApprove() {
     if (!CONTRACTS_READY || !usdcAbi) return;
     resetApprove();
+    try {
+      await ensureTargetChain();
+    } catch {
+      return; // user declined the network switch
+    }
     writeApprove({
+      chainId: arbitrumSepolia.id,
       address: USDC_ADDRESS,
       abi: usdcAbi,
       functionName: 'approve',
@@ -263,10 +282,16 @@ export default function ReviewConfirm({
     });
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!CONTRACTS_READY || !grantFactoryAbi) return;
     resetCreate();
+    try {
+      await ensureTargetChain();
+    } catch {
+      return; // user declined the network switch
+    }
     writeCreate({
+      chainId: arbitrumSepolia.id,
       address: GRANT_FACTORY_ADDRESS,
       abi: grantFactoryAbi,
       functionName: 'createGrant',
