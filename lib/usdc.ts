@@ -1,10 +1,14 @@
-import { Address } from 'viem';
+import { getAddress } from 'viem';
 import type { Abi } from 'viem';
 
 export const USDC_DECIMALS = 6;
 
-export const USDC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_ADDRESS ||
-  '0xaf88d065e77c8cC2239327C5EDb3A432268e5831') as Address;
+// getAddress throws at module load on a malformed or mis-checksummed env
+// value, so a bad NEXT_PUBLIC_USDC_ADDRESS fails immediately with a clear
+// message instead of surfacing mid-flow inside the approve transaction.
+export const USDC_ADDRESS = getAddress(
+  process.env.NEXT_PUBLIC_USDC_ADDRESS || '0xaf88d065e77c8cC2239327C5EDb3A432268e5831'
+);
 
 export const usdcAbi = [
   {

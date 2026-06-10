@@ -1,12 +1,20 @@
-import type { Abi, Address } from 'viem';
+import { getAddress } from 'viem';
+import type { Abi } from 'viem';
 
-export const GRANT_FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_GRANT_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000003') as Address;
+// getAddress throws at module load on malformed or mis-checksummed env
+// values, so a bad address fails immediately with a clear message instead
+// of surfacing mid-flow inside a transaction.
+export const GRANT_FACTORY_ADDRESS = getAddress(
+  process.env.NEXT_PUBLIC_GRANT_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000003'
+);
 
-export const GRANT_ESCROW_ADDRESS = (process.env.NEXT_PUBLIC_GRANT_ESCROW_ADDRESS ||
-  '0x0000000000000000000000000000000000000001') as Address;
+export const GRANT_ESCROW_ADDRESS = getAddress(
+  process.env.NEXT_PUBLIC_GRANT_ESCROW_ADDRESS || '0x0000000000000000000000000000000000000001'
+);
 
-export const IDENTITY_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_ADDRESS ||
-  '0x0000000000000000000000000000000000000002') as Address;
+export const IDENTITY_REGISTRY_ADDRESS = getAddress(
+  process.env.NEXT_PUBLIC_IDENTITY_REGISTRY_ADDRESS || '0x0000000000000000000000000000000000000002'
+);
 
 export const CONTRACTS_READY =
   GRANT_FACTORY_ADDRESS !== '0x0000000000000000000000000000000000000003';

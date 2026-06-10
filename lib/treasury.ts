@@ -276,7 +276,7 @@ function deriveEscrowFromGrants(): EscrowRow[] {
     {
       grantId: 'GRT-8692',
       pathSegment: '8692',
-      builder: '0x4A2bC9d8E5F6071c829AbCdef01234567890aB12',
+      builder: '0x4a2BC9d8e5F6071c829ABcdEF01234567890AB12',
       zkVerified: true,
       totalEscrowedUsdc: 50_000,
       releasedUsdc: 25_000,
@@ -292,7 +292,7 @@ function deriveEscrowFromGrants(): EscrowRow[] {
     {
       grantId: 'GRT-7731',
       pathSegment: '7731',
-      builder: '0x9b0CcAa11dEef234bC56789af9012345678abc44',
+      builder: '0x9B0ccaA11deef234BC56789aF9012345678AbC44',
       zkVerified: true,
       totalEscrowedUsdc: 120_000,
       releasedUsdc: 10_000,
@@ -308,7 +308,7 @@ function deriveEscrowFromGrants(): EscrowRow[] {
     {
       grantId: 'GRT-6102',
       pathSegment: '6102',
-      builder: '0x113cE1A22BAC987654321FED0123456789aA22Cc',
+      builder: '0x113ce1A22BAc987654321FED0123456789aa22CC',
       zkVerified: false,
       totalEscrowedUsdc: 15_000,
       releasedUsdc: 15_000,
@@ -324,7 +324,7 @@ function deriveEscrowFromGrants(): EscrowRow[] {
     {
       grantId: 'GRT-5400',
       pathSegment: '5400',
-      builder: '0x71fa5C8B3a01dE8f9013C4dDEf8123456789A0bb',
+      builder: '0x71FA5C8B3a01DE8F9013C4ddEf8123456789A0BB',
       zkVerified: true,
       totalEscrowedUsdc: 38_000,
       releasedUsdc: 9_000,
@@ -362,7 +362,7 @@ function buildSlashes(): SlashRow[] {
     {
       id: 'slash-0842',
       grantId: 'GRT-0842',
-      builder: '0x2F8a3C4D5E6F7a8B9C0D1E2F3a4B5C6D7E8F9a0B',
+      builder: '0x2f8A3C4d5e6F7A8b9c0D1e2F3A4b5c6D7e8F9A0b',
       milestoneTitle: 'Initial Delivery',
       amountUsdc: 45_000,
       slashedAtMs: new Date('2023-10-12T10:00:00Z').getTime(),
@@ -375,7 +375,7 @@ function buildSlashes(): SlashRow[] {
     {
       id: 'slash-0711',
       grantId: 'GRT-0711',
-      builder: '0xA1b2C3d4E5f6A7B8c9D0e1F2a3B4c5D6e7F8a9B0',
+      builder: '0xA1B2c3d4e5F6A7B8c9D0E1F2A3b4C5D6E7f8A9B0',
       milestoneTitle: 'Audit Remediation',
       amountUsdc: 12_500,
       slashedAtMs: new Date('2023-09-04T10:00:00Z').getTime(),
@@ -388,7 +388,7 @@ function buildSlashes(): SlashRow[] {
     {
       id: 'slash-0623',
       grantId: 'GRT-0623',
-      builder: '0xB2c3D4e5F6a7B8C9d0E1f2A3b4C5d6E7f8A9b0C1',
+      builder: '0xB2C3D4e5F6a7b8c9d0E1F2a3B4c5d6e7F8A9b0c1',
       milestoneTitle: 'Strategy Backtesting',
       amountUsdc: 28_000,
       slashedAtMs: now - 96 * MS_DAY,
@@ -401,7 +401,7 @@ function buildSlashes(): SlashRow[] {
     {
       id: 'slash-0511',
       grantId: 'GRT-0511',
-      builder: '0x71C9a2B3c4D5e6F7a8B9c0D1e2F3a4B5c6D7e8F9',
+      builder: '0x71C9a2b3c4d5e6F7A8B9c0d1e2f3a4b5C6D7e8F9',
       milestoneTitle: 'Mainnet Launch',
       amountUsdc: 57_000,
       slashedAtMs: now - 142 * MS_DAY,
