@@ -1,6 +1,5 @@
 'use client';
 
-import { useGrantCreationStore } from '@/grant-creation/store';
 import { useEffect, useMemo, useState } from 'react';
 import { isAddress } from 'viem';
 import { useAccount } from 'wagmi';
@@ -9,6 +8,7 @@ import { ArrowLeft, Lock, Minus, Plus, Wallet, X } from 'lucide-react';
 type CommitteeSetupProps = {
   members: string[];
   quorum: number;
+  builderAddress: string;
   onAddMember: (address: string) => void;
   onRemoveMember: (address: string) => void;
   onSetQuorum: (value: number) => void;
@@ -33,6 +33,7 @@ function dotColor(index: number) {
 export default function CommitteeSetup({
   members,
   quorum,
+  builderAddress,
   onAddMember,
   onRemoveMember,
   onSetQuorum,
@@ -44,9 +45,14 @@ export default function CommitteeSetup({
   const [input, setInput] = useState('');
   const [localError, setLocalError] = useState('');
   const { address } = useAccount();
-  const grantCreationSource = useGrantCreationStore((s) => s.grantCreationSource);
+  // The grant creator (connected wallet) is always a committee member and cannot
+  // be removed — unless they are themselves the builder, which is never allowed.
+  const isCreatorBuilder =
+    !!address &&
+    !!builderAddress &&
+    address.toLowerCase() === builderAddress.toLowerCase();
   const lockedMember =
-    grantCreationSource === 'dao' && address && isAddress(address) ? address : undefined;
+    address && isAddress(address) && !isCreatorBuilder ? address : undefined;
 
   useEffect(() => {
     if (!lockedMember) return;
@@ -72,6 +78,10 @@ export default function CommitteeSetup({
     const value = input.trim();
     if (!isAddress(value)) {
       setLocalError('Enter a valid wallet address.');
+      return;
+    }
+    if (builderAddress && value.toLowerCase() === builderAddress.toLowerCase()) {
+      setLocalError('The builder receiving this grant cannot be a committee member.');
       return;
     }
     if (members.some((m) => m.toLowerCase() === value.toLowerCase())) {
