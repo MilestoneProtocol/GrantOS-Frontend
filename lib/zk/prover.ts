@@ -9,8 +9,9 @@
 //   TIMEOUT FIX: Increased timeout and added detailed init logging.
 
 export interface ProveInputs {
+  /** 64 bytes: Grumpkin Schnorr signature from the oracle, `s` (32) || `e` (32),
+   *  big-endian. The circuit takes each scalar as 128-bit lo/hi limbs. */
   signature:          number[];
-  message_hash:       number[];
   github_id:          string;
   github_created_year: string;
   commits:            number;
@@ -90,39 +91,29 @@ function assertFieldScalar(name: string, value: string | number | bigint): strin
   return text;
 }
 
-// ── secp256k1 low-s normalisation ────────────────────────────────────────────
+// ── Grumpkin scalar decomposition ─────────────────────────────────────────────
+//
+// The v3 circuit (Schnorr over Grumpkin, schnorr lib v0.4.0) takes each
+// signature scalar as an `EmbeddedCurveScalar { lo, hi }` pair of 128-bit
+// limbs: scalar = hi * 2^128 + lo.
 
-const SECP256K1_N = BigInt(
-  '0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141'
+const GRUMPKIN_SCALAR_MODULUS = BigInt(
+  '0x30644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd47'
 );
-const SECP256K1_HALF_N = SECP256K1_N / BigInt(2);
+const MASK_128 = (BigInt(1) << BigInt(128)) - BigInt(1);
 
 function bytesToBigInt(bytes: number[]): bigint {
   return BigInt('0x' + bytes.map(b => b.toString(16).padStart(2, '0')).join(''));
 }
 
-function bigIntTo32Bytes(value: bigint): number[] {
-  const hex = value.toString(16).padStart(64, '0');
-  const bytes: number[] = [];
-  for (let i = 0; i < 64; i += 2) bytes.push(parseInt(hex.slice(i, i + 2), 16));
-  return bytes;
-}
-
-function sanitizeSignatureForNoir(signature: number[]): number[] {
-  const normalized = [...signature];
-  let s = bytesToBigInt(normalized.slice(32, 64));
-  if (s >= SECP256K1_N && (normalized[32] & 0x80) !== 0) {
-    normalized[32] &= 0x7f;
-    s = bytesToBigInt(normalized.slice(32, 64));
-  }
-  const r = bytesToBigInt(normalized.slice(0, 32));
-  if (r <= BigInt(0) || r >= SECP256K1_N) throw new Error('signature r is out of secp256k1 range');
-  if (s <= BigInt(0) || s >= SECP256K1_N) throw new Error('signature s is out of secp256k1 range');
-  if (s > SECP256K1_HALF_N) {
-    const normS = SECP256K1_N - s;
-    normalized.splice(32, 32, ...bigIntTo32Bytes(normS));
-  }
-  return normalized;
+function splitGrumpkinScalar(name: string, bytes32: number[]): { lo: string; hi: string } {
+  const value = bytesToBigInt(bytes32);
+  if (value <= BigInt(0)) throw new Error(`${name} must be a non-zero scalar`);
+  if (value >= GRUMPKIN_SCALAR_MODULUS) throw new Error(`${name} is out of Grumpkin scalar range`);
+  return {
+    lo: (value & MASK_128).toString(),
+    hi: (value >> BigInt(128)).toString(),
+  };
 }
 
 // ── Circuit artifact integrity check ─────────────────────────────────
@@ -177,13 +168,15 @@ export async function generateProof(inputs: ProveInputs): Promise<
     console.log('[ZK] Creating Noir instance...');
     const noir = new Noir(circuit as any);
 
-    const rawSignature   = assertFixedBytes('signature',     Array.from(inputs.signature), 64);
-    const rawMessageHash = assertFixedBytes('message_hash',  Array.from(inputs.message_hash), 32);
-    const signature      = sanitizeSignatureForNoir(rawSignature);
+    const rawSignature = assertFixedBytes('signature', Array.from(inputs.signature), 64);
+    const sigS = splitGrumpkinScalar('sig_s', rawSignature.slice(0, 32));
+    const sigE = splitGrumpkinScalar('sig_e', rawSignature.slice(32, 64));
 
     const witnessInputs = {
-      signature,
-      message_hash:         rawMessageHash,
+      sig_s_lo:             sigS.lo,
+      sig_s_hi:             sigS.hi,
+      sig_e_lo:             sigE.lo,
+      sig_e_hi:             sigE.hi,
       commits:              assertU32('commits', inputs.commits),
       stars:                assertU32('stars',   inputs.stars),
       events:               assertU32('events',  inputs.events),

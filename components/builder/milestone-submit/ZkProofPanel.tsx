@@ -166,9 +166,30 @@ export default function ZkProofPanel({
         setPhaseTimes((prev) => ({ ...prev, [2]: t2 }));
         setPhaseStates(['done', 'done', 'done', 'running']);
 
+        if (!attestation.oracleSchnorrSignature) {
+          throw new Error(
+            'Attestation is missing the Schnorr oracle signature — re-verify your GitHub identity (the attestation predates the v3 circuit).',
+          );
+        }
+
+        // The on-chain OracleAttestationVerifier checks the oracle's 65-byte ECDSA
+        // signature via ecrecover — NOT the UltraHonk proof. We still generate the
+        // ZK proof below for the proof-hash artifact, but the bytes submitted as the
+        // `proof` arg to submitMilestone must be this ECDSA signature, paired with
+        // the exact `publicInputs` array the oracle signed.
+        if (!attestation.oracleSignature) {
+          throw new Error(
+            'Attestation is missing the oracle ECDSA signature — the on-chain verifier checks this, not the ZK proof. Re-verify your GitHub identity.',
+          );
+        }
+        if (!Array.isArray(attestation.publicInputs) || attestation.publicInputs.length < 5) {
+          throw new Error(
+            'Attestation is missing the signed publicInputs array required by the on-chain verifier. Re-verify your GitHub identity.',
+          );
+        }
+
         const result = await generateProof({
-          signature:           toBytes(attestation.oracleSignature, 'Oracle signature', 64),
-          message_hash:        toBytes(attestation.messageHash,     'Message hash',     32),
+          signature:           toBytes(attestation.oracleSchnorrSignature, 'Oracle signature', 64),
           github_id:           attestation.githubId.toString(),
           github_created_year: attestation.githubCreatedYear.toString(),
           commits: attestation.commitCount ?? 0,
@@ -188,12 +209,6 @@ export default function ZkProofPanel({
         await sleep(600);
         if (cancelled) return;
 
-        const proofHex = ('0x' + Array.from(result.proof).map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`;
-        const pubInputsBytes32 = result.publicInputs.map(v => {
-          const hex = BigInt(v).toString(16).padStart(64, '0');
-          return `0x${hex}` as `0x${string}`;
-        });
-
         const proofHashBuf = await crypto.subtle.digest('SHA-256', result.proof as any);
         const proofHash = ('0x' + Array.from(new Uint8Array(proofHashBuf))
           .map(b => b.toString(16).padStart(2, '0')).join('')) as `0x${string}`;
@@ -206,8 +221,12 @@ export default function ZkProofPanel({
           mergedAtIso: prData.mergedAt || '',
           proofHash,
           identityMatches,
-          proof: proofHex,
-          publicInputs: pubInputsBytes32,
+          // ECDSA oracle signature (65 bytes) — the `proof` arg the on-chain
+          // OracleAttestationVerifier verifies via ecrecover.
+          proof: attestation.oracleSignature as `0x${string}`,
+          // The exact signed [tier, githubId, year, walletHi, walletLo] words.
+          // Must be the oracle-signed array, or ecrecover won't match on-chain.
+          publicInputs: attestation.publicInputs as `0x${string}`[],
         };
 
         onProofResolved({ outcome: 'success', preview });

@@ -146,18 +146,13 @@ export default function OnchainSubmitStep() {
       }
       lastEasUidRef.current = easUid;
 
-      let finalPublicInputs = (proofPreview.publicInputs || []) as Hex[];
-      // Forcefully bind the cached proof to the current connected wallet to prevent 
-      // "Proof not bound to grantee" errors from stale sessionStorage.
-      if (finalPublicInputs.length >= 5 && address) {
-        const walletAddr = BigInt(address);
-        const addrHi = (walletAddr >> BigInt(128)) & BigInt(0xffffffff);
-        const addrLo = walletAddr & ((BigInt(1) << BigInt(128)) - BigInt(1));
-        
-        finalPublicInputs = [...finalPublicInputs];
-        finalPublicInputs[3] = `0x${addrHi.toString(16).padStart(64, '0')}` as Hex;
-        finalPublicInputs[4] = `0x${addrLo.toString(16).padStart(64, '0')}` as Hex;
-      }
+      // Submit the oracle-signed publicInputs verbatim. These wallet limbs
+      // (indices 3/4) are part of the oracle's ECDSA digest — mutating them to
+      // the connected wallet would change attestationHash() and make the
+      // on-chain ecrecover fail. If the connected wallet differs from the
+      // attested wallet, GrantEscrow's "Proof not bound to grantee" check is
+      // the correct failure: re-verify identity with the active wallet instead.
+      const finalPublicInputs = (proofPreview.publicInputs || []) as Hex[];
 
       const hash = await writeContractAsync({
         address: resolvedEscrowAddress,
