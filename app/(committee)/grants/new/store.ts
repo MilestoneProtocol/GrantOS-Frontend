@@ -107,13 +107,27 @@ export const useGrantCreationStore = create<GrantCreationState>()(
       ...initialState,
       setStep: (step) => set({ currentStep: step }),
       setBuilderAddress: (address) =>
-        set((state) => ({
-          builderAddress: address,
-          builderIdentity:
-            state.builderAddress.toLowerCase() === address.toLowerCase()
-              ? state.builderIdentity
-              : null,
-        })),
+        set((state) => {
+          // Keep the builder out of the committee even if they were added before
+          // this address was set (or the builder address was changed afterwards).
+          const committeeMembers = address
+            ? state.committeeMembers.filter(
+                (m) => m.toLowerCase() !== address.toLowerCase()
+              )
+            : state.committeeMembers;
+          return {
+            builderAddress: address,
+            committeeMembers,
+            quorum:
+              committeeMembers.length < state.committeeMembers.length
+                ? Math.min(state.quorum, committeeMembers.length || 1)
+                : state.quorum,
+            builderIdentity:
+              state.builderAddress.toLowerCase() === address.toLowerCase()
+                ? state.builderIdentity
+                : null,
+          };
+        }),
       setBuilderIdentity: (identity) => set({ builderIdentity: identity }),
       setGrantName: (name) => set({ grantName: name }),
       setCategory: (category) => set({ category }),
@@ -163,6 +177,13 @@ export const useGrantCreationStore = create<GrantCreationState>()(
       addCommitteeMember: (address) =>
         set((state) => {
           if (state.committeeMembers.length >= 7) return state;
+          // The builder receiving the grant can never sit on the committee that reviews it.
+          if (
+            state.builderAddress &&
+            address.toLowerCase() === state.builderAddress.toLowerCase()
+          ) {
+            return state;
+          }
           const already = state.committeeMembers.some(
             (m) => m.toLowerCase() === address.toLowerCase()
           );

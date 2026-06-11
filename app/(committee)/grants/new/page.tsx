@@ -121,6 +121,12 @@ function CreateGrantPageContent() {
       if (new Set(lowered).size !== lowered.length) {
         return 'Duplicate committee addresses are not allowed.';
       }
+      if (
+        builderAddress &&
+        lowered.includes(builderAddress.toLowerCase())
+      ) {
+        return 'The builder receiving this grant cannot be a committee member.';
+      }
       if (quorum < 1 || quorum > committeeMembers.length) {
         return 'Quorum must be between 1 and the number of committee members.';
       }
@@ -151,6 +157,7 @@ function CreateGrantPageContent() {
     committeeMembers.length >= 2 &&
     committeeMembers.length <= 7 &&
     new Set(committeeMembers.map((m) => m.toLowerCase())).size === committeeMembers.length &&
+    !(builderAddress && committeeMembers.some((m) => m.toLowerCase() === builderAddress.toLowerCase())) &&
     quorum >= 1 &&
     quorum <= Math.max(1, committeeMembers.length);
 
@@ -318,6 +325,7 @@ function CreateGrantPageContent() {
             ) : currentStep === 2 ? (
               <CommitteeSetup
                 members={committeeMembers}
+                builderAddress={builderAddress}
                 quorum={Math.min(Math.max(1, quorum), Math.max(1, committeeMembers.length))}
                 onAddMember={(addr) => addCommitteeMember(addr)}
                 onRemoveMember={(addr) => removeCommitteeMember(addr)}
