@@ -69,17 +69,24 @@ export async function attestMilestoneSubmissionPackage(
   const recipient =
     params.recipient ?? ('0x0000000000000000000000000000000000000000' as Address);
 
-  const tx = await eas.attest({
-    schema: EAS_SCHEMA_UID,
-    data: {
-      recipient,
-      expirationTime: BigInt(0),
-      revocable: true,
-      refUID: ZERO,
-      data,
-      value: BigInt(0),
+  const tx = await eas.attest(
+    {
+      schema: EAS_SCHEMA_UID,
+      data: {
+        recipient,
+        expirationTime: BigInt(0),
+        revocable: true,
+        refUID: ZERO,
+        data,
+        value: BigInt(0),
+      },
     },
-  });
+    // Pin a 2 gwei legacy gasPrice, matching every other tx in the app
+    // (e.g. OnchainSubmitStep). Without it the EAS SDK lets ethers estimate
+    // maxFeePerGas == baseFee with no buffer, which the RPC rejects the moment
+    // Arbitrum's base fee ticks up ("max fee per gas less than block base fee").
+    { gasPrice: 2_000_000_000n },
+  );
 
   const uid = await tx.wait();
   if (!uid || typeof uid !== 'string') {
