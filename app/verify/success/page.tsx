@@ -26,9 +26,9 @@ import { writeContract } from 'viem/actions';
 import { parseUnits } from 'viem';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { useAccountModal, useConnectModal } from '@rainbow-me/rainbowkit';
-import { CHAIN_TARGET } from '@/lib/stellar/client';
 import { connectFreighter } from '@/lib/stellar/freighter';
 import { submitIdentityProof, isVerifiedOnStellar } from '@/lib/stellar/identity-registry';
+import { useWallet } from '@/lib/wallet/WalletProvider';
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -102,6 +102,7 @@ function ZkBadge({ githubLogin, tier, createdYear }: { githubLogin: string; tier
 
 function SuccessContent() {
   const { address, isConnected, status: walletStatus } = useAccount();
+  const { chainKind, isConnected: walletConnected, address: walletAddress } = useWallet();
   const wagmiConfig = useConfig();
   const { switchChainAsync } = useSwitchChain();
   const { openConnectModal }  = useConnectModal();
@@ -149,6 +150,10 @@ function SuccessContent() {
   const { isLoading: txConfirming, isSuccess: txConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
   const confirmedRef = useRef(false);
   const [isMockConfirmed, setIsMockConfirmed] = useState(false);
+  // Stellar txs are already confirmed by the time submitIdentityProof() resolves
+  // (it polls the Soroban RPC internally) — wagmi's useWaitForTransactionReceipt
+  // above only understands EVM hashes, so it never resolves for a Stellar hash.
+  const [stellarConfirmed, setStellarConfirmed] = useState(false);
   const { data: balanceData } = useBalance({ address });
   const isZeroBalance = balanceData ? balanceData.value === 0n : false;
   
@@ -297,7 +302,7 @@ function SuccessContent() {
   // ZK proving. This step just decodes the backend attestation into the
   // (proof, publicInputs) pair the contract expects.
   async function handleGenerateZk() {
-    if (CHAIN_TARGET === 'stellar') {
+    if (chainKind === 'stellar') {
       // Stellar has no EVM oracle signature to decode — the real Noir proof is
       // verified on-chain by the Soroban registry in handleSubmitOnStellar.
       // These placeholders just satisfy the "proof ready" UI gate below.
@@ -391,7 +396,9 @@ function SuccessContent() {
       }
       const hash = await submitIdentityProof({ caller, proof, publicInputs, githubHandle: githubLogin });
       setTxHash(hash as `0x${string}`);
+      setStellarConfirmed(true);
       if (resolvedRequestId) {
+        clearVerifySession(resolvedRequestId);
         api
           .post(`/identity/confirmed/${resolvedRequestId}`, { txHash: hash, chain: 'stellar' })
           .catch(() => {});
@@ -404,7 +411,7 @@ function SuccessContent() {
   }
 
   function handleSubmitOnChain() {
-    if (CHAIN_TARGET === 'stellar') {
+    if (chainKind === 'stellar') {
       void handleSubmitOnStellar();
       return;
     }
@@ -539,7 +546,7 @@ function SuccessContent() {
     },
   ];
 
-  const isFullyVerified = txConfirmed || alreadyVerified || isMockConfirmed;
+  const isFullyVerified = txConfirmed || alreadyVerified || isMockConfirmed || stellarConfirmed;
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -573,7 +580,7 @@ function SuccessContent() {
     resolvedRequestId && (attestation || zkProof || loading || generatingZk),
   );
   const showConnectWall =
-    !isConnected && !walletReconnecting && !hasVerifyProgress && !loading;
+    !walletConnected && !walletReconnecting && !hasVerifyProgress && !loading;
 
   return (
     <div className="min-h-screen bg-white">
@@ -668,7 +675,7 @@ function SuccessContent() {
                 </div>
               )}
 
-              {!isConnected && (walletReconnecting || hasVerifyProgress) && (
+              {!walletConnected && (walletReconnecting || hasVerifyProgress) && (
                 <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
                   {walletReconnecting ? (
                     <p>Restoring your wallet session…</p>
@@ -790,7 +797,7 @@ function SuccessContent() {
                     {txPending    ? 'Waiting for wallet…' :
                      txConfirming ? 'Confirming transaction…' :
                      isWalletMismatch ? 'Switch wallet to submit' :
-                     !isConnected ? 'Connect wallet to submit →' :
+                     !walletConnected ? 'Connect wallet to submit →' :
                                     'Submit proof on-chain →'}
                   </button>
 
@@ -864,7 +871,7 @@ function SuccessContent() {
                     <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                       <Shield className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
                       <span>
-                        Proof is wallet-bound to <span className="font-mono font-bold">{formatAddress(address)}</span>.
+                        Proof is wallet-bound to <span className="font-mono font-bold">{formatAddress(walletAddress ?? undefined)}</span>.
                         It cannot be replayed by another wallet.
                       </span>
                     </div>
