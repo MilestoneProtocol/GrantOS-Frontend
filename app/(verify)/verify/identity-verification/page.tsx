@@ -8,7 +8,7 @@ import { persistVerifyRequestId, persistVerifyWallet } from '@/lib/identity-veri
 import { Check, Circle, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useWallet } from '@/lib/wallet/WalletProvider';
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -24,7 +24,7 @@ const steps = [
 ];
 
 export default function IdentityVerificationPage() {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address } = useWallet();
   useRedirectIfAlreadyVerified();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);

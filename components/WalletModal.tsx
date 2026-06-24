@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useConnect, useAccount, type Connector } from 'wagmi';
 import { X, AlertCircle, RefreshCw } from 'lucide-react';
+import { useWallet } from '@/lib/wallet/WalletProvider';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -82,6 +83,17 @@ function RabbyIcon() {
       <path d="M28 17c0-3.9-3.6-7-8-7s-8 3.1-8 7c0 1.3.4 2.6 1.1 3.6L11 29h18l-2.1-8.4C27.6 19.6 28 18.3 28 17z" fill="white" />
       <circle cx="16" cy="17" r="1.5" fill="#8697FF" />
       <circle cx="24" cy="17" r="1.5" fill="#8697FF" />
+    </svg>
+  );
+}
+
+function FreighterIcon() {
+  return (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full">
+      <rect width="40" height="40" rx="10" fill="#0E0E12" />
+      <circle cx="20" cy="20" r="9" fill="none" stroke="#FDDA24" strokeWidth="2.5" />
+      <circle cx="20" cy="20" r="2.5" fill="#FDDA24" />
+      <path d="M20 6v3M20 31v3M6 20h3M31 20h3" stroke="#FDDA24" strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -260,6 +272,7 @@ function LoadingDots() {
 export default function WalletModal({ onClose }: WalletModalProps) {
   const { connectors, connect } = useConnect();
   const { isConnected } = useAccount();
+  const { connectStellar } = useWallet();
   const [state, setState] = useState<ModalState>('idle');
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -374,6 +387,23 @@ export default function WalletModal({ onClose }: WalletModalProps) {
     },
     [state, connectors, connect]
   );
+
+  const handleFreighter = useCallback(async () => {
+    if (state === 'connecting') return;
+    setState('connecting');
+    setConnectingId('freighter');
+    setErrorMsg('');
+    try {
+      await connectStellar();
+      onClose();
+    } catch (e) {
+      setState('error');
+      setConnectingId(null);
+      setErrorMsg(
+        e instanceof Error ? e.message : 'Could not connect Freighter. Is it installed?',
+      );
+    }
+  }, [state, connectStellar, onClose]);
 
   function handleRetry() {
     setState('idle');
@@ -497,6 +527,46 @@ export default function WalletModal({ onClose }: WalletModalProps) {
               </li>
             );
           })}
+
+          {/* Stellar — routes the app to the Soroban flow */}
+          <li className="px-1 pt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Stellar
+            </p>
+          </li>
+          <li>
+            <button
+              type="button"
+              disabled={state === 'connecting'}
+              onClick={handleFreighter}
+              className={[
+                'group relative flex w-full items-center gap-4 rounded-2xl border px-4 py-3.5 text-left',
+                'transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400',
+                state === 'connecting' && connectingId === 'freighter'
+                  ? 'border-indigo-200 bg-indigo-50/60 shadow-sm'
+                  : state === 'connecting'
+                    ? 'cursor-not-allowed border-slate-100 bg-white opacity-50'
+                    : 'cursor-pointer border-slate-100 bg-white hover:-translate-y-px hover:border-slate-300 hover:shadow-md active:scale-[0.98] active:shadow-none',
+              ].join(' ')}
+            >
+              <span className="h-10 w-10 shrink-0 overflow-hidden rounded-xl shadow-sm ring-1 ring-slate-100">
+                <FreighterIcon />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-900 leading-none">Freighter</p>
+                <p className="mt-1 text-xs text-slate-500">Stellar network · ZK on-chain</p>
+              </div>
+              <span className="shrink-0">
+                {state === 'connecting' && connectingId === 'freighter' ? (
+                  <LoadingDots />
+                ) : (
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 text-slate-300 transition group-hover:text-slate-500 group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M6 3l5 5-5 5" />
+                  </svg>
+                )}
+              </span>
+            </button>
+          </li>
         </ul>
 
         {/* Footer */}

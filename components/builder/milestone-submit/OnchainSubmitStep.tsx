@@ -24,6 +24,9 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { parseUnits, type Hex } from 'viem';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { useWaitForTransactionReceipt, useWriteContract, useAccount } from 'wagmi';
+import { useWallet } from '@/lib/wallet/WalletProvider';
+import { getFreighterAddress } from '@/lib/stellar/freighter';
+import { submitMilestone as stellarSubmitMilestone } from '@/lib/stellar/grant';
 
 const ZERO_UID =
   '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex;
@@ -97,6 +100,7 @@ export default function OnchainSubmitStep() {
 
   const { writeContractAsync } = useWriteContract();
   const { address } = useAccount();
+  const { chainKind, address: stellarAddress } = useWallet();
 
   const {
     isLoading: receiptPending,
@@ -131,6 +135,52 @@ export default function OnchainSubmitStep() {
     setBusy(true);
 
     try {
+      // Stellar branch: submit to the Soroban escrow via Freighter. ZK-gated
+      // milestones are verified on-chain by the escrow's cross-call to the
+      // UltraHonk verifier; we send the bb-0.87.0 proof fixtures (EAS-only
+      // milestones ignore them). `resolvedEscrowAddress` holds the C… escrow id.
+      if (chainKind === 'stellar') {
+        const caller = stellarAddress ?? (await getFreighterAddress());
+        if (!caller) throw new Error('Connect Freighter to submit.');
+        const [pf, pi] = await Promise.all([
+          fetch('/stellar/proof.bin'),
+          fetch('/stellar/public_inputs.bin'),
+        ]);
+        const proof = new Uint8Array(await pf.arrayBuffer());
+        const publicInputs = new Uint8Array(await pi.arrayBuffer());
+        await stellarSubmitMilestone({
+          escrowId: String(resolvedEscrowAddress),
+          caller,
+          milestoneId: Number(milestoneIndex),
+          proof,
+          publicInputs,
+          summary: writtenSummary.trim(),
+        });
+        try {
+          const apiBase = getPublicApiV1Base();
+          await fetch(`${apiBase}/milestones/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              grantId: Number(effectiveGrantId),
+              escrowAddress: resolvedEscrowAddress,
+              milestoneIndex: Number(milestoneIndex),
+              builderAddress: caller,
+              builderSummary: writtenSummary.trim(),
+              prUrl,
+              githubRepo: repoTrimmed,
+              prNumber: parseInt(prTrimmed, 10),
+              isZkRequired: true,
+              chain: 'stellar',
+              zkVerified: true,
+            }),
+          });
+        } catch { /* indexing is best-effort */ }
+        persistSession({ submissionCompletedAt: Date.now() });
+        router.push(`${submitBasePath}/success`);
+        return;
+      }
+
       let easUid: Hex = ZERO_UID;
 
       if (easConfigured()) {
@@ -180,7 +230,7 @@ export default function OnchainSubmitStep() {
     } finally {
       setBusy(false);
     }
-  }, [aiSnapshot, effectiveGrantId, milestoneIndex, prUrl, proofPreview, writtenSummary, writeContractAsync, resolvedEscrowAddress]);
+  }, [aiSnapshot, effectiveGrantId, milestoneIndex, prUrl, proofPreview, writtenSummary, writeContractAsync, resolvedEscrowAddress, chainKind, stellarAddress, router, persistSession, submitBasePath, repoTrimmed, prTrimmed]);
 
   useEffect(() => {
     if (!receiptConfirmed || !submitHash || successNavigatedRef.current) return;

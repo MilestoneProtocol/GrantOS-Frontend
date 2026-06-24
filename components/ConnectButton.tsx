@@ -5,6 +5,7 @@ import { Check, Copy, LogOut, Network, Wallet } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useDisconnect, useAccount, useSwitchChain } from 'wagmi';
 import { config } from '@/lib/wagmi';
+import { useWallet } from '@/lib/wallet/WalletProvider';
 
 /* Lazy-load the heavy modal so it doesn't bloat the initial bundle */
 const WalletModal = dynamic(() => import('./WalletModal'), { ssr: false });
@@ -215,6 +216,42 @@ function ConnectedAccountMenu({
   );
 }
 
+/** Lightweight connected pill for Stellar/Freighter (no EVM chain switching). */
+function StellarAccountPill({
+  variant,
+  displayName,
+}: {
+  variant: NonNullable<ConnectButtonProps['variant']>;
+  displayName: string;
+}) {
+  const { disconnect, stellarNetworkMismatch } = useWallet();
+  return (
+    <div className="relative flex items-center gap-2">
+      {stellarNetworkMismatch ? (
+        <span
+          className="hidden rounded-lg border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 md:inline-flex"
+          title="Freighter is on a different network than this app expects. Open the Freighter extension and switch to Testnet."
+        >
+          Wrong network — switch Freighter to Testnet
+        </span>
+      ) : (
+        <span className="hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 md:inline-flex">
+          Stellar
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => disconnect()}
+        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+        title="Click to disconnect"
+      >
+        <span className={`h-2 w-2 rounded-full ${stellarNetworkMismatch ? 'bg-amber-500' : 'bg-emerald-500'}`} aria-hidden />
+        {displayName}
+      </button>
+    </div>
+  );
+}
+
 export default function ConnectButton({ variant = 'default' }: ConnectButtonProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const mounted = useSyncExternalStore(
@@ -222,7 +259,8 @@ export default function ConnectButton({ variant = 'default' }: ConnectButtonProp
     () => true,
     () => false,
   );
-  const { address } = useAccount();
+  // Active wallet/address is chain-agnostic: EVM (wagmi) or Stellar (Freighter).
+  const { address, chainKind } = useWallet();
   const connectButtonClassName = connectButtonClassNameForVariant(variant);
 
   const displayName = address
@@ -245,6 +283,8 @@ export default function ConnectButton({ variant = 'default' }: ConnectButtonProp
             'Connect Wallet'
           )}
         </button>
+      ) : chainKind === 'stellar' ? (
+        <StellarAccountPill variant={variant === 'default' ? 'default' : variant} displayName={displayName} />
       ) : (
         <ConnectedAccountMenu variant={variant} displayName={displayName} />
       )}

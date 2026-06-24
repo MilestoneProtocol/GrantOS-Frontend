@@ -4,6 +4,9 @@ import { getPublicApiV1Base } from '@/lib/api-config';
 import { MilestoneInput, PaymentMode } from '@/grant-creation/store';
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
 import { GRANT_FACTORY_ADDRESS, grantFactoryAbi, CONTRACTS_READY } from '@/lib/escrow';
+import { useWallet } from '@/lib/wallet/WalletProvider';
+import { createGrant as stellarCreateGrant } from '@/lib/stellar/grant';
+import { getFreighterAddress } from '@/lib/stellar/freighter';
 import { USDC_ADDRESS, USDC_DECIMALS, usdcAbi } from '@/lib/usdc';
 import {
   ArrowUpRight,
@@ -59,10 +62,72 @@ export default function ReviewConfirm({
 }: ReviewConfirmProps) {
   const [dismissedApproveErrorKey, setDismissedApproveErrorKey] = useState('');
   const [dismissedCreateErrorKey, setDismissedCreateErrorKey] = useState('');
+  const { chainKind, address: stellarAddress, connectStellar } = useWallet();
+  const [stellarBusy, setStellarBusy] = useState(false);
+  const [stellarErr, setStellarErr] = useState<string | null>(null);
+
   const totalUsdc = useMemo(
     () => milestones.reduce((sum, m) => sum + Number(m.amount || 0), 0),
     [milestones]
   );
+
+  // Stellar create path: deploy + fund an escrow via the factory, then index it.
+  // Demo uses the test USDC SAC in raw base units (no decimal scaling).
+  async function handleCreateStellar() {
+    setStellarBusy(true);
+    setStellarErr(null);
+    try {
+      let caller = stellarAddress;
+      if (!caller) {
+        await connectStellar();
+        caller = await getFreighterAddress();
+      }
+      if (!caller) throw new Error('Connect Freighter to continue.');
+      const { grantId, escrowId } = await stellarCreateGrant({
+        caller,
+        grantee: builderAddress,
+        streaming: paymentMode === 'streaming',
+        committee: committeeMembers,
+        quorum: Number(quorum),
+        milestones: milestones.map((m) => ({
+          title: m.title,
+          description: m.description,
+          amount: BigInt(Math.floor(Number(m.amount || 0))),
+          deadline: BigInt(Math.floor(new Date(m.deadline).getTime() / 1000)),
+          proofType: m.proofType === 'zk_github' ? 'ZkGithub' : 'EasOnly',
+        })),
+      });
+      const apiBase = getPublicApiV1Base();
+      await fetch(`${apiBase}/grants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          onChainId: grantId,
+          escrowAddress: escrowId,
+          grantorAddress: caller,
+          granteeAddress: builderAddress,
+          txHash: escrowId,
+          chain: 'stellar',
+          totalUsdc: String(totalUsdc),
+          isStreaming: paymentMode === 'streaming',
+          quorum: Number(quorum),
+          committee: committeeMembers,
+          milestones: milestones.map((m) => ({
+            title: m.title,
+            description: m.description,
+            amount: String(m.amount || 0),
+            deadline: Math.floor(new Date(m.deadline).getTime() / 1000),
+            proofType: m.proofType === 'zk_github' ? 0 : 1,
+          })),
+        }),
+      }).catch(() => {});
+      onSuccess(escrowId, grantId);
+    } catch (e) {
+      setStellarErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setStellarBusy(false);
+    }
+  }
   const { address: userAddress, chainId: connectedChainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const queryClient = useQueryClient();
@@ -263,6 +328,12 @@ export default function ReviewConfirm({
   }
 
   async function handleApprove() {
+    // Stellar uses Soroban authorization — funding happens inside create_grant,
+    // so there is no separate ERC-20 approve step. Go straight to create.
+    if (chainKind === 'stellar') {
+      await handleCreateStellar();
+      return;
+    }
     if (!CONTRACTS_READY || !usdcAbi) return;
     resetApprove();
     try {
@@ -283,6 +354,10 @@ export default function ReviewConfirm({
   }
 
   async function handleCreate() {
+    if (chainKind === 'stellar') {
+      await handleCreateStellar();
+      return;
+    }
     if (!CONTRACTS_READY || !grantFactoryAbi) return;
     resetCreate();
     try {

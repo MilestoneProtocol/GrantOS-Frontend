@@ -5,6 +5,13 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { issueWarning, recordSlash } from '@/lib/warning-api';
 import { parseUnits, type Address } from 'viem';
+import { useWallet } from '@/lib/wallet/WalletProvider';
+import { getFreighterAddress } from '@/lib/stellar/freighter';
+import {
+  issueWarning as stellarIssueWarning,
+  slashMilestone as stellarSlash,
+  grantIdBytes,
+} from '@/lib/stellar/grant';
 
 export interface UseWarningFlowResult {
   issueWarning: (params: IssueWarningParams) => Promise<void>;
@@ -36,6 +43,7 @@ export function useWarningFlow(): UseWarningFlowResult {
   const [error, setError] = useState<Error | null>(null);
 
   const { writeContractAsync } = useWriteContract();
+  const { chainKind, address: stellarAddress } = useWallet();
 
   const issueWarningHandler = useCallback(
     async (params: IssueWarningParams) => {
@@ -43,6 +51,29 @@ export function useWarningFlow(): UseWarningFlowResult {
       setError(null);
 
       try {
+        // Stellar branch: plant the warning in grant_sentinel via Freighter.
+        if (chainKind === 'stellar') {
+          const caller = stellarAddress ?? (await getFreighterAddress());
+          if (!caller) throw new Error('Connect Freighter to issue a warning.');
+          await stellarIssueWarning({
+            caller,
+            grantId: grantIdBytes(params.grantId),
+            milestoneIndex: params.milestoneIndex,
+            msgHash: new Uint8Array(32),
+          });
+          await issueWarning({
+            grantId: params.grantId,
+            milestoneIndex: params.milestoneIndex,
+            builderAddress: params.builderAddress,
+            committeeAddress: params.committeeAddress,
+            message: params.message,
+            attestationUid: '0x0',
+            txHash: 'stellar',
+            warningTimestamp: Math.floor(Date.now() / 1000).toString(),
+          });
+          return;
+        }
+
         // Call SentinelEAS.issueWarning
         const grantIdBytes32 = `0x${params.grantId.toString(16).padStart(64, '0')}` as `0x${string}`;
         
@@ -92,7 +123,7 @@ export function useWarningFlow(): UseWarningFlowResult {
         setIsIssuing(false);
       }
     },
-    [writeContractAsync],
+    [writeContractAsync, chainKind, stellarAddress],
   );
 
   const slashMilestoneHandler = useCallback(
@@ -101,6 +132,25 @@ export function useWarningFlow(): UseWarningFlowResult {
       setError(null);
 
       try {
+        // Stellar branch: slash on the Soroban escrow via Freighter.
+        if (chainKind === 'stellar') {
+          const caller = stellarAddress ?? (await getFreighterAddress());
+          if (!caller) throw new Error('Connect Freighter to slash.');
+          await stellarSlash({
+            escrowId: String(params.escrowAddress),
+            voter: caller,
+            milestoneId: params.milestoneIndex,
+          });
+          await recordSlash({
+            grantId: params.grantId,
+            milestoneIndex: params.milestoneIndex,
+            slashTxHash: 'stellar',
+            slashedAt: Math.floor(Date.now() / 1000).toString(),
+            amountReturnedUsdc: params.amountUsdc,
+          });
+          return;
+        }
+
         // Call GrantEscrow.slashMilestone
         const hash = await writeContractAsync({
           address: params.escrowAddress,
@@ -137,7 +187,7 @@ export function useWarningFlow(): UseWarningFlowResult {
         setIsSlashing(false);
       }
     },
-    [writeContractAsync],
+    [writeContractAsync, chainKind, stellarAddress],
   );
 
   return {
