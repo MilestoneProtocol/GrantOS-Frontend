@@ -1,6 +1,7 @@
 'use client';
 
 import ZKVerifiedBadge from '@/components/ZKVerifiedBadge';
+import StreamWithdrawButton from '@/components/builder/StreamWithdrawButton';
 import type { GrantDetailContext } from '@/lib/grant-routes';
 import { easAttestationScanUrl } from '@/lib/eas-scan';
 import {
@@ -577,7 +578,7 @@ export function GrantDetailPageContent({
             </nav>
 
             {activeTab === 'milestones' ? (
-              <MilestonesTab grantId={effectiveGrantId} grant={resolvedGrant} escrowAddress={escrowAddress as Address} votedMap={votedMap} />
+              <MilestonesTab grantId={effectiveGrantId} grant={resolvedGrant} escrowAddress={escrowAddress as Address} stellarEscrowId={backendData?.grant?.escrowAddress} votedMap={votedMap} />
             ) : null}
             {activeTab === 'transactions' ? (
               <TransactionsTab txRows={txRows} />
@@ -633,11 +634,13 @@ function MilestonesTab({
   grantId,
   grant,
   escrowAddress,
+  stellarEscrowId,
   votedMap = {},
 }: {
   grantId: bigint;
   grant: GrantTuple & { backendMilestones?: any[] };
   escrowAddress?: Address;
+  stellarEscrowId?: string;
   votedMap?: Record<string, boolean>;
 }) {
   return (
@@ -754,6 +757,11 @@ function MilestonesTab({
         
         return (
           <article key={`${grantId.toString()}-${i}`} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            {displayStatus === 'streaming' && stellarEscrowId ? (
+              <div className="mb-3 flex justify-end">
+                <StreamWithdrawButton escrowId={stellarEscrowId} milestoneId={i} />
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

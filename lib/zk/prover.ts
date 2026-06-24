@@ -154,7 +154,17 @@ export async function warmupProver(): Promise<void> {
   }
 }
 
-export async function generateProof(inputs: ProveInputs): Promise<
+export interface ProveOptions {
+  /** Oracle hash flavor for the UltraHonk transcript.
+   *  - 'poseidon' (default): the original EVM/archive flavor.
+   *  - 'keccak': required by the Stellar Soroban UltraHonk verifier
+   *    (bb `--oracle_hash keccak`). NOTE: the proving toolchain version must
+   *    match the on-chain VK's bb version, otherwise the proof will not verify.
+   *    See GrantOS-Soroban/README.md. */
+  oracleHash?: 'poseidon' | 'keccak';
+}
+
+export async function generateProof(inputs: ProveInputs, options: ProveOptions = {}): Promise<
   | { success: true;  proof: Uint8Array; publicInputs: string[] }
   | { success: false; error: unknown }
 > {
@@ -189,8 +199,9 @@ export async function generateProof(inputs: ProveInputs): Promise<
     console.log('[ZK] Generating witness...');
     const { witness } = await noir.execute(witnessInputs);
 
-    console.log('[ZK] Generating proof (UltraHonk)...');
-    const proof = await backend.generateProof(witness);
+    const useKeccak = options.oracleHash === 'keccak';
+    console.log(`[ZK] Generating proof (UltraHonk, oracle_hash=${useKeccak ? 'keccak' : 'poseidon'})...`);
+    const proof = await backend.generateProof(witness, useKeccak ? { keccak: true } : undefined);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[ZK] Proof generated successfully in ${duration}s ✓`);

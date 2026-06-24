@@ -4,6 +4,9 @@ import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagm
 import { arbitrumSepolia } from 'wagmi/chains';
 import { grantEscrowAbi } from '@/lib/escrow';
 import { parseUnits, type Address, type Hex } from 'viem';
+import { useWallet } from '@/lib/wallet/WalletProvider';
+import { getFreighterAddress } from '@/lib/stellar/freighter';
+import { approveMilestone as stellarApprove, rejectMilestone as stellarReject } from '@/lib/stellar/grant';
 
 export type VoteIntent = 'approve' | 'reject';
 
@@ -18,10 +21,23 @@ export function useCommitteeVote(escrowAddress: Address, milestoneIndex: number,
   const [state, setState] = useState<VoteFlowState>({ kind: 'idle' });
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
+  const { chainKind, address: stellarAddress } = useWallet();
 
   const start = useCallback(async (intent: VoteIntent) => {
     setState({ kind: 'confirming', intent });
     try {
+      // Stellar branch: vote on the Soroban escrow via Freighter. `escrowAddress`
+      // holds the C… escrow contract id for Stellar grants.
+      if (chainKind === 'stellar') {
+        const voter = stellarAddress ?? (await getFreighterAddress());
+        if (!voter) throw new Error('Connect Freighter to vote.');
+        const args = { escrowId: String(escrowAddress), voter, milestoneId: milestoneIndex };
+        if (intent === 'approve') await stellarApprove(args);
+        else await stellarReject(args);
+        setState({ kind: 'voted', intent });
+        return;
+      }
+
       const hash = await writeContractAsync({
         address: escrowAddress,
         abi: grantEscrowAbi,
@@ -40,7 +56,7 @@ export function useCommitteeVote(escrowAddress: Address, milestoneIndex: number,
       console.error('Vote failed:', err);
       setState({ kind: 'error', message: err.message || 'Vote failed' });
     }
-  }, [escrowAddress, milestoneIndex, writeContractAsync]);
+  }, [escrowAddress, milestoneIndex, writeContractAsync, chainKind, stellarAddress]);
 
   const recordBackend = useCallback(async (txHash: string, intent: VoteIntent, approvalCount: number, rejectionCount: number, finalStatus?: 'approved' | 'rejected') => {
       try {

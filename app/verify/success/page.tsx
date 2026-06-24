@@ -26,6 +26,9 @@ import { writeContract } from 'viem/actions';
 import { parseUnits } from 'viem';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { useAccountModal, useConnectModal } from '@rainbow-me/rainbowkit';
+import { CHAIN_TARGET } from '@/lib/stellar/client';
+import { connectFreighter } from '@/lib/stellar/freighter';
+import { submitIdentityProof, isVerifiedOnStellar } from '@/lib/stellar/identity-registry';
 
 const GithubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -284,7 +287,7 @@ function SuccessContent() {
     if (!txConfirmed || !txHash || !resolvedRequestId || confirmedRef.current) return;
     confirmedRef.current = true;
     clearVerifySession(resolvedRequestId);
-    api.post(`/identity/confirmed/${resolvedRequestId}`, { txHash }).catch(() => {
+    api.post(`/identity/confirmed/${resolvedRequestId}`, { txHash, chain: 'evm' }).catch(() => {
       // Non-critical — the on-chain state is the source of truth
     });
   }, [txConfirmed, txHash, resolvedRequestId]);
@@ -294,6 +297,18 @@ function SuccessContent() {
   // ZK proving. This step just decodes the backend attestation into the
   // (proof, publicInputs) pair the contract expects.
   async function handleGenerateZk() {
+    if (CHAIN_TARGET === 'stellar') {
+      // Stellar has no EVM oracle signature to decode — the real Noir proof is
+      // verified on-chain by the Soroban registry in handleSubmitOnStellar.
+      // These placeholders just satisfy the "proof ready" UI gate below.
+      if (attestation?.status !== 'attested' && attestation?.status !== 'verified') {
+        setError('GitHub attestation not ready. Please wait a moment and try again.');
+        return;
+      }
+      setZkProof(new Uint8Array([1]));
+      setZkPublicInputs(['0', '0', '0', '0', '0']);
+      return;
+    }
     if (!attestation?.oracleSignature) {
       setError('Oracle attestation not ready. Please wait a moment and try again.');
       return;
@@ -331,7 +346,68 @@ function SuccessContent() {
     }
   }
 
+  // Stellar path: submit the REAL Noir UltraHonk proof to the Soroban registry,
+  // which verifies it on-chain (bb v0.87.0 keccak proof, Protocol 26 BN254 host
+  // functions). Demo fixtures live in /public/stellar; in production the backend
+  // serves a per-wallet bb-0.87.0 proof. See GrantOS-Soroban/DEPLOYED.md.
+  async function handleSubmitOnStellar() {
+    const githubLogin = attestation?.githubLogin ?? 'octocat';
+    setTxPending(true);
+    setTxError(null);
+    try {
+      const caller = await connectFreighter();
+
+      // Cross-chain Sybil guardrail: a GitHub account verified on another chain
+      // (e.g. EVM) cannot be re-verified on Stellar.
+      if (attestation?.githubId != null) {
+        try {
+          const status = await api.get<{ verified: boolean; chain?: string; wallet?: string }>(
+            `/identity/github/${attestation.githubId}/verified`,
+          );
+          if (status.verified && status.chain && status.chain !== 'stellar') {
+            setTxError(
+              new Error(
+                `GitHub @${githubLogin} is already verified on the ${status.chain} chain. ` +
+                  `A GitHub account can verify on only one chain.`,
+              ),
+            );
+            return;
+          }
+        } catch {
+          /* if the check is unreachable, fall through to the on-chain uniqueness guard */
+        }
+      }
+
+      const [proofRes, piRes] = await Promise.all([
+        fetch('/stellar/proof.bin'),
+        fetch('/stellar/public_inputs.bin'),
+      ]);
+      const proof = new Uint8Array(await proofRes.arrayBuffer());
+      const publicInputs = new Uint8Array(await piRes.arrayBuffer());
+
+      if (await isVerifiedOnStellar(caller)) {
+        setTxError(new Error('This Stellar wallet is already verified on-chain.'));
+        return;
+      }
+      const hash = await submitIdentityProof({ caller, proof, publicInputs, githubHandle: githubLogin });
+      setTxHash(hash as `0x${string}`);
+      if (resolvedRequestId) {
+        api
+          .post(`/identity/confirmed/${resolvedRequestId}`, { txHash: hash, chain: 'stellar' })
+          .catch(() => {});
+      }
+    } catch (e) {
+      setTxError(e instanceof Error ? e : new Error(String(e)));
+    } finally {
+      setTxPending(false);
+    }
+  }
+
   function handleSubmitOnChain() {
+    if (CHAIN_TARGET === 'stellar') {
+      void handleSubmitOnStellar();
+      return;
+    }
     if (!zkProof || !zkPublicInputs) return;
     const githubLogin = attestation?.githubLogin;
 

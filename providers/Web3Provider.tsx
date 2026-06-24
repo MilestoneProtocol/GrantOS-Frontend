@@ -6,6 +6,7 @@ import SettingsModal from '@/components/SettingsModal'
 import ThemeProvider from '@/components/settings/ThemeProvider'
 import WalletExtensionErrorHandler from '@/components/WalletExtensionErrorHandler'
 import { config } from '@/lib/wagmi'
+import { WalletProvider } from '@/lib/wallet/WalletProvider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import { WagmiProvider } from 'wagmi'
@@ -25,9 +26,11 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         <WalletExtensionErrorHandler>
           <ThemeProvider>
             <NotificationProvider>
-              {mounted ? <WagmiReconnectAfterMount /> : null}
-              {children}
-              <SettingsModal />
+              <WalletProvider>
+                {mounted ? <WagmiReconnectAfterMount /> : null}
+                {children}
+                <SettingsModal />
+              </WalletProvider>
             </NotificationProvider>
           </ThemeProvider>
         </WalletExtensionErrorHandler>
