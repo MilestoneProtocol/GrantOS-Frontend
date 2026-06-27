@@ -122,6 +122,7 @@ function SuccessContent() {
   const [zkPublicInputs, setZkPublicInputs] = useState<string[] | null>(null);
   const fetchedRef = useRef(false);
   const autoProofRef = useRef(false);
+  const stellarVerifiedCheckRef = useRef(false);
   const walletReconnecting =
     walletStatus === 'connecting' || walletStatus === 'reconnecting';
   const walletResolved =
@@ -221,6 +222,19 @@ function SuccessContent() {
     address,
     router,
   ]);
+
+  // Stellar: if the user lands on this page and is already verified on-chain (no
+  // active session), redirect to the onboarding page immediately. Runs once per mount.
+  useEffect(() => {
+    if (chainKind !== 'stellar') return;
+    if (!walletAddress || !walletResolved) return;
+    if (resolvedRequestId || stellarConfirmed) return;
+    if (stellarVerifiedCheckRef.current) return;
+    stellarVerifiedCheckRef.current = true;
+    isVerifiedOnStellar(walletAddress).then(verified => {
+      if (verified) router.replace('/?select=1&toast=already_verified');
+    }).catch(() => {});
+  }, [chainKind, walletAddress, walletResolved, resolvedRequestId, stellarConfirmed, router]);
 
   // Eagerly warm up the ZK prover WASM so it's ready when the user clicks "Generate Proof"
   useEffect(() => {
@@ -621,13 +635,15 @@ function SuccessContent() {
   ]);
 
   useEffect(() => {
-    if (isFullyVerified && resolvedRequestId) {
-      const timer = setTimeout(() => {
-        router.replace('/?select=1&toast=identity_verified');
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isFullyVerified, resolvedRequestId, router]);
+    // Redirect to onboarding after verification. For Stellar, stellarConfirmed is
+    // the source of truth — don't require resolvedRequestId (session may be cleared).
+    const shouldRedirect = isFullyVerified && (resolvedRequestId || stellarConfirmed);
+    if (!shouldRedirect) return;
+    const timer = setTimeout(() => {
+      router.replace('/?select=1&toast=identity_verified');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [isFullyVerified, resolvedRequestId, stellarConfirmed, router]);
 
   const hasVerifyProgress = Boolean(
     resolvedRequestId && (attestation || zkProof || loading || generatingZk),
