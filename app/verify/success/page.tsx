@@ -387,8 +387,26 @@ function SuccessContent() {
         fetch('/stellar/proof.bin'),
         fetch('/stellar/public_inputs.bin'),
       ]);
+      if (!proofRes.ok) {
+        throw new Error(
+          `Could not load proof fixture (HTTP ${proofRes.status}). ` +
+          `Make sure /public/stellar/proof.bin is present and the dev server is running.`
+        );
+      }
+      if (!piRes.ok) {
+        throw new Error(
+          `Could not load public_inputs fixture (HTTP ${piRes.status}). ` +
+          `Make sure /public/stellar/public_inputs.bin is present and the dev server is running.`
+        );
+      }
       const proof = new Uint8Array(await proofRes.arrayBuffer());
       const publicInputs = new Uint8Array(await piRes.arrayBuffer());
+      if (publicInputs.length !== 160) {
+        throw new Error(
+          `public_inputs.bin is ${publicInputs.length} bytes but must be exactly 160 (5 × 32). ` +
+          `Regenerate with: bb prove --scheme ultra_honk --oracle_hash keccak`
+        );
+      }
 
       if (await isVerifiedOnStellar(caller)) {
         setTxError(new Error('This Stellar wallet is already verified on-chain.'));
