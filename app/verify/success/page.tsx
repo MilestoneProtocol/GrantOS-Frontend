@@ -39,7 +39,8 @@ const GithubIcon = ({ className }: { className?: string }) => (
 type AttestationData = {
   requestId:          string;
   status:             string;
-  oracleSignature?:   string | null;
+  oracleSignature?:        string | null;
+  oracleSchnorrSignature?: string | null;
   messageHash?:       string | null;
   githubLogin?:       string | null;
   githubId?:          number | null;
@@ -303,35 +304,47 @@ function SuccessContent() {
   // (proof, publicInputs) pair the contract expects.
   async function handleGenerateZk() {
     if (chainKind === 'stellar') {
-      // Stellar verifies the real Noir proof on-chain in handleSubmitOnStellar.
-      // Here we load the fixture so the UI can display the actual public outputs.
       if (attestation?.status !== 'attested' && attestation?.status !== 'verified') {
         setError('GitHub attestation not ready. Please wait a moment and try again.');
+        return;
+      }
+      if (!attestation.oracleSchnorrSignature) {
+        setError('Schnorr oracle signature not available. Please try again.');
         return;
       }
       setGeneratingZk(true);
       setError(null);
       try {
-        const [proofRes, piRes] = await Promise.all([
-          fetch('/stellar/proof.bin'),
-          fetch('/stellar/public_inputs.bin'),
-        ]);
-        if (!proofRes.ok) throw new Error(`Could not load proof fixture (HTTP ${proofRes.status}). Make sure /public/stellar/proof.bin is present and the dev server is running.`);
-        if (!piRes.ok)    throw new Error(`Could not load public_inputs fixture (HTTP ${piRes.status}). Make sure /public/stellar/public_inputs.bin is present and the dev server is running.`);
-        const proofBytes = new Uint8Array(await proofRes.arrayBuffer());
-        const piBytes    = new Uint8Array(await piRes.arrayBuffer());
-        if (piBytes.length !== 160) throw new Error(`public_inputs.bin is ${piBytes.length} bytes but must be exactly 160 (5 × 32).`);
-        // Decode five big-endian 32-byte field elements into decimal strings for display.
-        const publicInputs = Array.from({ length: 5 }, (_, i) => {
-          let val = BigInt(0);
-          for (let b = 0; b < 32; b++) val = (val << BigInt(8)) | BigInt(piBytes[i * 32 + b]);
-          return val.toString();
-        });
-        setZkProof(proofBytes);
-        setZkPublicInputs(publicInputs);
-        if (resolvedRequestId) persistZkProof(resolvedRequestId, proofBytes, publicInputs);
+        const { generateProof } = await import('@/lib/zk/prover');
+        const sigHex = attestation.oracleSchnorrSignature.replace(/^0x/i, '');
+        if (sigHex.length !== 128) throw new Error(`Schnorr signature must be 64 bytes, got ${sigHex.length / 2}`);
+        const signature = Array.from({ length: 64 }, (_, i) =>
+          parseInt(sigHex.slice(i * 2, i * 2 + 2), 16));
+        // Convert any hex-prefixed field to a decimal string (assertFieldScalar requires decimal).
+        const toDecStr = (v: string | number | null | undefined) =>
+          v == null ? '0' : BigInt(v).toString();
+
+        const result = await generateProof({
+          signature,
+          github_id:           toDecStr(attestation.githubId),
+          github_created_year: toDecStr(attestation.githubCreatedYear),
+          commits: attestation.commitCount           ?? 0,
+          stars:   attestation.totalStars            ?? 0,
+          events:  attestation.contributionEvents90d ?? 0,
+          wallet_address_hi: toDecStr(attestation.walletAddressHi),
+          wallet_address_lo: toDecStr(attestation.walletAddressLo),
+        }, { oracleHash: 'keccak' });
+
+        if (!result.success) {
+          throw result.error instanceof Error ? result.error : new Error(String(result.error));
+        }
+        // Convert 32-byte hex field elements to decimal strings for display
+        const decimalInputs = result.publicInputs.map(v => BigInt(v).toString());
+        setZkProof(result.proof);
+        setZkPublicInputs(decimalInputs);
+        if (resolvedRequestId) persistZkProof(resolvedRequestId, result.proof, decimalInputs);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load Stellar proof fixture');
+        setError(e instanceof Error ? e.message : 'Failed to generate Stellar ZK proof');
       } finally {
         setGeneratingZk(false);
       }
