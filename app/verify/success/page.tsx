@@ -431,10 +431,23 @@ function SuccessContent() {
       }));
 
       if (await isVerifiedOnStellar(caller)) {
-        setTxError(new Error('This Stellar wallet is already verified on-chain.'));
+        // Already registered — treat as success so the UI shows the verified state.
+        setStellarConfirmed(true);
         return;
       }
-      const hash = await submitIdentityProof({ caller, proof, publicInputs, githubHandle: githubLogin });
+      let hash: string;
+      try {
+        hash = await submitIdentityProof({ caller, proof, publicInputs, githubHandle: githubLogin });
+      } catch (submitErr) {
+        // Contract error #5 = AlreadyVerified — the wallet was registered in a prior
+        // tx. Treat it as success rather than surfacing an error to the user.
+        const msg = submitErr instanceof Error ? submitErr.message : String(submitErr);
+        if (msg.includes('#5') || msg.toLowerCase().includes('alreadyverified')) {
+          setStellarConfirmed(true);
+          return;
+        }
+        throw submitErr;
+      }
       setTxHash(hash as `0x${string}`);
       setStellarConfirmed(true);
       if (resolvedRequestId) {

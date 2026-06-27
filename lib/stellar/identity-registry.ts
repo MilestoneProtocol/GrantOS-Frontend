@@ -99,23 +99,25 @@ export async function submitIdentityProof(params: {
 
 /** Read-only: is this Stellar wallet verified? Mirrors EVM `isVerified`. */
 export async function isVerifiedOnStellar(wallet: string): Promise<boolean> {
-  return Boolean(await simulateRead('is_verified', [Address.fromString(wallet).toScVal()]));
+  // Pass the wallet as the simulation source — it's a funded G… account,
+  // unlike the C… contract address which getAccount() can't fetch.
+  return Boolean(await simulateRead('is_verified', [Address.fromString(wallet).toScVal()], wallet));
 }
 
 /** Read-only: full identity record, or null. Mirrors EVM `getIdentity`. */
 export async function getIdentityOnStellar(wallet: string): Promise<StellarIdentity | null> {
-  const native = await simulateRead('get_identity', [Address.fromString(wallet).toScVal()]);
+  const native = await simulateRead('get_identity', [Address.fromString(wallet).toScVal()], wallet);
   return (native as StellarIdentity | null) ?? null;
 }
 
-/** Simulate a read-only contract call and decode the result to a native value. */
-async function simulateRead(method: string, args: xdr.ScVal[]): Promise<unknown> {
+/** Simulate a read-only contract call and decode the result to a native value.
+ *  @param source  A funded G… account to use as the transaction source.
+ *                 Defaults to the registry contract (may fail — prefer passing a G… address). */
+async function simulateRead(method: string, args: xdr.ScVal[], source?: string): Promise<unknown> {
   assertStellarConfigured();
   const server = getSorobanServer();
   const contract = new Contract(STELLAR_REGISTRY_ID);
-  // A funded account isn't required for simulation; use the contract's own
-  // address as a read-only source sequence.
-  const sourceAccount = await server.getAccount(STELLAR_REGISTRY_ID).catch(() => null);
+  const sourceAccount = await server.getAccount(source ?? STELLAR_REGISTRY_ID).catch(() => null);
   if (!sourceAccount) return null;
 
   const tx = new TransactionBuilder(sourceAccount, {
