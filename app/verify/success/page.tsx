@@ -303,15 +303,38 @@ function SuccessContent() {
   // (proof, publicInputs) pair the contract expects.
   async function handleGenerateZk() {
     if (chainKind === 'stellar') {
-      // Stellar has no EVM oracle signature to decode — the real Noir proof is
-      // verified on-chain by the Soroban registry in handleSubmitOnStellar.
-      // These placeholders just satisfy the "proof ready" UI gate below.
+      // Stellar verifies the real Noir proof on-chain in handleSubmitOnStellar.
+      // Here we load the fixture so the UI can display the actual public outputs.
       if (attestation?.status !== 'attested' && attestation?.status !== 'verified') {
         setError('GitHub attestation not ready. Please wait a moment and try again.');
         return;
       }
-      setZkProof(new Uint8Array([1]));
-      setZkPublicInputs(['0', '0', '0', '0', '0']);
+      setGeneratingZk(true);
+      setError(null);
+      try {
+        const [proofRes, piRes] = await Promise.all([
+          fetch('/stellar/proof.bin'),
+          fetch('/stellar/public_inputs.bin'),
+        ]);
+        if (!proofRes.ok) throw new Error(`Could not load proof fixture (HTTP ${proofRes.status}). Make sure /public/stellar/proof.bin is present and the dev server is running.`);
+        if (!piRes.ok)    throw new Error(`Could not load public_inputs fixture (HTTP ${piRes.status}). Make sure /public/stellar/public_inputs.bin is present and the dev server is running.`);
+        const proofBytes = new Uint8Array(await proofRes.arrayBuffer());
+        const piBytes    = new Uint8Array(await piRes.arrayBuffer());
+        if (piBytes.length !== 160) throw new Error(`public_inputs.bin is ${piBytes.length} bytes but must be exactly 160 (5 × 32).`);
+        // Decode five big-endian 32-byte field elements into decimal strings for display.
+        const publicInputs = Array.from({ length: 5 }, (_, i) => {
+          let val = BigInt(0);
+          for (let b = 0; b < 32; b++) val = (val << BigInt(8)) | BigInt(piBytes[i * 32 + b]);
+          return val.toString();
+        });
+        setZkProof(proofBytes);
+        setZkPublicInputs(publicInputs);
+        if (resolvedRequestId) persistZkProof(resolvedRequestId, proofBytes, publicInputs);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load Stellar proof fixture');
+      } finally {
+        setGeneratingZk(false);
+      }
       return;
     }
     if (!attestation?.oracleSignature) {
@@ -383,30 +406,16 @@ function SuccessContent() {
         }
       }
 
-      const [proofRes, piRes] = await Promise.all([
-        fetch('/stellar/proof.bin'),
-        fetch('/stellar/public_inputs.bin'),
-      ]);
-      if (!proofRes.ok) {
-        throw new Error(
-          `Could not load proof fixture (HTTP ${proofRes.status}). ` +
-          `Make sure /public/stellar/proof.bin is present and the dev server is running.`
-        );
+      // zkProof and zkPublicInputs were already loaded from the fixture in
+      // handleGenerateZk — reuse them rather than fetching again.
+      if (!zkProof || !zkPublicInputs) {
+        throw new Error('Proof not ready. Click "Generate ZK proof" first.');
       }
-      if (!piRes.ok) {
-        throw new Error(
-          `Could not load public_inputs fixture (HTTP ${piRes.status}). ` +
-          `Make sure /public/stellar/public_inputs.bin is present and the dev server is running.`
-        );
-      }
-      const proof = new Uint8Array(await proofRes.arrayBuffer());
-      const publicInputs = new Uint8Array(await piRes.arrayBuffer());
-      if (publicInputs.length !== 160) {
-        throw new Error(
-          `public_inputs.bin is ${publicInputs.length} bytes but must be exactly 160 (5 × 32). ` +
-          `Regenerate with: bb prove --scheme ultra_honk --oracle_hash keccak`
-        );
-      }
+      const proof = zkProof;
+      const publicInputs = new Uint8Array(zkPublicInputs.flatMap(v => {
+        const hex = BigInt(v).toString(16).padStart(64, '0');
+        return Array.from({ length: 32 }, (_, i) => parseInt(hex.slice(i * 2, i * 2 + 2), 16));
+      }));
 
       if (await isVerifiedOnStellar(caller)) {
         setTxError(new Error('This Stellar wallet is already verified on-chain.'));
